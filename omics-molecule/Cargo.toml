@@ -1,0 +1,16 @@
+[package]
+name = "omics-molecule"
+version = "0.1.0"
+description = "Foundational representations of biological molecules in the Rust omics ecosystem"
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+omics-core = { path = "../omics-core", version = "0.1.0" }
+
+[lints]
+workspace = true

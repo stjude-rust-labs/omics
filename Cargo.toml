@@ -1,0 +1,35 @@
+[workspace]
+members = [
+    "omics",
+    "omics-coordinate",
+    "omics-core",
+    "omics-molecule",
+    "omics-variation",
+]
+resolver = "2"
+
+[workspace.package]
+license = "MIT OR Apache-2.0"
+edition = "2021"
+authors = ["The Omics project developers"]
+description = "Foundations for the Rust omics ecosystem"
+homepage = "https://github.com/stjude-rust-labs/omics"
+repository = "https://github.com/stjude-rust-labs/omics"
+rust-version = "1.80.0"
+
+[workspace.dependencies]
+anyhow = "1.0.89"
+regex = "1.9.6"
+
+[workspace.lints.rust]
+missing_docs = "warn"
+nonstandard-style = "warn"
+rust-2018-idioms = "warn"
+rust-2021-compatibility = "warn"
+rust-2024-compatibility = "warn"
+
+[workspace.lints.rustdoc]
+broken_intra_doc_links = "warn"
+
+[workspace.lints.clippy]
+missing_docs_in_private_items = "warn"
