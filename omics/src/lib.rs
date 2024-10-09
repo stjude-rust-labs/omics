@@ -1,4 +1,6 @@
-//! Foundations for genomics.
+//! Foundational representations for Rust omics ecosystem.
+//!
+//! See each individual module's documentation for more information.
 
 #[cfg(feature = "coordinate")]
 #[doc(inline)]
