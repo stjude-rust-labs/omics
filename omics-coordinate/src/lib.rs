@@ -90,7 +90,8 @@
 //! * A **genome** is the complete set of genetic code stored within a cell ([learn
 //!   more](https://www.genome.gov/genetics-glossary/Genome)).
 //! * **Deoxyribose nucleic acid**, or **DNA**, is a molecule that warehouses
-//!   the aforementioned genetic code in the nucleus of a cell.
+//!   the aforementioned genetic code. In eukaryotic cells, DNA resides in the
+//!   nucleus of a cell.
 //!     * DNA is stored as a sequence of **nucleotides** (i.e., `A`, `C`, `G`,
 //!       and `T`).
 //!     * DNA is double-stranded, meaning there are two, complementary sequences
@@ -357,10 +358,10 @@
 //!
 //! ## Strand
 //!
-//! DNA is a double-stranded molecule that stores genetic code within the
-//! nucleus of a cell. This means that two sequences of complementary
-//! nucleotides run in antiparallel. This is often referred to as being read
-//! from [5' to 3'](https://en.wikipedia.org/wiki/Directionality_%28molecular_biology%29), referring
+//! DNA is a double-stranded molecule that stores genetic code. This means that
+//! two sequences of complementary nucleotides run in antiparallel. This is
+//! often referred to as being read from [5' to
+//! 3'](https://en.wikipedia.org/wiki/Directionality_%28molecular_biology%29), referring
 //! to connections within the underlying chemical structure. For example, below
 //! is a fictional double-stranded molecule with the name `seq0`.
 //!
