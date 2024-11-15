@@ -1,118 +1,61 @@
-//! Named, contiguous molecules within a genome.
+//! Contiguous molecules.
 
-use std::ops::Deref;
-use std::str::FromStr;
+use std::convert::Infallible;
 
-/// An error related to the parsing of a [`Contig`].
-#[derive(Debug, Eq, PartialEq)]
-pub enum ParseError {
-    /// A [`Contig`] was attempted to be parsed from an invalid value.
-    InvalidValue(String),
-}
-
-impl std::fmt::Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ParseError::InvalidValue(value) => {
-                write!(f, "invalid value for contig: {value}")
-            }
-        }
-    }
-}
-
-impl std::error::Error for ParseError {}
-
-/// An error related to a [`Contig`].
-#[derive(Debug, Eq, PartialEq)]
-pub enum Error {
-    /// Attempted to create an empty [`Contig`].
-    Empty,
-
-    /// A parse error.
-    ParseError(ParseError),
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::Empty => write!(f, "empty"),
-            Error::ParseError(err) => write!(f, "parse error: {err}"),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
+////////////////////////////////////////////////////////////////////////////////////////
+// Contig
+////////////////////////////////////////////////////////////////////////////////////////
 
 /// A named, contiguous molecule within a genome.
 ///
-/// At present, a [`Contig`] is simply a wrapper around [`String`]. Notably, the
-/// internal representation of [`Contig`] may change in the future (though the
-/// interface will remain stable with respect to [semantic versioning](https://semver.org/)).
+/// At present, a contig is simply a wrapper around a string. Empty contig names
+/// are allowed though not recommended.
+///
+/// Notably, the internal representation of [`Contig`] may change in the future
+/// (though the interface to this type will remain stable with respect to
+/// [semantic versioning](https://semver.org/)).
 ///
 /// For a more in-depth discussion on this, please see [this section of the
 /// docs](crate#contigs).
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Contig(String);
 
 impl Contig {
-    /// Attempts to create a new [`Contig`].
-    ///
-    /// # Notes
-    ///
-    /// * This will fail with a [`Error::Empty`] if the provided [`String`] is
-    ///   empty (empty contig names are considered non-sensical by this crate).
+    /// Attempts to create a new contig.
     ///
     /// # Examples
     ///
     /// ```
     /// use omics_coordinate::Contig;
     ///
-    /// let contig = Contig::try_new("seq0")?;
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// let contig = Contig::new("chr1");
     /// ```
-    pub fn try_new<S: Into<String>>(value: S) -> Result<Self, Error> {
-        let value = value.into();
-
-        if value.is_empty() {
-            return Err(Error::Empty);
-        }
-
-        Ok(Self(value))
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
     }
 
-    /// Gets the inner [`String`] by reference.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use omics_coordinate::Contig;
-    ///
-    /// let contig = "seq0".parse::<Contig>()?;
-    /// assert_eq!(contig.inner(), "seq0");
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn inner(&self) -> &str {
-        self.0.as_str()
-    }
+    // NOTE: an `inner()` method is explicitly not included as the type
+    // dereferences `String`. This means that the `as_str()` method is usable
+    // for this purpose.
 
-    /// Consumes the [`Contig`] and returns the inner [`String`].
+    /// Consumes `self` and returns the inner value.
     ///
     /// # Examples
     ///
     /// ```
     /// use omics_coordinate::Contig;
     ///
-    /// let contig = "seq0".parse::<Contig>()?;
-    /// assert_eq!(contig.into_inner(), "seq0");
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// let contig = Contig::new("chr1");
+    /// assert_eq!(contig.into_inner(), String::from("chr1"));
     /// ```
     pub fn into_inner(self) -> String {
         self.0
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////
+// Trait implementations
+////////////////////////////////////////////////////////////////////////////////////////
 
 impl std::fmt::Display for Contig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -120,31 +63,21 @@ impl std::fmt::Display for Contig {
     }
 }
 
-impl FromStr for Contig {
-    type Err = Error;
+impl std::str::FromStr for Contig {
+    type Err = Infallible;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::try_new(s)
+    fn from_str(s: &str) -> Result<Self, Infallible> {
+        Ok(Self::new(s))
     }
 }
 
-impl TryFrom<&str> for Contig {
-    type Error = Error;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Self::try_new(value)
+impl From<&str> for Contig {
+    fn from(value: &str) -> Self {
+        Self::new(value)
     }
 }
 
-impl TryFrom<String> for Contig {
-    type Error = Error;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::try_new(value)
-    }
-}
-
-impl Deref for Contig {
+impl std::ops::Deref for Contig {
     type Target = String;
 
     fn deref(&self) -> &Self::Target {
@@ -157,8 +90,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_fails_to_create_a_contig_from_an_empty_string() {
-        let err = Contig::try_from(String::new()).unwrap_err();
-        assert!(matches!(err, Error::Empty));
+    fn parse() {
+        let contig = "chr1".parse::<Contig>().expect("contig to parse");
+        assert_eq!(contig.as_str(), "chr1");
     }
 }

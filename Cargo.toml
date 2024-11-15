@@ -19,7 +19,9 @@ rust-version = "1.80.0"
 
 [workspace.dependencies]
 anyhow = "1.0.89"
+criterion = "0.5.1"
 regex = "1.9.6"
+thiserror = "2.0.4"
 
 [workspace.lints.rust]
 missing_docs = "warn"

@@ -1,10 +1,13 @@
 //! Genomic coordinate systems.
 
-pub mod one;
-pub mod zero;
+pub mod base;
+pub mod interbase;
 
-pub use one::One;
-pub use zero::Zero;
+use std::fmt::Debug;
+use std::fmt::Display;
 
-/// The requirements to be a coordinate system.
-pub trait System: Clone + Default + std::fmt::Debug + std::fmt::Display {}
+pub use base::Base;
+pub use interbase::Interbase;
+
+/// A coordinate system.
+pub trait System: Clone + Default + Debug + Display + PartialOrd {}
