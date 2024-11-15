@@ -5,6 +5,8 @@ use crate::position::Error;
 use crate::position::ParseError;
 use crate::position::Result;
 use crate::position::Value;
+use crate::position::value::Kind;
+use crate::position::value::Number;
 use crate::system::One;
 
 mod addition;
@@ -22,12 +24,12 @@ impl position::r#trait::Position<One> for Position {
     /// use omics_coordinate::position::Value;
     /// use omics_coordinate::position::one::Position;
     ///
-    /// // Non-zero usize
+    /// // Non-zero number
     ///
     /// let value = Value::Usize(1);
     /// let position = Position::try_new(value)?;
     ///
-    /// // Zero usize
+    /// // Zero
     ///
     /// let value = Value::Usize(0);
     /// let err = Position::try_new(value).unwrap_err();
@@ -48,20 +50,23 @@ impl position::r#trait::Position<One> for Position {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     fn try_new(value: impl Into<Value>) -> Result<Self> {
-        let value = match value.into() {
-            Value::LowerBound => {
+        let value = value.into();
+
+        match value.kind() {
+            Kind::LowerBound => {
                 return Err(Error::Parse(ParseError::IncompatibleValue(
                     One.to_string(),
-                    Value::LowerBound.to_string(),
+                    value.to_string(),
                 )));
             }
-            Value::Usize(0) => {
-                return Err(Error::Parse(ParseError::IncompatibleValue(
-                    One.to_string(),
-                    Value::Usize(0).to_string(),
-                )));
+            Kind::Numerical => {
+                if let Some(0) = value.get() {
+                    return Err(Error::Parse(ParseError::IncompatibleValue(
+                        One.to_string(),
+                        value.to_string(),
+                    )));
+                }
             }
-            v => v,
         };
 
         Ok(Self {
@@ -71,23 +76,24 @@ impl position::r#trait::Position<One> for Position {
     }
 }
 
+impl TryFrom<Number> for Position {
+    type Error = Error;
+
+    fn try_from(value: Number) -> std::result::Result<Self, Self::Error> {
+        let value = Value::try_new(value).ok_or(Error::InvalidValue(value))?;
+        Self::try_new(value)
+    }
+}
+
 impl std::str::FromStr for Position {
     type Err = Error;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let value = s
             .parse::<Value>()
-            .map_err(|err| Error::Parse(ParseError::ValueError(err)))?;
+            .map_err(|err| Error::Parse(ParseError::Value(err)))?;
 
         Self::try_new(value)
-    }
-}
-
-impl TryFrom<usize> for Position {
-    type Error = Error;
-
-    fn try_from(value: usize) -> std::result::Result<Self, Self::Error> {
-        Self::try_new(Value::Usize(value))
     }
 }
 

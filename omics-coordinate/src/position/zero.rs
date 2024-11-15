@@ -1,20 +1,21 @@
-//! 0-based, half-open [`Position`](crate::Position)s.
+//! 0-based positions.
 
 use crate::position;
 use crate::position::Error;
 use crate::position::ParseError;
 use crate::position::Result;
 use crate::position::Value;
+use crate::position::value::Number;
 use crate::system::Zero;
 
 mod addition;
 mod subtraction;
 
-/// A 0-based, half-open [`Position`](crate::Position).
+/// A 0-based, interbase position.
 pub type Position = crate::Position<Zero>;
 
 impl position::r#trait::Position<Zero> for Position {
-    /// Creates a new [`Position`].
+    /// Creates a new 0-based, interbase position.
     ///
     /// Examples
     ///
@@ -22,14 +23,11 @@ impl position::r#trait::Position<Zero> for Position {
     /// use omics_coordinate::position::Value;
     /// use omics_coordinate::position::zero::Position;
     ///
-    /// // Usize
-    ///
-    /// let value = Value::Usize(0);
+    /// // SAFETY: this should always unwrap.
+    /// let value = Value::try_new(0).unwrap();
     /// let position = Position::try_new(value)?;
     ///
-    /// // Lower bound
-    ///
-    /// let value = Value::LowerBound;
+    /// let value = Value::lower_bound();
     /// let position = Position::try_new(value)?;
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -43,7 +41,7 @@ impl position::r#trait::Position<Zero> for Position {
 }
 
 impl Position {
-    /// Creates a [`Position`] with a [`Value::LowerBound`].
+    /// Creates a lower-bound [`Position`].
     ///
     /// # Examples
     ///
@@ -65,8 +63,17 @@ impl Position {
     pub fn lower_bound() -> Self {
         Self {
             system: Zero,
-            inner: Value::LowerBound,
+            inner: Value::lower_bound(),
         }
+    }
+}
+
+impl TryFrom<Number> for Position {
+    type Error = Error;
+
+    fn try_from(value: Number) -> std::result::Result<Self, Self::Error> {
+        let value = Value::try_new(value).ok_or(Error::InvalidValue(value))?;
+        Self::try_new(value)
     }
 }
 
@@ -76,17 +83,9 @@ impl std::str::FromStr for Position {
     fn from_str(s: &str) -> Result<Self> {
         let value = s
             .parse::<Value>()
-            .map_err(|err| Error::Parse(ParseError::ValueError(err)))?;
+            .map_err(|err| Error::Parse(ParseError::Value(err)))?;
 
         Self::try_new(value)
-    }
-}
-
-impl From<usize> for Position {
-    fn from(value: usize) -> Self {
-        // SAFETY: a zero-based position accepts any usize, so this will never
-        // fail and can be safely unwrapped.
-        Self::try_new(Value::Usize(value)).unwrap()
     }
 }
 
@@ -104,14 +103,14 @@ mod tests {
 
     #[test]
     fn test_zero_based_position_creation() {
-        let position = Position::from(10);
-        assert_eq!(position.inner(), &Value::Usize(10));
+        let position = Position::try_new(10).unwrap();
+        assert_eq!(position.inner(), &Value::try_new(10).unwrap());
     }
 
     #[test]
     fn test_negative_position_creation() {
         let position = Position::lower_bound();
-        assert_eq!(position.inner(), &Value::LowerBound);
+        assert_eq!(position.inner(), &Value::lower_bound());
     }
 
     #[test]
@@ -144,7 +143,7 @@ mod tests {
     #[test]
     fn test_usize_into_position() {
         let position: Position = 30usize.into();
-        assert_eq!(position.inner(), &Value::Usize(30));
+        assert_eq!(position.inner(), &Value::try_new(30).unwrap());
     }
 
     #[test]

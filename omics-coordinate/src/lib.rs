@@ -536,7 +536,8 @@ pub use interval::Interval;
 pub use position::Position;
 pub use strand::Strand;
 
-use crate::position::Value;
+use crate::position::value::Kind;
+use crate::position::value::Number;
 use crate::system::System;
 
 /// Safe addition.
@@ -729,11 +730,11 @@ impl<S: System> Coordinate<S> {
         let strand = strand
             .try_into()
             .map_err(|err| Error::ParseError(ParseError::InvalidStrand(err.to_string())))?;
-        let position = position
+        let position: Position<S> = position
             .try_into()
             .map_err(|err| Error::ParseError(ParseError::InvalidPosition(err.to_string())))?;
 
-        if position.inner() == &Value::LowerBound && strand != Strand::Negative {
+        if position.inner().kind() == Kind::LowerBound && strand != Strand::Negative {
             return Err(Error::LowerBoundOnNonNegativeStrand);
         }
 
@@ -851,7 +852,7 @@ impl<S: System> Coordinate<S> {
     /// let (contig, strand, position) = coordinate.into_parts();
     /// assert_eq!(contig.inner(), "seq0");
     /// assert_eq!(strand, Strand::Positive);
-    /// assert_eq!(position.inner(), &Value::Usize(1));
+    /// assert_eq!(position.inner(), &Value::try_new(1).unwrap());
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -869,7 +870,10 @@ impl<S: System> Coordinate<S> {
     /// use omics_coordinate::system::Zero;
     ///
     /// let coordinate = "seq0:+:1".parse::<Coordinate<Zero>>()?;
-    /// assert_eq!(coordinate.into_position().inner(), &Value::Usize(1));
+    /// assert_eq!(
+    ///     coordinate.into_position().inner(),
+    ///     &Value::try_new(1).unwrap()
+    /// );
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -883,7 +887,7 @@ impl<S: System> Coordinate<S> {
     /// A checked add (for positive strand) or subtract (for negative strand) is
     /// performed to ensure we don't overflow.
     ///
-    /// Note that, though the position is checked for usize overflow, we don't
+    /// Note that, though the position is checked for Number overflow, we don't
     /// do any bounds checking to make sure that the coordinates fall within any
     /// given interval.
     ///
@@ -899,7 +903,7 @@ impl<S: System> Coordinate<S> {
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn move_forward(self, magnitude: usize) -> Result<Option<Coordinate<S>>>
+    pub fn move_forward(self, magnitude: Number) -> Result<Option<Coordinate<S>>>
     where
         Position<S>: position::r#trait::Position<S>,
     {
@@ -933,7 +937,7 @@ impl<S: System> Coordinate<S> {
     /// A checked sub (for positive strand) or add (for negative strand) is
     /// performed to ensure we don't overflow.
     ///
-    /// Note that, though the position is checked for usize overflow, we don't
+    /// Note that, though the position is checked for Number overflow, we don't
     /// do any bounds checking to make sure that the coordinates fall within any
     /// given interval.
     ///
@@ -949,7 +953,7 @@ impl<S: System> Coordinate<S> {
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn move_backward(self, magnitude: usize) -> Result<Option<Coordinate<S>>>
+    pub fn move_backward(self, magnitude: Number) -> Result<Option<Coordinate<S>>>
     where
         Position<S>: position::r#trait::Position<S>,
     {
@@ -986,7 +990,7 @@ impl<S: System> Coordinate<S> {
     /// * First, the coordinate is moved forward by the specified magnitude.
     ///   During this move, the position is checked for overflows.
     /// * Next, the calculated result is checked to ensure it falls within the
-    ///   specified interval. This is to ensure that, although the `usize`
+    ///   specified interval. This is to ensure that, although the `Number`
     ///   limits may not broken, the interval continues to contain the moved
     ///   coordinate.
     ///
@@ -1010,7 +1014,7 @@ impl<S: System> Coordinate<S> {
     ///     .unwrap();
     ///
     /// assert_eq!(result.contig().inner(), "seq0");
-    /// assert_eq!(result.position().inner(), &Value::Usize(10));
+    /// assert_eq!(result.position().inner(), &Value::try_new(10).unwrap());
     /// assert_eq!(result.strand(), &Strand::Positive);
     ///
     /// // Negative-stranded position that falls within the provided interval.
@@ -1023,7 +1027,7 @@ impl<S: System> Coordinate<S> {
     ///     .unwrap();
     ///
     /// assert_eq!(result.contig().inner(), "seq0");
-    /// assert_eq!(result.position().inner(), &Value::Usize(990));
+    /// assert_eq!(result.position().inner(), &Value::try_new(990).unwrap());
     /// assert_eq!(result.strand(), &Strand::Negative);
     ///
     /// // Positive-stranded position that _does not_ fall within the provided interval.
@@ -1054,7 +1058,7 @@ impl<S: System> Coordinate<S> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     pub fn move_forward_checked_bounds(
         self,
-        magnitude: usize,
+        magnitude: Number,
         interval: &Interval<S>,
     ) -> Result<Option<Coordinate<S>>>
     where
@@ -1079,7 +1083,7 @@ impl<S: System> Coordinate<S> {
     /// * First, the coordinate is moved backward by the specified magnitude.
     ///   During this move, the position is checked for overflows.
     /// * Next, the calculated result is checked to ensure it falls within the
-    ///   specified interval. This is to ensure that, although the `usize`
+    ///   specified interval. This is to ensure that, although the `Number`
     ///   limits may not broken, the interval continues to contain the moved
     ///   coordinate.
     ///
@@ -1103,7 +1107,7 @@ impl<S: System> Coordinate<S> {
     ///     .unwrap();
     ///
     /// assert_eq!(result.contig().inner(), "seq0");
-    /// assert_eq!(result.position().inner(), &Value::Usize(0));
+    /// assert_eq!(result.position().inner(), &Value::try_new(0).unwrap());
     /// assert_eq!(result.strand(), &Strand::Positive);
     ///
     /// // Negative-stranded position that falls within the provided interval.
@@ -1116,7 +1120,7 @@ impl<S: System> Coordinate<S> {
     ///     .unwrap();
     ///
     /// assert_eq!(result.contig().inner(), "seq0");
-    /// assert_eq!(result.position().inner(), &Value::Usize(1000));
+    /// assert_eq!(result.position().inner(), &Value::try_new(1000).unwrap());
     /// assert_eq!(result.strand(), &Strand::Negative);
     ///
     /// // Positive-stranded position that _does not_ fall within the provided interval.
@@ -1146,13 +1150,13 @@ impl<S: System> Coordinate<S> {
     ///     .unwrap();
     ///
     /// assert_eq!(result.contig().inner(), "seq0");
-    /// assert_eq!(result.position().inner(), &Value::Usize(0));
+    /// assert_eq!(result.position().inner(), &Value::try_new(0).unwrap());
     /// assert_eq!(result.strand(), &Strand::Negative);
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     pub fn move_backward_checked_bounds(
         self,
-        magnitude: usize,
+        magnitude: Number,
         interval: &Interval<S>,
     ) -> Result<Option<Coordinate<S>>>
     where
@@ -1186,7 +1190,7 @@ impl<S: System> Coordinate<S> {
     ///
     /// assert_eq!(swapped.contig().inner(), "seq0");
     /// assert_eq!(swapped.strand(), &Strand::Negative);
-    /// assert_eq!(swapped.position().inner(), &Value::Usize(1000));
+    /// assert_eq!(swapped.position().inner(), &Value::try_new(1000).unwrap());
     ///
     /// // Swapping a negative-stranded position to a positive-stranded position.
     ///
@@ -1195,7 +1199,7 @@ impl<S: System> Coordinate<S> {
     ///
     /// assert_eq!(swapped.contig().inner(), "seq0");
     /// assert_eq!(swapped.strand(), &Strand::Positive);
-    /// assert_eq!(swapped.position().inner(), &Value::Usize(1000));
+    /// assert_eq!(swapped.position().inner(), &Value::try_new(1000).unwrap());
     ///
     /// // Failing to swap the lower bound.
     ///
@@ -1288,25 +1292,28 @@ mod tests {
         let coordinate = "seq0:+:1".parse::<Coordinate<Zero>>()?;
         assert_eq!(coordinate.contig().inner(), "seq0");
         assert_eq!(coordinate.strand(), &Strand::Positive);
-        assert_eq!(coordinate.position().inner(), &Value::Usize(1));
+        assert_eq!(coordinate.position().inner(), &Value::try_new(1).unwrap());
         assert_eq!(coordinate.position().inner().get(), Some(1));
 
         let coordinate = "Y:-:[".parse::<Coordinate<Zero>>()?;
         assert_eq!(coordinate.contig().inner(), "Y");
         assert_eq!(coordinate.strand(), &Strand::Negative);
-        assert_eq!(coordinate.position().inner(), &Value::LowerBound);
+        assert_eq!(coordinate.position().inner(), &Value::lower_bound());
         assert_eq!(coordinate.position().inner().get(), None);
 
         let coordinate = "seq0:+:1".parse::<Coordinate<One>>()?;
         assert_eq!(coordinate.contig().inner(), "seq0");
         assert_eq!(coordinate.strand(), &Strand::Positive);
-        assert_eq!(coordinate.position().inner(), &Value::Usize(1));
+        assert_eq!(coordinate.position().inner(), &Value::try_new(1).unwrap());
         assert_eq!(coordinate.position().get(), Some(1));
 
         let coordinate = "Y:-:1000".parse::<Coordinate<One>>()?;
         assert_eq!(coordinate.contig().inner(), "Y");
         assert_eq!(coordinate.strand(), &Strand::Negative);
-        assert_eq!(coordinate.position().inner(), &Value::Usize(1000));
+        assert_eq!(
+            coordinate.position().inner(),
+            &Value::try_new(1000).unwrap()
+        );
         assert_eq!(coordinate.position().get(), Some(1000));
 
         Ok(())
@@ -1333,20 +1340,20 @@ mod tests {
         let coordinate = Coordinate::<Zero>::try_new("seq0", Strand::Positive, 0)?;
         assert_eq!(coordinate.contig().inner(), "seq0");
         assert_eq!(coordinate.strand(), &Strand::Positive);
-        assert_eq!(coordinate.position().inner(), &Value::Usize(0));
+        assert_eq!(coordinate.position().inner(), &Value::try_new(0).unwrap());
 
         // Negative-stranded
         let coordinate = Coordinate::<Zero>::try_new("seq0", Strand::Negative, 0)?;
         assert_eq!(coordinate.contig().inner(), "seq0");
         assert_eq!(coordinate.strand(), &Strand::Negative);
-        assert_eq!(coordinate.position().inner(), &Value::Usize(0));
+        assert_eq!(coordinate.position().inner(), &Value::try_new(0).unwrap());
 
         // Lower bound
         let coordinate =
             Coordinate::<Zero>::try_new("seq0", Strand::Negative, Position::<Zero>::lower_bound())?;
         assert_eq!(coordinate.contig().inner(), "seq0");
         assert_eq!(coordinate.strand(), &Strand::Negative);
-        assert_eq!(coordinate.position().inner(), &Value::LowerBound);
+        assert_eq!(coordinate.position().inner(), &Value::lower_bound());
 
         // Attempting to create lower bound on positive strand
         let err =
@@ -1364,7 +1371,7 @@ mod tests {
         let result = coordinate.move_forward(10)?.unwrap();
 
         assert_eq!(result.contig().inner(), "seq0");
-        assert_eq!(result.position().inner(), &Value::Usize(10));
+        assert_eq!(result.position().inner(), &Value::try_new(10).unwrap());
         assert_eq!(result.strand(), &Strand::Positive);
 
         // Negative-stranded
@@ -1372,7 +1379,7 @@ mod tests {
         let result = coordinate.move_forward(10)?.unwrap();
 
         assert_eq!(result.contig().inner(), "seq0");
-        assert_eq!(result.position().inner(), &Value::Usize(990));
+        assert_eq!(result.position().inner(), &Value::try_new(990).unwrap());
         assert_eq!(result.strand(), &Strand::Negative);
 
         // Positive-stranded, but with magnitude zero
@@ -1380,7 +1387,7 @@ mod tests {
         let result = coordinate.move_forward(0)?.unwrap();
 
         assert_eq!(result.contig().inner(), "seq0");
-        assert_eq!(result.position().inner(), &Value::Usize(0));
+        assert_eq!(result.position().inner(), &Value::try_new(0).unwrap());
         assert_eq!(result.strand(), &Strand::Positive);
 
         // Negative-stranded, but with magnitude zero
@@ -1388,7 +1395,7 @@ mod tests {
         let result = coordinate.move_forward(0)?.unwrap();
 
         assert_eq!(result.contig().inner(), "seq0");
-        assert_eq!(result.position().inner(), &Value::Usize(0));
+        assert_eq!(result.position().inner(), &Value::try_new(0).unwrap());
         assert_eq!(result.strand(), &Strand::Negative);
 
         // Negative-stranded to lower bound
@@ -1419,7 +1426,7 @@ mod tests {
         let result = coordinate.move_forward(10)?.unwrap();
 
         assert_eq!(result.contig().inner(), "seq0");
-        assert_eq!(result.position().inner(), &Value::Usize(11));
+        assert_eq!(result.position().inner(), &Value::try_new(11).unwrap());
         assert_eq!(result.strand(), &Strand::Positive);
 
         // Negative-stranded
@@ -1427,7 +1434,7 @@ mod tests {
         let result = coordinate.move_forward(10)?.unwrap();
 
         assert_eq!(result.contig().inner(), "seq0");
-        assert_eq!(result.position().inner(), &Value::Usize(1));
+        assert_eq!(result.position().inner(), &Value::try_new(1).unwrap());
         assert_eq!(result.strand(), &Strand::Negative);
 
         // Positive-stranded, but with magnitude zero
@@ -1435,7 +1442,7 @@ mod tests {
         let result = coordinate.move_forward(0)?.unwrap();
 
         assert_eq!(result.contig().inner(), "seq0");
-        assert_eq!(result.position().inner(), &Value::Usize(1));
+        assert_eq!(result.position().inner(), &Value::try_new(1).unwrap());
         assert_eq!(result.strand(), &Strand::Positive);
 
         // Negative-stranded, but with magnitude zero
@@ -1443,7 +1450,7 @@ mod tests {
         let result = coordinate.move_forward(0)?.unwrap();
 
         assert_eq!(result.contig().inner(), "seq0");
-        assert_eq!(result.position().inner(), &Value::Usize(1));
+        assert_eq!(result.position().inner(), &Value::try_new(1).unwrap());
         assert_eq!(result.strand(), &Strand::Negative);
 
         // Negative-stranded overflow (to where the lower bound would be).
@@ -1469,7 +1476,7 @@ mod tests {
         let result = coordinate.move_backward(10)?.unwrap();
 
         assert_eq!(result.contig().inner(), &String::from("seq0"));
-        assert_eq!(result.position().inner(), &Value::Usize(490));
+        assert_eq!(result.position().inner(), &Value::try_new(490).unwrap());
         assert_eq!(result.strand(), &Strand::Positive);
 
         // Negative-stranded
@@ -1477,7 +1484,7 @@ mod tests {
         let result = coordinate.move_backward(10)?.unwrap();
 
         assert_eq!(result.contig().inner(), &String::from("seq0"));
-        assert_eq!(result.position().inner(), &Value::Usize(510));
+        assert_eq!(result.position().inner(), &Value::try_new(510).unwrap());
         assert_eq!(result.strand(), &Strand::Negative);
 
         // Positive-stranded, but with magnitude zero
@@ -1485,7 +1492,7 @@ mod tests {
         let result = coordinate.move_backward(0)?.unwrap();
 
         assert_eq!(result.contig().inner(), &String::from("seq0"));
-        assert_eq!(result.position().inner(), &Value::Usize(0));
+        assert_eq!(result.position().inner(), &Value::try_new(0).unwrap());
         assert_eq!(result.strand(), &Strand::Positive);
 
         // Negative-stranded, but with magnitude zero
@@ -1493,7 +1500,7 @@ mod tests {
         let result = coordinate.move_backward(0)?.unwrap();
 
         assert_eq!(result.contig().inner(), &String::from("seq0"));
-        assert_eq!(result.position().inner(), &Value::Usize(0));
+        assert_eq!(result.position().inner(), &Value::try_new(0).unwrap());
         assert_eq!(result.strand(), &Strand::Negative);
 
         // Would try to create a lower bound on the positive strand.
@@ -1513,7 +1520,7 @@ mod tests {
         let result = coordinate.move_backward(10)?.unwrap();
 
         assert_eq!(result.contig().inner(), &String::from("seq0"));
-        assert_eq!(result.position().inner(), &Value::Usize(9));
+        assert_eq!(result.position().inner(), &Value::try_new(9).unwrap());
         assert_eq!(result.strand(), &Strand::Negative);
 
         Ok(())
@@ -1526,7 +1533,7 @@ mod tests {
         let result = coordinate.move_backward(10)?.unwrap();
 
         assert_eq!(result.contig().inner(), &String::from("seq0"));
-        assert_eq!(result.position().inner(), &Value::Usize(490));
+        assert_eq!(result.position().inner(), &Value::try_new(490).unwrap());
         assert_eq!(result.strand(), &Strand::Positive);
 
         // Negative-stranded
@@ -1534,7 +1541,7 @@ mod tests {
         let result = coordinate.move_backward(10)?.unwrap();
 
         assert_eq!(result.contig().inner(), &String::from("seq0"));
-        assert_eq!(result.position().inner(), &Value::Usize(510));
+        assert_eq!(result.position().inner(), &Value::try_new(510).unwrap());
         assert_eq!(result.strand(), &Strand::Negative);
 
         // Positive-stranded, but with magnitude zero
@@ -1542,7 +1549,7 @@ mod tests {
         let result = coordinate.move_backward(0)?.unwrap();
 
         assert_eq!(result.contig().inner(), &String::from("seq0"));
-        assert_eq!(result.position().inner(), &Value::Usize(1));
+        assert_eq!(result.position().inner(), &Value::try_new(1).unwrap());
         assert_eq!(result.strand(), &Strand::Positive);
 
         // Negative-stranded, but with magnitude zero
@@ -1550,7 +1557,7 @@ mod tests {
         let result = coordinate.move_backward(0)?.unwrap();
 
         assert_eq!(result.contig().inner(), &String::from("seq0"));
-        assert_eq!(result.position().inner(), &Value::Usize(1));
+        assert_eq!(result.position().inner(), &Value::try_new(1).unwrap());
         assert_eq!(result.strand(), &Strand::Negative);
 
         // Would try to create a lower bound on the positive strand.

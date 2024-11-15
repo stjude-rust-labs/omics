@@ -25,6 +25,7 @@ use crate::Strand;
 use crate::interval;
 use crate::interval::Error;
 use crate::one::Coordinate;
+use crate::position::value::Number;
 use crate::system::One;
 
 /// A 1-based, fully-closed [`Interval`](crate::Interval).
@@ -155,7 +156,7 @@ impl interval::r#trait::Interval<One> for Interval {
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    fn len(&self) -> usize {
+    fn len(&self) -> Number {
         // SAFETY: For the first unwrap, because of the bounds checks we do when
         // creating an [`Interval`], the resulting [`Position`] should always
         // unwrap.
@@ -208,8 +209,8 @@ mod tests {
 
         assert_eq!(complemented.contig().inner(), "seq0");
         assert_eq!(complemented.strand(), &Strand::Negative);
-        assert_eq!(complemented.start().position().inner(), &Value::Usize(1));
-        assert_eq!(complemented.end().position().inner(), &Value::Usize(1));
+        assert_eq!(complemented.start().position().inner().get().unwrap(), 1);
+        assert_eq!(complemented.end().position().inner().get().unwrap(), 1);
 
         // A positive-stranded interval with some magnitude.
         let start = Coordinate::try_new("seq0", Strand::Positive, 1)?;
@@ -218,8 +219,8 @@ mod tests {
 
         assert_eq!(complemented.contig().inner(), "seq0");
         assert_eq!(complemented.strand(), &Strand::Negative);
-        assert_eq!(complemented.start().position().inner(), &Value::Usize(10));
-        assert_eq!(complemented.end().position().inner(), &Value::Usize(1));
+        assert_eq!(complemented.start().position().inner().get().unwrap(), 10);
+        assert_eq!(complemented.end().position().inner().get().unwrap(), 1);
 
         // A negative-stranded, zero-sized interval.
         let position = Coordinate::try_new("seq0", Strand::Negative, 1)?;
@@ -228,8 +229,8 @@ mod tests {
 
         assert_eq!(complemented.contig().inner(), "seq0");
         assert_eq!(complemented.strand(), &Strand::Positive);
-        assert_eq!(complemented.start().position().inner(), &Value::Usize(1));
-        assert_eq!(complemented.end().position().inner(), &Value::Usize(1));
+        assert_eq!(complemented.start().position().inner().get().unwrap(), 1);
+        assert_eq!(complemented.end().position().inner().get().unwrap(), 1);
 
         // A positive-stranded interval with some magnitude.
         let start = Coordinate::try_new("seq0", Strand::Negative, 10)?;
@@ -238,33 +239,33 @@ mod tests {
 
         assert_eq!(complemented.contig().inner(), "seq0");
         assert_eq!(complemented.strand(), &Strand::Positive);
-        assert_eq!(complemented.start().position().inner(), &Value::Usize(1));
-        assert_eq!(complemented.end().position().inner(), &Value::Usize(10));
+        assert_eq!(complemented.start().position().inner().get().unwrap(), 1);
+        assert_eq!(complemented.end().position().inner().get().unwrap(), 10);
 
         // The maximum positive-stranded interval.
         let start = Coordinate::try_new("seq0", Strand::Positive, 1)?;
-        let end = Coordinate::try_new("seq0", Strand::Positive, usize::MAX)?;
+        let end = Coordinate::try_new("seq0", Strand::Positive, Number::MAX - 1)?;
         let complemented = Interval::try_new(start, end)?.complement()?.unwrap();
 
         assert_eq!(complemented.contig().inner(), "seq0");
         assert_eq!(complemented.strand(), &Strand::Negative);
         assert_eq!(
-            complemented.start().position().inner(),
-            &Value::Usize(usize::MAX)
+            complemented.start().position().inner().get().unwrap(),
+            Number::MAX - 1
         );
-        assert_eq!(complemented.end().position().inner(), &Value::Usize(1));
+        assert_eq!(complemented.end().position().inner().get().unwrap(), 1);
 
         // The maximum negative-stranded interval.
-        let start = Coordinate::try_new("seq0", Strand::Negative, usize::MAX)?;
+        let start = Coordinate::try_new("seq0", Strand::Negative, Number::MAX - 1)?;
         let end = Coordinate::try_new("seq0", Strand::Negative, 1)?;
         let complemented = Interval::try_new(start, end)?.complement()?.unwrap();
 
         assert_eq!(complemented.contig().inner(), "seq0");
         assert_eq!(complemented.strand(), &Strand::Positive);
-        assert_eq!(complemented.start().position().inner(), &Value::Usize(1));
+        assert_eq!(complemented.start().position().inner().get().unwrap(), 1);
         assert_eq!(
-            complemented.end().position().inner(),
-            &Value::Usize(usize::MAX)
+            complemented.end().position().inner().get().unwrap(),
+            Number::MAX - 1
         );
 
         Ok(())

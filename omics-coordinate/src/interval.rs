@@ -9,6 +9,7 @@ use crate::Position;
 use crate::Strand;
 use crate::contig;
 use crate::position;
+use crate::position::value::Number;
 use crate::strand;
 use crate::system::System;
 
@@ -419,7 +420,7 @@ impl<S: System> Interval<S> {
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn distance(&self) -> usize
+    pub fn distance(&self) -> Number
     where
         Interval<S>: r#trait::Interval<S>,
     {
@@ -539,7 +540,7 @@ impl<S: System> Interval<S> {
     ///   [`None`] is returned.
     /// - If the provided coordinate _does_ fall within the interval, then the
     ///   distance from the starting position of the interval is returned
-    ///   wrapped in [`Some<usize>`].
+    ///   wrapped in [`Some<Number>`].
     ///
     /// Note that for [`Strand::Positive`] intervals, the magnitude should be
     /// interpreted as a _positive_ magnitude, whereas a [`Strand::Negative`]
@@ -604,7 +605,7 @@ impl<S: System> Interval<S> {
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn offset(self: &Interval<S>, coordinate: &Coordinate<S>) -> Option<usize>
+    pub fn offset(self: &Interval<S>, coordinate: &Coordinate<S>) -> Option<Number>
     where
         Interval<S>: r#trait::Interval<S>,
         Position<S>: position::r#trait::Position<S>,
@@ -671,7 +672,7 @@ impl<S: System> Interval<S> {
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn translate(&self, offset: usize) -> Result<Option<Coordinate<S>>, Error>
+    pub fn translate(&self, offset: Number) -> Result<Option<Coordinate<S>>, Error>
     where
         Interval<S>: r#trait::Interval<S>,
         Position<S>: position::r#trait::Position<S>,
@@ -887,7 +888,7 @@ pub mod r#trait {
         fn contains(&self, coordinate: &Coordinate<S>) -> bool;
 
         /// Gets the length of the [`Interval`].
-        fn len(&self) -> usize;
+        fn len(&self) -> Number;
 
         /// Complements the interval by swapping the strand and the start and
         /// end coordinates.

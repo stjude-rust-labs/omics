@@ -12,6 +12,7 @@ use std::env::args;
 use anyhow::Context;
 use anyhow::anyhow;
 use omics_coordinate::Coordinate;
+use omics_coordinate::position::value::Number;
 use omics_coordinate::system::One;
 
 fn main() -> anyhow::Result<()> {
@@ -23,7 +24,7 @@ fn main() -> anyhow::Result<()> {
     let magnitude = args()
         .nth(2)
         .expect("missing magnitude")
-        .parse::<usize>()
+        .parse::<Number>()
         .with_context(|| "parsing magnitude")?;
 
     let result = coordinate

@@ -23,7 +23,8 @@
 use crate::Strand;
 use crate::interval;
 use crate::interval::Error;
-use crate::position::Value;
+use crate::position::value::Kind;
+use crate::position::value::Number;
 use crate::system::Zero;
 use crate::zero::Coordinate;
 
@@ -164,7 +165,7 @@ impl crate::interval::r#trait::Interval<Zero> for Interval {
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    fn len(&self) -> usize {
+    fn len(&self) -> Number {
         // SAFETY: For the first unwrap, because of the bounds checks we do when
         // creating an [`Interval`], the resulting [`Position`] should always
         // unwrap.
@@ -184,7 +185,7 @@ impl crate::interval::r#trait::Interval<Zero> for Interval {
         // the bounding coordinates to the correct location.
         let (current_start, current_end) = self.into_coordinates();
 
-        let new_start = match current_end.position().inner() {
+        let new_start = match current_end.position().inner().kind() {
             // If the current end's position is the lower bound, then we know
             // the complemented position will be zero on the positive strand.
             //
@@ -196,14 +197,13 @@ impl crate::interval::r#trait::Interval<Zero> for Interval {
             // Notably, if you change the order of operations so that the
             // position moves before complementing the strand, other cases
             // break.
-
-            // SAFETY: this coordinate is hand crafted to always unwrap.
-            Value::LowerBound => {
+            Kind::LowerBound => {
+                // SAFETY: this coordinate is hand crafted to always unwrap.
                 Coordinate::try_new(current_end.contig().clone(), Strand::Positive, 0).unwrap()
             }
             // SAFETY: for the first unwrap, the only case that can fail
             // swapping strands is handled separately above.
-            Value::Usize(_) => {
+            Kind::Numerical => {
                 let coordinate = current_end
                     .swap_strand()
                     .map_err(Error::Coordinate)?
@@ -235,9 +235,10 @@ impl crate::interval::r#trait::Interval<Zero> for Interval {
 pub mod tests {
     use super::*;
     use crate::interval::r#trait::Interval as _;
+    use crate::position::Value;
 
     #[test]
-    fn complementing_a_positive_interval_with_two_usize_positions_works()
+    fn complementing_a_positive_interval_with_two_number_positions_works()
     -> Result<(), Box<dyn std::error::Error>> {
         let start = Coordinate::try_new("seq0", Strand::Positive, 1)?;
         let end = Coordinate::try_new("seq0", Strand::Positive, 6)?;
@@ -247,18 +248,30 @@ pub mod tests {
         let interval = Interval::try_new(start, end)?;
         assert_eq!(interval.start().contig().inner(), "seq0");
         assert_eq!(interval.start().strand(), &Strand::Positive);
-        assert_eq!(interval.start().position().inner(), &Value::Usize(1));
+        assert_eq!(
+            interval.start().position().inner(),
+            &Value::try_new(1).unwrap()
+        );
         assert_eq!(interval.end().contig().inner(), "seq0");
         assert_eq!(interval.end().strand(), &Strand::Positive);
-        assert_eq!(interval.end().position().inner(), &Value::Usize(6));
+        assert_eq!(
+            interval.end().position().inner(),
+            &Value::try_new(6).unwrap()
+        );
 
         let complement = interval.complement()?.unwrap();
         assert_eq!(complement.start().contig().inner(), "seq0");
         assert_eq!(complement.start().strand(), &Strand::Negative);
-        assert_eq!(complement.start().position().inner(), &Value::Usize(5));
+        assert_eq!(
+            complement.start().position().inner(),
+            &Value::try_new(5).unwrap()
+        );
         assert_eq!(complement.end().contig().inner(), "seq0");
         assert_eq!(complement.end().strand(), &Strand::Negative);
-        assert_eq!(complement.end().position().inner(), &Value::Usize(0));
+        assert_eq!(
+            complement.end().position().inner(),
+            &Value::try_new(0).unwrap()
+        );
 
         // Testing converting to lower bound.
         let start = Coordinate::try_new("seq0", Strand::Positive, 0)?;
@@ -269,49 +282,64 @@ pub mod tests {
         let interval = Interval::try_new(start, end)?;
         assert_eq!(interval.start().contig().inner(), "seq0");
         assert_eq!(interval.start().strand(), &Strand::Positive);
-        assert_eq!(interval.start().position().inner(), &Value::Usize(0));
+        assert_eq!(
+            interval.start().position().inner(),
+            &Value::try_new(0).unwrap()
+        );
         assert_eq!(interval.end().contig().inner(), "seq0");
         assert_eq!(interval.end().strand(), &Strand::Positive);
-        assert_eq!(interval.end().position().inner(), &Value::Usize(6));
-
-        let complement = interval.complement()?.unwrap();
-        assert_eq!(complement.start().contig().inner(), "seq0");
-        assert_eq!(complement.start().strand(), &Strand::Negative);
-        assert_eq!(complement.start().position().inner(), &Value::Usize(5));
-        assert_eq!(complement.end().contig().inner(), "seq0");
-        assert_eq!(complement.end().strand(), &Strand::Negative);
-        assert_eq!(complement.end().position().inner(), &Value::LowerBound);
-
-        // Testing the case where it's the maximum positive interval.
-        let start = Coordinate::try_new("seq0", Strand::Positive, 0)?;
-        let end = Coordinate::try_new("seq0", Strand::Positive, usize::MAX)?;
-
-        // This represents the interval [0, usize::MAX), which should be complemented to
-        // (LB, usize::MAX - 1] when it's all said and done.
-        let interval = Interval::try_new(start, end)?;
-        assert_eq!(interval.start().contig().inner(), "seq0");
-        assert_eq!(interval.start().strand(), &Strand::Positive);
-        assert_eq!(interval.start().position().inner(), &Value::Usize(0));
-        assert_eq!(interval.end().contig().inner(), "seq0");
-        assert_eq!(interval.end().strand(), &Strand::Positive);
-        assert_eq!(interval.end().position().inner(), &Value::Usize(usize::MAX));
+        assert_eq!(
+            interval.end().position().inner(),
+            &Value::try_new(6).unwrap()
+        );
 
         let complement = interval.complement()?.unwrap();
         assert_eq!(complement.start().contig().inner(), "seq0");
         assert_eq!(complement.start().strand(), &Strand::Negative);
         assert_eq!(
             complement.start().position().inner(),
-            &Value::Usize(usize::MAX - 1)
+            &Value::try_new(5).unwrap()
         );
         assert_eq!(complement.end().contig().inner(), "seq0");
         assert_eq!(complement.end().strand(), &Strand::Negative);
-        assert_eq!(complement.end().position().inner(), &Value::LowerBound);
+        assert_eq!(complement.end().position().inner(), &Value::lower_bound());
+
+        // Testing the case where it's the maximum positive interval.
+        let start = Coordinate::try_new("seq0", Strand::Positive, 0)?;
+        let end = Coordinate::try_new("seq0", Strand::Positive, Number::MAX)?;
+
+        // This represents the interval [0, Number::MAX), which should be complemented
+        // to (LB, Number::MAX - 1] when it's all said and done.
+        let interval = Interval::try_new(start, end)?;
+        assert_eq!(interval.start().contig().inner(), "seq0");
+        assert_eq!(interval.start().strand(), &Strand::Positive);
+        assert_eq!(
+            interval.start().position().inner(),
+            &Value::try_new(0).unwrap()
+        );
+        assert_eq!(interval.end().contig().inner(), "seq0");
+        assert_eq!(interval.end().strand(), &Strand::Positive);
+        assert_eq!(
+            interval.end().position().inner(),
+            &Value::try_new(Number::MAX).unwrap()
+        );
+
+        let complement = interval.complement()?.unwrap();
+        assert_eq!(complement.start().contig().inner(), "seq0");
+        assert_eq!(complement.start().strand(), &Strand::Negative);
+        assert_eq!(
+            complement.start().position().inner(),
+            &Value::try_new(Number::MAX - 1).unwrap()
+        );
+        assert_eq!(complement.end().contig().inner(), "seq0");
+        assert_eq!(complement.end().strand(), &Strand::Negative);
+        assert_eq!(complement.end().position().inner(), &Value::lower_bound());
 
         Ok(())
     }
 
     #[test]
-    fn complementing_a_negative_interval_with_two_usize_positions_works()
+    fn complementing_a_negative_interval_with_two_number_positions_works()
     -> Result<(), Box<dyn std::error::Error>> {
         let start = Coordinate::try_new("seq0", Strand::Negative, 5)?;
         let end = Coordinate::try_new("seq0", Strand::Negative, 0)?;
@@ -321,18 +349,30 @@ pub mod tests {
         let interval = Interval::try_new(start, end)?;
         assert_eq!(interval.start().contig().inner(), "seq0");
         assert_eq!(interval.start().strand(), &Strand::Negative);
-        assert_eq!(interval.start().position().inner(), &Value::Usize(5));
+        assert_eq!(
+            interval.start().position().inner(),
+            &Value::try_new(5).unwrap()
+        );
         assert_eq!(interval.end().contig().inner(), "seq0");
         assert_eq!(interval.end().strand(), &Strand::Negative);
-        assert_eq!(interval.end().position().inner(), &Value::Usize(0));
+        assert_eq!(
+            interval.end().position().inner(),
+            &Value::try_new(0).unwrap()
+        );
 
         let complement = interval.complement()?.unwrap();
         assert_eq!(complement.start().contig().inner(), "seq0");
         assert_eq!(complement.start().strand(), &Strand::Positive);
-        assert_eq!(complement.start().position().inner(), &Value::Usize(1));
+        assert_eq!(
+            complement.start().position().inner(),
+            &Value::try_new(1).unwrap()
+        );
         assert_eq!(complement.end().contig().inner(), "seq0");
         assert_eq!(complement.end().strand(), &Strand::Positive);
-        assert_eq!(complement.end().position().inner(), &Value::Usize(6));
+        assert_eq!(
+            complement.end().position().inner(),
+            &Value::try_new(6).unwrap()
+        );
 
         // Testing converting from lower bound.
         let start = Coordinate::try_new("seq0", Strand::Negative, 5)?;
@@ -343,35 +383,44 @@ pub mod tests {
         let interval = Interval::try_new(start, end)?;
         assert_eq!(interval.start().contig().inner(), "seq0");
         assert_eq!(interval.start().strand(), &Strand::Negative);
-        assert_eq!(interval.start().position().inner(), &Value::Usize(5));
+        assert_eq!(
+            interval.start().position().inner(),
+            &Value::try_new(5).unwrap()
+        );
         assert_eq!(interval.end().contig().inner(), "seq0");
         assert_eq!(interval.end().strand(), &Strand::Negative);
-        assert_eq!(interval.end().position().inner(), &Value::LowerBound);
+        assert_eq!(interval.end().position().inner(), &Value::lower_bound());
 
         let complement = interval.complement()?.unwrap();
         assert_eq!(complement.start().contig().inner(), "seq0");
         assert_eq!(complement.start().strand(), &Strand::Positive);
-        assert_eq!(complement.start().position().inner(), &Value::Usize(0));
+        assert_eq!(
+            complement.start().position().inner(),
+            &Value::try_new(0).unwrap()
+        );
         assert_eq!(complement.end().contig().inner(), "seq0");
         assert_eq!(complement.end().strand(), &Strand::Positive);
-        assert_eq!(complement.end().position().inner(), &Value::Usize(6));
+        assert_eq!(
+            complement.end().position().inner(),
+            &Value::try_new(6).unwrap()
+        );
 
         // Testing the case where it's the maximum negative interval.
-        let start = Coordinate::try_new("seq0", Strand::Negative, usize::MAX)?;
+        let start = Coordinate::try_new("seq0", Strand::Negative, Number::MAX)?;
         let end = Coordinate::lower_bound("seq0");
 
-        // This represents the interval (LB, usize::MAX], which cannot be
+        // This represents the interval (LB, Number::MAX], which cannot be
         // converted and should return `None`.
         let interval = Interval::try_new(start, end)?;
         assert_eq!(interval.start().contig().inner(), "seq0");
         assert_eq!(interval.start().strand(), &Strand::Negative);
         assert_eq!(
             interval.start().position().inner(),
-            &Value::Usize(usize::MAX)
+            &Value::try_new(Number::MAX).unwrap()
         );
         assert_eq!(interval.end().contig().inner(), "seq0");
         assert_eq!(interval.end().strand(), &Strand::Negative);
-        assert_eq!(interval.end().position().inner(), &Value::LowerBound);
+        assert_eq!(interval.end().position().inner(), &Value::lower_bound());
 
         let err = interval.complement()?;
         assert!(err.is_none());

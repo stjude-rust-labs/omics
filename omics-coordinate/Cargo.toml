@@ -9,6 +9,10 @@ homepage.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+default = []
+position-u64 = []
+
 [dependencies]
 omics-core = { path = "../omics-core", version = "0.1.0" }
 

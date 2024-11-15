@@ -1,28 +1,34 @@
-//! Numerical locations of a coordinate within a genome.
+//! Positions.
 
 use std::fmt::Debug;
 
 use crate::CheckedAdd;
 use crate::CheckedSub;
+use crate::position::value::Kind;
 use crate::system::System;
 
 pub mod one;
 pub mod value;
 pub mod zero;
 
+use value::Number;
 pub use value::Value;
+
+////////////////////////////////////////////////////////////////////////////////////////
+// Errors
+////////////////////////////////////////////////////////////////////////////////////////
 
 /// A error related to parsing a [`Position`].
 #[derive(Debug)]
 pub enum ParseError {
     /// Incompatible value for a given coordinate system.
     ///
-    /// - The first argument is the name of the coordinate system.
-    /// - The second argument is the value.
+    /// * The first argument is the name of the coordinate system.
+    /// * The second argument is the value.
     IncompatibleValue(String, String),
 
     /// An invalid value was attempted to be parsed.
-    ValueError(value::Error),
+    Value(value::Error),
 }
 
 impl std::fmt::Display for ParseError {
@@ -31,7 +37,7 @@ impl std::fmt::Display for ParseError {
             ParseError::IncompatibleValue(system, v) => {
                 write!(f, "incompatible value for {system}: {v}")
             }
-            ParseError::ValueError(v) => write!(f, "value error: {v}"),
+            ParseError::Value(v) => write!(f, "value error: {v}"),
         }
     }
 }
@@ -49,6 +55,9 @@ pub enum Error {
 
     /// An error with a [`Value`] was encountered.
     Value(value::Error),
+
+    /// Could not create value from [`Number`].
+    InvalidValue(Number),
 }
 
 impl std::fmt::Display for Error {
@@ -59,6 +68,7 @@ impl std::fmt::Display for Error {
             }
             Error::Parse(err) => write!(f, "parse error: {err}"),
             Error::Value(err) => write!(f, "value error: {err}"),
+            Error::InvalidValue(number) => write!(f, "invalid value: {number}"),
         }
     }
 }
@@ -68,26 +78,20 @@ impl std::error::Error for Error {}
 /// A [`Result`](std::result::Result) with an [`Error`].
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// A position within a genome.
+////////////////////////////////////////////////////////////////////////////////////////
+// Positions
+////////////////////////////////////////////////////////////////////////////////////////
+
+/// A nucleotide offset from the start of a nucleic acid molecule.
 ///
-/// # Overview
-///
-/// Positions can be either 0-based (interbase) or 1-based (in-base). As their
-/// names suggest, 0-based positions start counting at zero and are generally
-/// considered to be easier to work with computationally. On the other hand,
-/// 1-based positions are more generally considered to more intuitive from a
-/// biological reasoning perspective. As such, you may see both of these
-/// representations in the wild and should be careful to ensure you know which
-/// is being used in a given context.
-///
-/// For a more in-depth discussion on this, please see [this section of the
-/// docs](crate#positions).
+/// For a more in-depth discussion on what positions are and the notations used
+/// within this crate, please see [this section of the docs](crate#positions).
 #[derive(Clone, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Position<S: System> {
     /// The coordinate system.
-    pub(crate) system: S,
+    system: S,
 
-    /// The inner value.
+    /// The value.
     pub(crate) inner: Value,
 }
 
@@ -134,7 +138,7 @@ impl<S: System> Position<S> {
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn try_new<V: Into<Value>>(value: V) -> Result<Self>
+    pub fn try_new(value: impl Into<Value>) -> Result<Self>
     where
         Self: r#trait::Position<S>,
     {
@@ -189,9 +193,9 @@ impl<S: System> Position<S> {
         self.inner
     }
 
-    /// Gets the value of the [`Position`] as a [`usize`] wrapped in [`Some`] if
-    /// the inner value is of type [`Value::Usize`]. Else, returns [`None`]
-    /// (notably, for the lower bound).
+    /// Gets the value of the [`Position`] as a [`Number`] wrapped in [`Some`]
+    /// if the inner value is of type [`Value::Usize`]. Else, returns
+    /// [`None`] (notably, for the lower bound).
     ///
     /// # Examples
     ///
@@ -215,11 +219,8 @@ impl<S: System> Position<S> {
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn get(&self) -> Option<usize> {
-        match self.inner {
-            Value::Usize(v) => Some(v),
-            Value::LowerBound => None,
-        }
+    pub fn get(&self) -> Option<Number> {
+        self.inner.get()
     }
 
     /// Attempts to add the specified magnitude to inner value of the
@@ -312,18 +313,33 @@ impl<S: System> Position<S> {
     /// two [`Position<S>`]s that are assumed to be on the same strand and
     /// contig. Notably, **there is no check regarding strand or contig
     /// equivalence within this calculation**.
-    pub fn distance_unchecked(&self, other: &Position<S>) -> Option<usize> {
-        match (self.inner(), other.inner()) {
-            (Value::Usize(a), Value::Usize(b)) => {
+    pub fn distance_unchecked(&self, other: &Position<S>) -> Option<Number> {
+        match (self.inner().kind(), other.inner().kind()) {
+            (Kind::Numerical, Kind::Numerical) => {
+                // SAFETY: because both kinds are numerical, they are required
+                // to always unwrap here.
+                let a = self.inner().get().unwrap();
+                let b = self.inner().get().unwrap();
+
                 if a > b {
-                    a.checked_sub(*b)
+                    a.checked_sub(b)
                 } else {
-                    b.checked_sub(*a)
+                    b.checked_sub(a)
                 }
             }
-            (Value::Usize(a), Value::LowerBound) => a.checked_add(1),
-            (Value::LowerBound, Value::Usize(b)) => b.checked_add(1),
-            (Value::LowerBound, Value::LowerBound) => Some(0),
+            (Kind::Numerical, Kind::LowerBound) => {
+                // SAFETY: because the first member of the tuple is numerical,
+                // it must always unwrap here.
+                let a = self.inner().get().unwrap();
+                a.checked_add(1)
+            }
+            (Kind::LowerBound, Kind::Numerical) => {
+                // SAFETY: because the second member of the tuple is numerical,
+                // it must always unwrap here.
+                let b = other.inner().get().unwrap();
+                b.checked_add(1)
+            }
+            (Kind::LowerBound, Kind::LowerBound) => Some(0),
         }
     }
 }
@@ -346,11 +362,11 @@ impl<S: System> std::fmt::Debug for Position<S> {
     }
 }
 
-impl<S: System> TryFrom<Position<S>> for usize {
+impl<S: System> TryFrom<Position<S>> for Number {
     type Error = Error;
 
     fn try_from(value: Position<S>) -> std::result::Result<Self, Self::Error> {
-        <Value as TryInto<usize>>::try_into(value.into_inner()).map_err(Error::Value)
+        <Value as TryInto<Number>>::try_into(value.into_inner()).map_err(Error::Value)
     }
 }
 
@@ -365,8 +381,8 @@ pub mod r#trait {
         + PartialEq
         + PartialOrd
         + std::str::FromStr<Err = Error>
-        + CheckedAdd<usize, Output = Self>
-        + CheckedSub<usize, Output = Self>
+        + CheckedAdd<Number, Output = Self>
+        + CheckedSub<Number, Output = Self>
     {
         /// Attempts to create a new [`Position<S>`].
         fn try_new(value: impl Into<Value>) -> Result<Self>;
@@ -380,49 +396,39 @@ mod tests {
     use crate::system::Zero;
 
     #[test]
-    fn it_converts_a_usize_valued_position_to_a_usize()
-    -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn it_converts_a_usize_valued_position_to_a_usize() {
         let position: Position<Zero> = 1.into();
-        let value = <Position<Zero> as TryInto<usize>>::try_into(position)?;
+        let value = <Position<Zero> as TryInto<Number>>::try_into(position)?;
 
         assert_eq!(value, 1);
-
-        Ok(())
     }
 
     #[test]
-    fn it_fails_to_convert_a_lower_bound_valued_position_to_a_usize()
-    -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn it_fails_to_convert_a_lower_bound_valued_position_to_a_usize() {
         let position = Position::<Zero>::lower_bound();
-        let err = <Position<Zero> as TryInto<usize>>::try_into(position).unwrap_err();
+        let err = <Position<Zero> as TryInto<Number>>::try_into(position).unwrap_err();
 
-        assert!(matches!(
-            err,
-            Error::Value(value::Error::CannotConvertLowerBoundToUsize)
-        ));
-
-        Ok(())
+        assert!(matches!(err, Error::Value(value::Error::LowerBoundToUsize)));
     }
 
     #[test]
-    fn it_calculates_the_distance_between_two_zero_based_positions()
-    -> std::result::Result<(), Box<dyn std::error::Error>> {
-        // Zero distance between two usize positions.
-        let a = Position::<Zero>::from(10);
-        let b = Position::<Zero>::from(10);
+    fn it_calculates_the_distance_between_two_zero_based_positions() -> Result<()> {
+        // Zero distance between two Number positions.
+        let a = Position::<Zero>::try_new(10).unwrap();
+        let b = Position::<Zero>::try_new(10).unwrap();
 
         assert_eq!(a.distance_unchecked(&b), Some(0));
         assert_eq!(b.distance_unchecked(&a), Some(0));
 
-        // Non-zero distance between two usize positions.
-        let a = Position::<Zero>::from(10);
-        let b = Position::<Zero>::from(5);
+        // Non-zero distance between two Number positions.
+        let a = Position::<Zero>::try_new(10).unwrap();
+        let b = Position::<Zero>::try_new(5).unwrap();
 
         assert_eq!(a.distance_unchecked(&b), Some(5));
         assert_eq!(b.distance_unchecked(&a), Some(5));
 
-        // distance between two usize positions.
-        let a = Position::<Zero>::from(usize::MAX);
+        // distance between two Number positions.
+        let a = Position::<Zero>::try_new(Number::MAX).unwrap();
         let b = Position::<Zero>::lower_bound();
 
         assert_eq!(a.distance_unchecked(&b), None);
@@ -432,28 +438,27 @@ mod tests {
     }
 
     #[test]
-    fn it_calculates_the_distance_between_two_one_based_positions()
-    -> std::result::Result<(), Box<dyn std::error::Error>> {
-        // Zero distance between two usize positions.
+    fn it_calculates_the_distance_between_two_one_based_positions() -> Result<()> {
+        // Zero distance between two Number positions.
         let a = Position::<One>::try_from(10)?;
         let b = Position::<One>::try_from(10)?;
 
         assert_eq!(a.distance_unchecked(&b), Some(0));
         assert_eq!(b.distance_unchecked(&a), Some(0));
 
-        // Non-zero distance between two usize positions.
+        // Non-zero distance between two Number positions.
         let a = Position::<One>::try_from(10)?;
         let b = Position::<One>::try_from(5)?;
 
         assert_eq!(a.distance_unchecked(&b), Some(5));
         assert_eq!(b.distance_unchecked(&a), Some(5));
 
-        // Distance between two usize positions.
-        let a = Position::<One>::try_from(usize::MAX)?;
+        // Distance between two Number positions.
+        let a = Position::<One>::try_from(Number::MAX)?;
         let b = Position::<One>::try_from(1)?;
 
-        assert_eq!(a.distance_unchecked(&b), Some(usize::MAX - 1));
-        assert_eq!(b.distance_unchecked(&a), Some(usize::MAX - 1));
+        assert_eq!(a.distance_unchecked(&b), Some(Number::MAX - 1));
+        assert_eq!(b.distance_unchecked(&a), Some(Number::MAX - 1));
 
         Ok(())
     }
