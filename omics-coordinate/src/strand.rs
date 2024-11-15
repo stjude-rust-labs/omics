@@ -1,110 +1,85 @@
-//! Strands of a coordinate within a genome.
+//! Strands of a molecule.
 
-/// An error related to the parsing of a [`Strand`].
-#[derive(Debug, Eq, PartialEq)]
+use thiserror::Error;
+
+///////////////////////////////////////////////////////////////////////////////////////
+// Assertions
+////////////////////////////////////////////////////////////////////////////////////////
+
+const _: () = {
+    // A strand should always fit into a single byte.
+    assert!(size_of::<Strand>() == 1);
+
+    /// A function to ensure that types are `Copy`.
+    const fn is_copy<T: Copy>() {}
+    is_copy::<Strand>();
+};
+
+////////////////////////////////////////////////////////////////////////////////////////
+// Errors
+////////////////////////////////////////////////////////////////////////////////////////
+
+/// A error related to parsing a strand.
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum ParseError {
-    /// Attempted to create an empty [`Strand`].
-    Empty,
-
-    /// A [`Strand`] was attempted to be parsed from the provided, invalid
-    /// value.
-    InvalidValue(String),
+    /// An invalid strand.
+    ///
+    /// Occurs when a strand cannot be parsed.
+    #[error("invalid strand: {value}")]
+    Invalid {
+        /// The value that was attempted to be parsed.
+        value: String,
+    },
 }
 
-impl std::fmt::Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ParseError::Empty => write!(f, "empty strand"),
-            ParseError::InvalidValue(value) => {
-                write!(f, "invalid value for strand: {value}")
-            }
-        }
-    }
-}
+/// A [`Result`](std::result::Result) with an [`ParseError`].
+pub type ParseResult<T> = std::result::Result<T, ParseError>;
 
-impl std::error::Error for ParseError {}
-
-/// An error related to a [`Strand`].
-#[derive(Debug, Eq, PartialEq)]
+/// A strand-related error.
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum Error {
     /// A parse error.
-    ParseError(ParseError),
+    #[error("parse error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::ParseError(err) => write!(f, "parse error: {err}"),
-        }
-    }
-}
+/// A [`Result`](std::result::Result) with an [`Error`].
+pub type Result<T> = std::result::Result<T, Error>;
 
-impl std::error::Error for Error {}
+////////////////////////////////////////////////////////////////////////////////////////
+// Strand
+////////////////////////////////////////////////////////////////////////////////////////
 
-/// A strand within a genome.
+/// The strand of a double-stranded molecule.
 ///
 /// For a more in-depth discussion on this, please see [this section of the
 /// docs](crate#strand).
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[repr(u8)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Strand {
     /// The positive strand (`+`).
+    ///
+    /// This is also known as the _sense_ strand.
     Positive,
 
     /// The negative strand (`-`).
+    ///
+    /// This is also known as the _antisense_ strand.
     Negative,
 }
 
 impl Strand {
-    /// Attempts to create a new [`Strand`].
-    ///
-    /// # Notes
-    ///
-    /// * This will fail with a [`ParseError::Empty`] if the provided [`String`]
-    ///   is empty (a strand with no name is considered non-sensical).
-    /// * This will fail with a [`ParseError::InvalidValue`] if the provided
-    ///   [`String`] does not match a known [`Strand`].
+    /// Complements a strand.
     ///
     /// # Examples
     ///
     /// ```
     /// use omics_coordinate::Strand;
     ///
-    /// let contig = Strand::try_new("+")?;
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// assert_eq!(Strand::Positive.complement(), Strand::Negative);
+    /// assert_eq!(Strand::Negative.complement(), Strand::Positive);
     /// ```
-    pub fn try_new(value: &str) -> Result<Self, Error> {
-        if value.is_empty() {
-            return Err(Error::ParseError(ParseError::Empty));
-        }
-
-        match value {
-            "+" => Ok(Self::Positive),
-            "-" => Ok(Self::Negative),
-            _ => Err(Error::ParseError(ParseError::InvalidValue(
-                value.to_string(),
-            ))),
-        }
-    }
-
-    /// Complements a [`Strand`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use omics_coordinate::Strand;
-    ///
-    /// // Positive complement
-    ///
-    /// let strand = Strand::Positive;
-    /// assert_eq!(strand.complement(), Strand::Negative);
-    ///
-    /// // Negative complement
-    ///
-    /// let strand = Strand::Negative;
-    /// assert_eq!(strand.complement(), Strand::Positive);
-    /// ```
-    pub fn complement(self) -> Strand {
+    pub fn complement(&self) -> Strand {
         match self {
             Strand::Positive => Strand::Negative,
             Strand::Negative => Strand::Positive,
@@ -115,24 +90,26 @@ impl Strand {
 impl std::str::FromStr for Strand {
     type Err = Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Strand::try_new(s)
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "+" => Ok(Strand::Positive),
+            "-" => Ok(Strand::Negative),
+            _ => Err(Error::Parse(ParseError::Invalid {
+                value: s.to_string(),
+            })),
+        }
     }
 }
+
+// NOTE: technically, this is just a duplication of of [`FromStr`] above. That
+// being said, this is required for the [`Coordinate::try_new()`] call to work
+// correctly with string slices.
 
 impl TryFrom<&str> for Strand {
     type Error = Error;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Strand::try_new(value)
-    }
-}
-
-impl TryFrom<String> for Strand {
-    type Error = Error;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Strand::try_new(&value)
+    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
+        value.parse()
     }
 }
 
@@ -146,28 +123,30 @@ impl std::fmt::Display for Strand {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
 
     #[test]
-    fn it_deserializes_correctly() -> Result<(), Box<dyn std::error::Error>> {
-        let strand: Strand = "+".parse()?;
-        assert_eq!(strand, Strand::Positive);
+    fn parse() {
+        let s = "+".parse::<Strand>().unwrap();
+        assert_eq!(s, Strand::Positive);
 
-        let strand: Strand = "-".parse()?;
-        assert_eq!(strand, Strand::Negative);
+        let s = "-".parse::<Strand>().unwrap();
+        assert_eq!(s, Strand::Negative);
 
-        let err = "?".parse::<Strand>().unwrap_err();
-        assert_eq!(err.to_string(), "parse error: invalid value for strand: ?");
-
-        Ok(())
+        let err = "a".parse::<Strand>().unwrap_err();
+        assert_eq!(err.to_string(), "parse error: invalid strand: a");
     }
 
     #[test]
-    fn it_serializes_correctly() -> Result<(), Box<dyn std::error::Error>> {
+    fn serialize() {
         assert_eq!(Strand::Positive.to_string(), "+");
         assert_eq!(Strand::Negative.to_string(), "-");
+    }
 
-        Ok(())
+    #[test]
+    fn complement() {
+        assert_eq!(Strand::Positive.complement(), Strand::Negative);
+        assert_eq!(Strand::Negative.complement(), Strand::Positive);
     }
 }

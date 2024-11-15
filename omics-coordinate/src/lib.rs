@@ -1,16 +1,17 @@
-//! Coordinates upon a nucleic acid molecule.
+//! Coordinates upon a molecule.
 //!
 //! A **coordinate** is the fundamental unit for describing a location within a
-//! genome. Coordinates point to a single location within a contiguous nucleic
-//! acid molecule (such as DNA or RNA) and are specified at the _nucleotide_
-//! level of abstraction.
+//! genome. Coordinates point to a single location within a contiguous molecule
+//! (typically a nucleic acid molecule, such as DNA or RNA, or a protein) and
+//! are specified at the _nucleotide_ level of abstraction.
 //!
 //! Coordinates are comprised of three components:
 //!
-//! * The contiguous molecule upon which the coordinate sits is known as the
+//! * The name of the molecule upon which the coordinate sits is known as the
 //!   [**contig**](crate::Contig).
-//! * The offset of the coordinate with respect to the start of the molecule is
-//!   known as the [**position**](crate::Position).
+//! * Each molecule is made of a contiguous series of elements. The offset of
+//!   the selected element with respect to the starting element of the molecule
+//!   is known as the [**position**](crate::Position).
 //! * Optionally, if the molecule is stranded, the strand upon which the
 //!   coordinate sits is known as the [**strand**](crate::Strand).
 //!
@@ -21,6 +22,12 @@
 //! supported coordinate systems, or if you want to learn why this crate uses
 //! the terms that it does (e.g., "in-base" instead of "1-based"), please jump
 //! to [this section](crate#positions) of the docs.
+//!
+//! ### Scope
+//!
+//! At present, `omics-coordinate` is focused almost exclusively on nucleic acid
+//! molecules. In the future, however, we expect to expand this to cover
+//! proteins as well.
 //!
 //! ### Quickstart
 //!
@@ -38,15 +45,15 @@
 //!
 //! ```
 //! use omics_coordinate::Coordinate;
-//! use omics_coordinate::system::One;
-//! use omics_coordinate::system::Zero;
+//! use omics_coordinate::system::Base;
+//! use omics_coordinate::system::Interbase;
 //!
 //! // An 0-based, interbase coordinate.
-//! let coordinate = Coordinate::<Zero>::try_new("seq0", "+", 0)?;
+//! let coordinate = Coordinate::<Interbase>::try_new("seq0", "+", 0)?;
 //! println!("{:#}", coordinate);
 //!
 //! // A 1-based, in-base coordinate.
-//! let coordinate = Coordinate::<One>::try_new("seq0", "+", 1)?;
+//! let coordinate = Coordinate::<Base>::try_new("seq0", "+", 1)?;
 //! println!("{:#}", coordinate);
 //!
 //! # Ok::<(), Box<dyn std::error::Error>>(())
@@ -54,11 +61,11 @@
 //!
 //! For convenience, the crate also provides type aliases for the 0-based and
 //! 1-based variants of the relevant concepts. For example, you can use a
-//! [`Position<Zero>`] by instead simply importing a
+//! [`Position<Interbase>`] by instead simply importing a
 //! [`zero::Position`](crate::position::zero::Position).
 //!
 //! ```
-//! use omics_coordinate::zero::Coordinate;
+//! use omics_coordinate::interbase::Coordinate;
 //!
 //! let coordinate = Coordinate::try_new("seq0", "+", 0)?;
 //! println!("{:#}", coordinate);
@@ -76,8 +83,8 @@
 //! and then cover their perspective on what terms are most appropriate to be
 //! used within different contexts. Notably, this may not match the worldview of
 //! other popular resources or papers out there. In these cases, departures from
-//! convention are noted alongside carefully reasoned opinions on why
-//! the departure was made.
+//! convention are noted alongside carefully reasoned opinions on why the
+//! departure was made.
 //!
 //! ## Biology Primer
 //!
@@ -87,8 +94,8 @@
 //! systems—if you're interested in more detailed information, you can learn
 //! more at [https://learngenomics.dev](https://learngenomics.dev).
 //!
-//! * A **genome** is the complete set of genetic code stored within a cell ([learn
-//!   more](https://www.genome.gov/genetics-glossary/Genome)).
+//! * A **genome** is the complete set of genetic code stored within a cell
+//!   ([learn more](https://www.genome.gov/genetics-glossary/Genome)).
 //! * **Deoxyribose nucleic acid**, or **DNA**, is a molecule that warehouses
 //!   the aforementioned genetic code. In eukaryotic cells, DNA resides in the
 //!   nucleus of a cell.
@@ -110,11 +117,11 @@
 //!
 //! Though there are exceptions to this rule, the core idea is this: through a
 //! series of steps described within [the central dogma of molecular
-//! biology](https://en.wikipedia.org/wiki/Central_dogma_of_molecular_biology), genetic
-//! code stored within DNA is commonly transcribed to RNA and either (a) the RNA
-//! is used as a template to assemble a functional protein through the process
-//! of translation [in the case of _coding_ RNA], or (b) that RNA plays some
-//! functional role in and of itself [in the case of _non-coding_ RNA].
+//! biology](https://en.wikipedia.org/wiki/Central_dogma_of_molecular_biology),
+//! genetic code stored within DNA is commonly transcribed to RNA and either (a)
+//! the RNA is used as a template to assemble a functional protein through the
+//! process of translation [in the case of _coding_ RNA], or (b) that RNA plays
+//! some functional role in and of itself [in the case of _non-coding_ RNA].
 //!
 //! This crate attempts to provide facilities to effectively describe
 //! coordinates within the context of DNA molecules and RNA molecules in the
@@ -218,7 +225,8 @@
 //! decision on which coordinate system to use was largely based on the
 //! distinction on how the two file types were meant to be consumed (to learn
 //! more about what the author of SAM/BAM said about the decision, read the end
-//! of [this StackExchange answer](https://bioinformatics.stackexchange.com/a/17757)).
+//! of [this StackExchange
+//! answer](https://bioinformatics.stackexchange.com/a/17757)).
 //!
 //! #### Conceptual Model
 //!
@@ -361,9 +369,9 @@
 //! DNA is a double-stranded molecule that stores genetic code. This means that
 //! two sequences of complementary nucleotides run in antiparallel. This is
 //! often referred to as being read from [5' to
-//! 3'](https://en.wikipedia.org/wiki/Directionality_%28molecular_biology%29), referring
-//! to connections within the underlying chemical structure. For example, below
-//! is a fictional double-stranded molecule with the name `seq0`.
+//! 3'](https://en.wikipedia.org/wiki/Directionality_%28molecular_biology%29),
+//! referring to connections within the underlying chemical structure. For
+//! example, below is a fictional double-stranded molecule with the name `seq0`.
 //!
 //! ```text
 //! ---------------- Read this direction --------------->
@@ -521,1050 +529,19 @@
 //! [t2t-genome]: https://www.ncbi.nlm.nih.gov/assembly/GCF_009914755.1/
 //! [t2t-publication]: https://www.science.org/doi/10.1126/science.abj6987
 
-use omics_core::VARIANT_SEPARATOR;
-
 pub mod contig;
+pub mod coordinate;
 pub mod interval;
-pub mod one;
+pub mod math;
 pub mod position;
 pub mod strand;
 pub mod system;
-pub mod zero;
 
 pub use contig::Contig;
+pub use coordinate::Coordinate;
+pub use coordinate::base;
+pub use coordinate::interbase;
 pub use interval::Interval;
 pub use position::Position;
 pub use strand::Strand;
-
-use crate::position::Value;
-use crate::system::System;
-
-/// Safe addition.
-pub trait CheckedAdd<T>: Sized {
-    /// The output type.
-    type Output;
-
-    /// Adds two items.
-    ///
-    /// - If the addition occurs succesfully, then [`Some<Self>`] is returned.
-    /// - If the addition would overflow, [`None`] is returned.
-    fn checked_add(&self, rhs: T) -> Option<Self::Output>;
-}
-
-/// Safe subtraction.
-pub trait CheckedSub<T>: Sized {
-    /// The output type.
-    type Output;
-
-    /// Subtracts two items.
-    ///
-    /// - If the subtraction occurs successfully, then [`Some<Self>`] is
-    ///   returned.
-    /// - If the subtraction would overflow, [`None`] is returned.
-    fn checked_sub(&self, rhs: T) -> Option<Self::Output>;
-}
-
-/// An error related to the parsing of a [`Coordinate`].
-#[derive(Debug, Eq, PartialEq)]
-pub enum ParseError {
-    /// Attempted to parse a [`Coordinate`] from an invalid coordinate format.
-    InvalidFormat(String),
-
-    /// An invalid contig was attempted to be parsed.
-    ///
-    /// The value is the [`Contig`]'s [`Error`](crate::contig::Error) written to
-    /// a [`String`].
-    InvalidContig(String),
-
-    /// An invalid strand was attempted to be parsed.
-    ///
-    /// The value is the [`Strand`]'s [`Error`](crate::strand::Error) written to
-    /// a [`String`].
-    InvalidStrand(String),
-
-    /// An invalid position was attempted to be parsed.
-    ///
-    /// The value is the [`Position`]'s [`Error`](crate::position::Error)
-    /// written to a [`String`].
-    InvalidPosition(String),
-}
-
-impl std::fmt::Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ParseError::InvalidFormat(value) => write!(f, "invalid format: {value}"),
-            ParseError::InvalidContig(err) => write!(f, "invalid contig: {err}"),
-            ParseError::InvalidStrand(err) => write!(f, "invalid strand: {err}"),
-            ParseError::InvalidPosition(err) => write!(f, "invalid position: {err}"),
-        }
-    }
-}
-
-impl std::error::Error for ParseError {}
-
-/// An artimetic error related to [`Coordinate`]s.
-#[derive(Debug, Eq, PartialEq)]
-pub enum ArithmeticError {
-    /// Could not perform arithmetic for coordinates on different contigs.
-    MismatchedContigs(Contig, Contig),
-
-    /// Could not perform arithmetic for coordinates on different strands.
-    MismatchedStrands(Strand, Strand),
-}
-
-impl std::fmt::Display for ArithmeticError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ArithmeticError::MismatchedContigs(a, b) => {
-                write!(f, "mismatched contigs: {a}, {b}")
-            }
-            ArithmeticError::MismatchedStrands(a, b) => {
-                write!(f, "mismatched strands: {a}, {b}")
-            }
-        }
-    }
-}
-
-impl std::error::Error for ArithmeticError {}
-
-/// An error related to a [`Coordinate`].
-#[derive(Debug)]
-pub enum Error {
-    /// An arithmetic error.
-    ArithmeticError(ArithmeticError),
-
-    /// Attempted to create a lower bound coordinate that was not on the
-    /// negative strand.
-    LowerBoundOnNonNegativeStrand,
-
-    /// A parse error.
-    ParseError(ParseError),
-
-    /// A position error.
-    Position(position::Error),
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::ArithmeticError(err) => write!(f, "arithmetic error: {err}"),
-            Error::LowerBoundOnNonNegativeStrand => write!(
-                f,
-                "attempted to place lower bound position on non-negative strand for coordinate"
-            ),
-            Error::ParseError(err) => write!(f, "parse error: {err}"),
-            Error::Position(err) => write!(f, "position error: {err}"),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
-
-/// A [`Result`](std::result::Result) with an [`Error`].
-pub type Result<T> = std::result::Result<T, Error>;
-
-/// A coordinate within a genome consisting of a contig, a strand, and a
-/// position.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Coordinate<S: System> {
-    /// The coordinate system.
-    system: S,
-
-    /// The contig.
-    contig: Contig,
-
-    /// The strand.
-    strand: Strand,
-
-    /// The position.
-    position: Position<S>,
-}
-
-impl<S: System> std::fmt::Display for Coordinate<S> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if !f.alternate() {
-            write!(f, "{}:{}:{}", self.contig, self.strand, self.position)
-        } else {
-            write!(
-                f,
-                "{}:{}:{} ({:#})",
-                self.contig, self.strand, self.position, self.system
-            )
-        }
-    }
-}
-
-impl<S: System> Coordinate<S> {
-    /// Attempts to create a new [`Coordinate`].
-    ///
-    /// Note that a lower bound position can only sit on the
-    /// [`Strand::Negative`], so trying to create a [`Coordinate`] with a lower
-    /// bound position on any non-negative strand will result in an
-    /// [`Error::LowerBoundOnNonNegativeStrand`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use omics_coordinate::Coordinate;
-    /// use omics_coordinate::Strand;
-    /// use omics_coordinate::system::Zero;
-    ///
-    /// let coordinate = Coordinate::<Zero>::try_new("seq0", "+", 1)?;
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn try_new<C: TryInto<Contig>, Q: TryInto<Strand>, P: TryInto<Position<S>>>(
-        contig: C,
-        strand: Q,
-        position: P,
-    ) -> Result<Self>
-    where
-        <C as TryInto<Contig>>::Error: std::error::Error,
-        <Q as TryInto<Strand>>::Error: std::error::Error,
-        <P as TryInto<Position<S>>>::Error: std::error::Error,
-    {
-        let contig = contig
-            .try_into()
-            .map_err(|err| Error::ParseError(ParseError::InvalidContig(err.to_string())))?;
-        let strand = strand
-            .try_into()
-            .map_err(|err| Error::ParseError(ParseError::InvalidStrand(err.to_string())))?;
-        let position = position
-            .try_into()
-            .map_err(|err| Error::ParseError(ParseError::InvalidPosition(err.to_string())))?;
-
-        if position.inner() == &Value::LowerBound && strand != Strand::Negative {
-            return Err(Error::LowerBoundOnNonNegativeStrand);
-        }
-
-        Ok(Self {
-            system: S::default(),
-            contig,
-            strand,
-            position,
-        })
-    }
-
-    /// Gets the [`Contig`] for this [`Coordinate`] by reference.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use omics_coordinate::Coordinate;
-    /// use omics_coordinate::system::Zero;
-    ///
-    /// let coordinate = "seq0:+:1".parse::<Coordinate<Zero>>()?;
-    /// assert_eq!(coordinate.contig().inner(), "seq0");
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn contig(&self) -> &Contig {
-        &self.contig
-    }
-
-    /// Consumes `self` and returns the inner [`Contig`] from this
-    /// [`Coordinate`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use omics_coordinate::Coordinate;
-    /// use omics_coordinate::system::Zero;
-    ///
-    /// let coordinate = "seq0:+:1".parse::<Coordinate<Zero>>()?;
-    /// assert_eq!(coordinate.into_contig().inner(), "seq0");
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn into_contig(self) -> Contig {
-        self.contig
-    }
-
-    /// Gets the [`Strand`] for this [`Coordinate`] by reference.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use omics_coordinate::Coordinate;
-    /// use omics_coordinate::Strand;
-    /// use omics_coordinate::system::Zero;
-    ///
-    /// let coordinate = "seq0:+:1".parse::<Coordinate<Zero>>()?;
-    /// assert_eq!(coordinate.strand(), &Strand::Positive);
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn strand(&self) -> &Strand {
-        &self.strand
-    }
-
-    /// Consumes `self` and returns the inner [`Strand`] from this
-    /// [`Coordinate`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use omics_coordinate::Coordinate;
-    /// use omics_coordinate::Strand;
-    /// use omics_coordinate::system::Zero;
-    ///
-    /// let coordinate = "seq0:+:1".parse::<Coordinate<Zero>>()?;
-    /// assert_eq!(coordinate.into_strand(), Strand::Positive);
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn into_strand(self) -> Strand {
-        self.strand
-    }
-
-    /// Gets the [`Position`] for this [`Coordinate`] by reference.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use omics_coordinate::Coordinate;
-    /// use omics_coordinate::Position;
-    /// use omics_coordinate::system::Zero;
-    ///
-    /// let coordinate = "seq0:+:1".parse::<Coordinate<Zero>>()?;
-    /// assert_eq!(coordinate.position(), &"1".parse::<Position<Zero>>()?);
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn position(&self) -> &Position<S> {
-        &self.position
-    }
-
-    /// Consumes `self` and returns the inner [`Position`] from this
-    /// [`Coordinate`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use omics_coordinate::Coordinate;
-    /// use omics_coordinate::Strand;
-    /// use omics_coordinate::position::Value;
-    /// use omics_coordinate::system::Zero;
-    ///
-    /// let coordinate = "seq0:+:1".parse::<Coordinate<Zero>>()?;
-    ///
-    /// let (contig, strand, position) = coordinate.into_parts();
-    /// assert_eq!(contig.inner(), "seq0");
-    /// assert_eq!(strand, Strand::Positive);
-    /// assert_eq!(position.inner(), &Value::Usize(1));
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn into_position(self) -> Position<S> {
-        self.position
-    }
-
-    /// Consumes `self` to return the parts that comprise this [`Coordinate`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use omics_coordinate::Coordinate;
-    /// use omics_coordinate::position::Value;
-    /// use omics_coordinate::system::Zero;
-    ///
-    /// let coordinate = "seq0:+:1".parse::<Coordinate<Zero>>()?;
-    /// assert_eq!(coordinate.into_position().inner(), &Value::Usize(1));
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn into_parts(self) -> (Contig, Strand, Position<S>) {
-        (self.contig, self.strand, self.position)
-    }
-
-    /// Consumes the [`Coordinate`] to attempt to move the coordinate forward by
-    /// a specified magnitude.
-    ///
-    /// A checked add (for positive strand) or subtract (for negative strand) is
-    /// performed to ensure we don't overflow.
-    ///
-    /// Note that, though the position is checked for usize overflow, we don't
-    /// do any bounds checking to make sure that the coordinates fall within any
-    /// given interval.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use omics_coordinate::Coordinate;
-    /// use omics_coordinate::Strand;
-    /// use omics_coordinate::system::Zero;
-    ///
-    /// let coordinate = "seq0:+:0".parse::<Coordinate<Zero>>()?;
-    /// let result = coordinate.move_forward(10)?.unwrap();
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn move_forward(self, magnitude: usize) -> Result<Option<Coordinate<S>>>
-    where
-        Position<S>: position::r#trait::Position<S>,
-    {
-        // If the magnitude is zero, the result is just the identity of the
-        // current [`Coordinate`].
-        if magnitude == 0 {
-            return Ok(Some(self));
-        }
-
-        let position = match self.strand {
-            Strand::Positive => self.position.checked_add(magnitude),
-            Strand::Negative => self.position.checked_sub(magnitude),
-        };
-
-        let result = position
-            .map(|position| Self::try_new(self.contig().clone(), self.strand().clone(), position))
-            .transpose();
-
-        match result {
-            // This should never be possible, as (a) you are only adding on the
-            // forward strand and (b) you cannot add anything to a [`Position`]
-            // to give you a value of [`Value::LowerBound`].
-            Err(Error::LowerBoundOnNonNegativeStrand) => unreachable!(),
-            result => result,
-        }
-    }
-
-    /// Consumes the [`Coordinate`] to attempt to move the coordinate backward
-    /// by a specified magnitude.
-    ///
-    /// A checked sub (for positive strand) or add (for negative strand) is
-    /// performed to ensure we don't overflow.
-    ///
-    /// Note that, though the position is checked for usize overflow, we don't
-    /// do any bounds checking to make sure that the coordinates fall within any
-    /// given interval.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use omics_coordinate::Coordinate;
-    /// use omics_coordinate::Strand;
-    /// use omics_coordinate::system::Zero;
-    ///
-    /// let coordinate = "seq0:+:0".parse::<Coordinate<Zero>>()?;
-    /// let result = coordinate.move_forward(10)?.unwrap();
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn move_backward(self, magnitude: usize) -> Result<Option<Coordinate<S>>>
-    where
-        Position<S>: position::r#trait::Position<S>,
-    {
-        // If the magnitude is zero, the result is just the identity of the
-        // current [`Coordinate`].
-        if magnitude == 0 {
-            return Ok(Some(self));
-        }
-
-        let position = match self.strand {
-            Strand::Positive => self.position.checked_sub(magnitude),
-            Strand::Negative => self.position.checked_add(magnitude),
-        };
-
-        let result = position
-            .map(|position| Self::try_new(self.contig().clone(), self.strand().clone(), position))
-            .transpose();
-
-        match result {
-            // If we would have tried to create a lower bound on the positive
-            // strand, we can just treat this as if the move was out of bounds.
-            // Generally, the user does not want an error in this case.
-            Err(Error::LowerBoundOnNonNegativeStrand) => Ok(None),
-            result => result,
-        }
-    }
-
-    /// Consumes `self` to attempt to move the [`Coordinate`] forward by the
-    /// specified magnitude while also performing a bounds check within the
-    /// provided interval.
-    ///
-    /// The following steps are performed:
-    ///
-    /// * First, the coordinate is moved forward by the specified magnitude.
-    ///   During this move, the position is checked for overflows.
-    /// * Next, the calculated result is checked to ensure it falls within the
-    ///   specified interval. This is to ensure that, although the `usize`
-    ///   limits may not broken, the interval continues to contain the moved
-    ///   coordinate.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use omics_coordinate::system::Zero;
-    /// use omics_coordinate::Coordinate;
-    /// use omics_coordinate::Interval;
-    /// use omics_coordinate::position::Value;
-    /// use omics_coordinate::Strand;
-    ///
-    /// // Positive-stranded coordinate that falls within the provided interval.
-    ///
-    /// let mut coordinate = Coordinate::<Zero>::try_new("seq0", Strand::Positive, 0)?;
-    /// let interval = "seq0:+:0-1000".parse::<Interval<Zero>>()?;
-    ///
-    /// let result = coordinate
-    ///     .move_forward_checked_bounds(10, &interval)
-    ///     .unwrap()
-    ///     .unwrap();
-    ///
-    /// assert_eq!(result.contig().inner(), "seq0");
-    /// assert_eq!(result.position().inner(), &Value::Usize(10));
-    /// assert_eq!(result.strand(), &Strand::Positive);
-    ///
-    /// // Negative-stranded position that falls within the provided interval.
-    ///
-    /// let coordinate = Coordinate::try_new("seq0", Strand::Negative, 1000)?;
-    /// let interval = "seq0:-:1000-0".parse::<Interval<Zero>>()?;
-    /// let result = coordinate
-    ///     .move_forward_checked_bounds(10, &interval)
-    ///     .unwrap()
-    ///     .unwrap();
-    ///
-    /// assert_eq!(result.contig().inner(), "seq0");
-    /// assert_eq!(result.position().inner(), &Value::Usize(990));
-    /// assert_eq!(result.strand(), &Strand::Negative);
-    ///
-    /// // Positive-stranded position that _does not_ fall within the provided interval.
-    ///
-    /// let coordinate = Coordinate::try_new("seq0", Strand::Positive, 0)?;
-    /// let interval = "seq0:+:0-10".parse::<Interval<Zero>>()?;
-    /// let result = coordinate.move_forward_checked_bounds(10, &interval).unwrap();
-    ///
-    /// assert_eq!(result, None);
-    ///
-    /// // Negative-stranded position that _does not_ fall within the provided interval.
-    ///
-    /// let coordinate = Coordinate::try_new("seq0", Strand::Negative, 10)?;
-    /// let interval = "seq0:-:10-0".parse::<Interval<Zero>>()?;
-    /// let result = coordinate.move_forward_checked_bounds(10, &interval).unwrap();
-    ///
-    /// assert_eq!(result, None);
-    ///
-    /// // Lower-bound position that _does not_ fall within interval
-    /// // (and also would not move forward due to underflow).
-    ///
-    /// let coordinate = Coordinate::<Zero>::lower_bound("seq0");
-    /// let interval = "seq0:-:10-[".parse::<Interval<Zero>>()?;
-    /// let result = coordinate.move_forward_checked_bounds(1, &interval).unwrap();
-    ///
-    /// assert_eq!(result, None);
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    pub fn move_forward_checked_bounds(
-        self,
-        magnitude: usize,
-        interval: &Interval<S>,
-    ) -> Result<Option<Coordinate<S>>>
-    where
-        Position<S>: position::r#trait::Position<S>,
-        Interval<S>: interval::r#trait::Interval<S>,
-    {
-        Ok(self.move_forward(magnitude)?.and_then(|value| {
-            if interval.contains(&value) {
-                Some(value)
-            } else {
-                None
-            }
-        }))
-    }
-
-    /// Consumes `self` to attempt to move the [`Coordinate`] backward by the
-    /// specified magnitude while also performing a bounds check within the
-    /// provided interval.
-    ///
-    /// The following steps are performed:
-    ///
-    /// * First, the coordinate is moved backward by the specified magnitude.
-    ///   During this move, the position is checked for overflows.
-    /// * Next, the calculated result is checked to ensure it falls within the
-    ///   specified interval. This is to ensure that, although the `usize`
-    ///   limits may not broken, the interval continues to contain the moved
-    ///   coordinate.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use omics_coordinate::system::Zero;
-    /// use omics_coordinate::Coordinate;
-    /// use omics_coordinate::Interval;
-    /// use omics_coordinate::position::Value;
-    /// use omics_coordinate::Strand;
-    ///
-    /// // Positive-stranded coordinate that falls within the provided interval.
-    ///
-    /// let mut coordinate = Coordinate::<Zero>::try_new("seq0", Strand::Positive, 10)?;
-    /// let interval = "seq0:+:0-1000".parse::<Interval<Zero>>()?;
-    ///
-    /// let result = coordinate
-    ///     .move_backward_checked_bounds(10, &interval)
-    ///     .unwrap()
-    ///     .unwrap();
-    ///
-    /// assert_eq!(result.contig().inner(), "seq0");
-    /// assert_eq!(result.position().inner(), &Value::Usize(0));
-    /// assert_eq!(result.strand(), &Strand::Positive);
-    ///
-    /// // Negative-stranded position that falls within the provided interval.
-    ///
-    /// let coordinate = Coordinate::try_new("seq0", Strand::Negative, 990)?;
-    /// let interval = "seq0:-:1000-0".parse::<Interval<Zero>>()?;
-    /// let result = coordinate
-    ///     .move_backward_checked_bounds(10, &interval)
-    ///     .unwrap()
-    ///     .unwrap();
-    ///
-    /// assert_eq!(result.contig().inner(), "seq0");
-    /// assert_eq!(result.position().inner(), &Value::Usize(1000));
-    /// assert_eq!(result.strand(), &Strand::Negative);
-    ///
-    /// // Positive-stranded position that _does not_ fall within the provided interval.
-    ///
-    /// let coordinate = Coordinate::try_new("seq0", Strand::Positive, 0)?;
-    /// let interval = "seq0:+:0-10".parse::<Interval<Zero>>()?;
-    /// let result = coordinate.move_backward_checked_bounds(1, &interval).unwrap();
-    ///
-    /// assert_eq!(result, None);
-    ///
-    /// // Negative-stranded position that _does not_ fall within the provided interval.
-    ///
-    /// let coordinate = Coordinate::try_new("seq0", Strand::Negative, 10)?;
-    /// let interval = "seq0:-:10-0".parse::<Interval<Zero>>()?;
-    /// let result = coordinate.move_backward_checked_bounds(1, &interval).unwrap();
-    ///
-    /// assert_eq!(result, None);
-    ///
-    /// // Lower-bound position that _does not_ fall within interval
-    /// // (and also would not move forward due to underflow).
-    ///
-    /// let coordinate = Coordinate::<Zero>::lower_bound("seq0");
-    /// let interval = "seq0:-:10-[".parse::<Interval<Zero>>()?;
-    /// let result = coordinate
-    ///     .move_backward_checked_bounds(1, &interval)
-    ///     .unwrap()
-    ///     .unwrap();
-    ///
-    /// assert_eq!(result.contig().inner(), "seq0");
-    /// assert_eq!(result.position().inner(), &Value::Usize(0));
-    /// assert_eq!(result.strand(), &Strand::Negative);
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    pub fn move_backward_checked_bounds(
-        self,
-        magnitude: usize,
-        interval: &Interval<S>,
-    ) -> Result<Option<Coordinate<S>>>
-    where
-        Position<S>: position::r#trait::Position<S>,
-        Interval<S>: interval::r#trait::Interval<S>,
-    {
-        Ok(self.move_backward(magnitude)?.and_then(|value| {
-            if interval.contains(&value) {
-                Some(value)
-            } else {
-                None
-            }
-        }))
-    }
-
-    /// Consumes `self` to swap the [`Strand`] of the [`Coordinate`] without
-    /// modifying the contig or the position.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use omics_coordinate::Coordinate;
-    /// use omics_coordinate::Strand;
-    /// use omics_coordinate::position::Value;
-    /// use omics_coordinate::system::Zero;
-    ///
-    /// // Swapping a positive-stranded position to a negative-stranded position.
-    ///
-    /// let coordinate = "seq0:+:1000".parse::<Coordinate<Zero>>()?;
-    /// let swapped = coordinate.swap_strand()?;
-    ///
-    /// assert_eq!(swapped.contig().inner(), "seq0");
-    /// assert_eq!(swapped.strand(), &Strand::Negative);
-    /// assert_eq!(swapped.position().inner(), &Value::Usize(1000));
-    ///
-    /// // Swapping a negative-stranded position to a positive-stranded position.
-    ///
-    /// let coordinate = "seq0:-:1000".parse::<Coordinate<Zero>>()?;
-    /// let swapped = coordinate.swap_strand()?;
-    ///
-    /// assert_eq!(swapped.contig().inner(), "seq0");
-    /// assert_eq!(swapped.strand(), &Strand::Positive);
-    /// assert_eq!(swapped.position().inner(), &Value::Usize(1000));
-    ///
-    /// // Failing to swap the lower bound.
-    ///
-    /// let coordinate = "seq0:-:[".parse::<Coordinate<Zero>>()?;
-    /// let err = coordinate.swap_strand().unwrap_err();
-    ///
-    /// assert_eq!(
-    ///     err.to_string(),
-    ///     String::from(
-    ///         "attempted to place lower bound position on non-negative strand for coordinate"
-    ///     )
-    /// );
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn swap_strand(self) -> Result<Coordinate<S>> {
-        let (contig, strand, position) = self.into_parts();
-        Coordinate::try_new(contig, strand.complement(), position)
-    }
-}
-
-impl<S: System> std::str::FromStr for Coordinate<S>
-where
-    Position<S>: position::r#trait::Position<S>,
-{
-    type Err = Error;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let parts = s.split(VARIANT_SEPARATOR).collect::<Vec<_>>();
-
-        if parts.len() != 3 {
-            return Err(Error::ParseError(ParseError::InvalidFormat(s.to_owned())));
-        }
-
-        let mut parts = parts.iter();
-
-        // SAFETY: we checked that there are three parts above. Given that we
-        // haven't pulled anything from the iterator, we can always safely
-        // unwrap this.
-        let contig = parts
-            .next()
-            .unwrap()
-            .parse::<Contig>()
-            .map_err(|err| Error::ParseError(ParseError::InvalidContig(err.to_string())))?;
-
-        // SAFETY: we checked that there are three parts above. Given that we
-        // have only pulled one item from the iterator, we can always safely
-        // unwrap this.
-        let strand = parts
-            .next()
-            .unwrap()
-            .parse::<Strand>()
-            .map_err(|err| Error::ParseError(ParseError::InvalidStrand(err.to_string())))?;
-
-        // SAFETY: we checked that there are three parts above. Given that we
-        // have only pulled two items from the iterator, we can always safely
-        // unwrap this.
-        let position = parts
-            .next()
-            .unwrap()
-            .parse::<Position<S>>()
-            .map_err(|err| Error::ParseError(ParseError::InvalidPosition(err.to_string())))?;
-
-        Self::try_new(contig, strand, position)
-    }
-}
-
-/// Traits related to coordinates.
-pub mod r#trait {
-    use super::*;
-
-    /// Requirements to be a coordinate.
-    pub trait Coordinate<S: System>: Sized {}
-}
-
-#[cfg(test)]
-mod tests {
-    use std::result::Result;
-
-    use crate::Coordinate;
-    use crate::Error;
-    use crate::Position;
-    use crate::Strand;
-    use crate::position::Value;
-    use crate::system::One;
-    use crate::system::Zero;
-
-    #[test]
-    fn it_correctly_deserializes_valid_coordinates() -> Result<(), Box<dyn std::error::Error>> {
-        let coordinate = "seq0:+:1".parse::<Coordinate<Zero>>()?;
-        assert_eq!(coordinate.contig().inner(), "seq0");
-        assert_eq!(coordinate.strand(), &Strand::Positive);
-        assert_eq!(coordinate.position().inner(), &Value::Usize(1));
-        assert_eq!(coordinate.position().inner().get(), Some(1));
-
-        let coordinate = "Y:-:[".parse::<Coordinate<Zero>>()?;
-        assert_eq!(coordinate.contig().inner(), "Y");
-        assert_eq!(coordinate.strand(), &Strand::Negative);
-        assert_eq!(coordinate.position().inner(), &Value::LowerBound);
-        assert_eq!(coordinate.position().inner().get(), None);
-
-        let coordinate = "seq0:+:1".parse::<Coordinate<One>>()?;
-        assert_eq!(coordinate.contig().inner(), "seq0");
-        assert_eq!(coordinate.strand(), &Strand::Positive);
-        assert_eq!(coordinate.position().inner(), &Value::Usize(1));
-        assert_eq!(coordinate.position().get(), Some(1));
-
-        let coordinate = "Y:-:1000".parse::<Coordinate<One>>()?;
-        assert_eq!(coordinate.contig().inner(), "Y");
-        assert_eq!(coordinate.strand(), &Strand::Negative);
-        assert_eq!(coordinate.position().inner(), &Value::Usize(1000));
-        assert_eq!(coordinate.position().get(), Some(1000));
-
-        Ok(())
-    }
-
-    #[test]
-    fn it_correctly_fails_when_deserializing_invalid_coordinates()
-    -> Result<(), Box<dyn std::error::Error>> {
-        let err = "seq0".parse::<Coordinate<One>>().unwrap_err();
-        assert_eq!(err.to_string(), "parse error: invalid format: seq0");
-
-        let err = "seq0:0".parse::<Coordinate<One>>().unwrap_err();
-        assert_eq!(err.to_string(), "parse error: invalid format: seq0:0");
-
-        let err = ":1".parse::<Coordinate<One>>().unwrap_err();
-        assert_eq!(err.to_string(), "parse error: invalid format: :1");
-
-        Ok(())
-    }
-
-    #[test]
-    fn it_creates_valid_coordinates() -> Result<(), Box<dyn std::error::Error>> {
-        // Positive-stranded
-        let coordinate = Coordinate::<Zero>::try_new("seq0", Strand::Positive, 0)?;
-        assert_eq!(coordinate.contig().inner(), "seq0");
-        assert_eq!(coordinate.strand(), &Strand::Positive);
-        assert_eq!(coordinate.position().inner(), &Value::Usize(0));
-
-        // Negative-stranded
-        let coordinate = Coordinate::<Zero>::try_new("seq0", Strand::Negative, 0)?;
-        assert_eq!(coordinate.contig().inner(), "seq0");
-        assert_eq!(coordinate.strand(), &Strand::Negative);
-        assert_eq!(coordinate.position().inner(), &Value::Usize(0));
-
-        // Lower bound
-        let coordinate =
-            Coordinate::<Zero>::try_new("seq0", Strand::Negative, Position::<Zero>::lower_bound())?;
-        assert_eq!(coordinate.contig().inner(), "seq0");
-        assert_eq!(coordinate.strand(), &Strand::Negative);
-        assert_eq!(coordinate.position().inner(), &Value::LowerBound);
-
-        // Attempting to create lower bound on positive strand
-        let err =
-            Coordinate::<Zero>::try_new("seq0", Strand::Positive, Position::<Zero>::lower_bound())
-                .unwrap_err();
-        assert!(matches!(err, Error::LowerBoundOnNonNegativeStrand));
-
-        Ok(())
-    }
-
-    #[test]
-    fn it_correctly_moves_forward_zero_based_positions() -> Result<(), Box<dyn std::error::Error>> {
-        // Positive-stranded
-        let coordinate = Coordinate::<Zero>::try_new("seq0", Strand::Positive, 0)?;
-        let result = coordinate.move_forward(10)?.unwrap();
-
-        assert_eq!(result.contig().inner(), "seq0");
-        assert_eq!(result.position().inner(), &Value::Usize(10));
-        assert_eq!(result.strand(), &Strand::Positive);
-
-        // Negative-stranded
-        let coordinate = Coordinate::<Zero>::try_new("seq0", Strand::Negative, 1000)?;
-        let result = coordinate.move_forward(10)?.unwrap();
-
-        assert_eq!(result.contig().inner(), "seq0");
-        assert_eq!(result.position().inner(), &Value::Usize(990));
-        assert_eq!(result.strand(), &Strand::Negative);
-
-        // Positive-stranded, but with magnitude zero
-        let coordinate = Coordinate::<Zero>::try_new("seq0", Strand::Positive, 0)?;
-        let result = coordinate.move_forward(0)?.unwrap();
-
-        assert_eq!(result.contig().inner(), "seq0");
-        assert_eq!(result.position().inner(), &Value::Usize(0));
-        assert_eq!(result.strand(), &Strand::Positive);
-
-        // Negative-stranded, but with magnitude zero
-        let coordinate = Coordinate::<Zero>::try_new("seq0", Strand::Negative, 0)?;
-        let result = coordinate.move_forward(0)?.unwrap();
-
-        assert_eq!(result.contig().inner(), "seq0");
-        assert_eq!(result.position().inner(), &Value::Usize(0));
-        assert_eq!(result.strand(), &Strand::Negative);
-
-        // Negative-stranded to lower bound
-        let coordinate = Coordinate::<Zero>::try_new("seq0", Strand::Negative, 0)?;
-        let result = coordinate.move_forward(1)?.unwrap();
-
-        assert_eq!(result, Coordinate::<Zero>::lower_bound("seq0"));
-
-        // Negative-stranded overflow (in the negative direction)
-        let coordinate = Coordinate::<Zero>::try_new("seq0", Strand::Negative, 0)?;
-        let result = coordinate.move_forward(2)?;
-
-        assert_eq!(result, None);
-
-        // Negative-bound overflow (in the negative direction)
-        let coordinate = Coordinate::<Zero>::lower_bound("seq0");
-        let result = coordinate.move_forward(1)?;
-
-        assert_eq!(result, None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn it_correctly_moves_forward_one_based_positions() -> Result<(), Box<dyn std::error::Error>> {
-        // Positive-stranded
-        let coordinate = Coordinate::<One>::try_new("seq0", Strand::Positive, 1)?;
-        let result = coordinate.move_forward(10)?.unwrap();
-
-        assert_eq!(result.contig().inner(), "seq0");
-        assert_eq!(result.position().inner(), &Value::Usize(11));
-        assert_eq!(result.strand(), &Strand::Positive);
-
-        // Negative-stranded
-        let coordinate = Coordinate::<One>::try_new("seq0", Strand::Negative, 11)?;
-        let result = coordinate.move_forward(10)?.unwrap();
-
-        assert_eq!(result.contig().inner(), "seq0");
-        assert_eq!(result.position().inner(), &Value::Usize(1));
-        assert_eq!(result.strand(), &Strand::Negative);
-
-        // Positive-stranded, but with magnitude zero
-        let coordinate = Coordinate::<One>::try_new("seq0", Strand::Positive, 1)?;
-        let result = coordinate.move_forward(0)?.unwrap();
-
-        assert_eq!(result.contig().inner(), "seq0");
-        assert_eq!(result.position().inner(), &Value::Usize(1));
-        assert_eq!(result.strand(), &Strand::Positive);
-
-        // Negative-stranded, but with magnitude zero
-        let coordinate = Coordinate::<One>::try_new("seq0", Strand::Negative, 1)?;
-        let result = coordinate.move_forward(0)?.unwrap();
-
-        assert_eq!(result.contig().inner(), "seq0");
-        assert_eq!(result.position().inner(), &Value::Usize(1));
-        assert_eq!(result.strand(), &Strand::Negative);
-
-        // Negative-stranded overflow (to where the lower bound would be).
-        let coordinate = Coordinate::<One>::try_new("seq0", Strand::Negative, 1)?;
-        let result = coordinate.move_forward(1)?;
-
-        assert_eq!(result, None);
-
-        // Negative-stranded overflow (in the negative direction)
-        let coordinate = Coordinate::<One>::try_new("seq0", Strand::Negative, 1)?;
-        let result = coordinate.move_forward(1)?;
-
-        assert_eq!(result, None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn it_correctly_moves_backward_zero_based_positions() -> Result<(), Box<dyn std::error::Error>>
-    {
-        // Positive-stranded
-        let coordinate = Coordinate::<Zero>::try_new("seq0", Strand::Positive, 500)?;
-        let result = coordinate.move_backward(10)?.unwrap();
-
-        assert_eq!(result.contig().inner(), &String::from("seq0"));
-        assert_eq!(result.position().inner(), &Value::Usize(490));
-        assert_eq!(result.strand(), &Strand::Positive);
-
-        // Negative-stranded
-        let coordinate = Coordinate::<Zero>::try_new("seq0", Strand::Negative, 500)?;
-        let result = coordinate.move_backward(10)?.unwrap();
-
-        assert_eq!(result.contig().inner(), &String::from("seq0"));
-        assert_eq!(result.position().inner(), &Value::Usize(510));
-        assert_eq!(result.strand(), &Strand::Negative);
-
-        // Positive-stranded, but with magnitude zero
-        let coordinate = Coordinate::<Zero>::try_new("seq0", Strand::Positive, 0)?;
-        let result = coordinate.move_backward(0)?.unwrap();
-
-        assert_eq!(result.contig().inner(), &String::from("seq0"));
-        assert_eq!(result.position().inner(), &Value::Usize(0));
-        assert_eq!(result.strand(), &Strand::Positive);
-
-        // Negative-stranded, but with magnitude zero
-        let coordinate = Coordinate::<Zero>::try_new("seq0", Strand::Negative, 0)?;
-        let result = coordinate.move_backward(0)?.unwrap();
-
-        assert_eq!(result.contig().inner(), &String::from("seq0"));
-        assert_eq!(result.position().inner(), &Value::Usize(0));
-        assert_eq!(result.strand(), &Strand::Negative);
-
-        // Would try to create a lower bound on the positive strand.
-        let coordinate = Coordinate::<Zero>::try_new("seq0", Strand::Positive, 0)?;
-        let result = coordinate.move_backward(1)?;
-
-        assert_eq!(result, None);
-
-        // Positive-stranded overflow (in the negative direction)
-        let coordinate = Coordinate::<Zero>::try_new("seq0", Strand::Positive, 0)?;
-        let result = coordinate.move_backward(2)?;
-
-        assert_eq!(result, None);
-
-        // Negative-bound
-        let coordinate = Coordinate::<Zero>::lower_bound("seq0");
-        let result = coordinate.move_backward(10)?.unwrap();
-
-        assert_eq!(result.contig().inner(), &String::from("seq0"));
-        assert_eq!(result.position().inner(), &Value::Usize(9));
-        assert_eq!(result.strand(), &Strand::Negative);
-
-        Ok(())
-    }
-
-    #[test]
-    fn it_correctly_moves_backward_one_based_positions() -> Result<(), Box<dyn std::error::Error>> {
-        // Positive-stranded
-        let coordinate = Coordinate::<One>::try_new("seq0", Strand::Positive, 500)?;
-        let result = coordinate.move_backward(10)?.unwrap();
-
-        assert_eq!(result.contig().inner(), &String::from("seq0"));
-        assert_eq!(result.position().inner(), &Value::Usize(490));
-        assert_eq!(result.strand(), &Strand::Positive);
-
-        // Negative-stranded
-        let coordinate = Coordinate::<One>::try_new("seq0", Strand::Negative, 500)?;
-        let result = coordinate.move_backward(10)?.unwrap();
-
-        assert_eq!(result.contig().inner(), &String::from("seq0"));
-        assert_eq!(result.position().inner(), &Value::Usize(510));
-        assert_eq!(result.strand(), &Strand::Negative);
-
-        // Positive-stranded, but with magnitude zero
-        let coordinate = Coordinate::<One>::try_new("seq0", Strand::Positive, 1)?;
-        let result = coordinate.move_backward(0)?.unwrap();
-
-        assert_eq!(result.contig().inner(), &String::from("seq0"));
-        assert_eq!(result.position().inner(), &Value::Usize(1));
-        assert_eq!(result.strand(), &Strand::Positive);
-
-        // Negative-stranded, but with magnitude zero
-        let coordinate = Coordinate::<One>::try_new("seq0", Strand::Negative, 1)?;
-        let result = coordinate.move_backward(0)?.unwrap();
-
-        assert_eq!(result.contig().inner(), &String::from("seq0"));
-        assert_eq!(result.position().inner(), &Value::Usize(1));
-        assert_eq!(result.strand(), &Strand::Negative);
-
-        // Would try to create a lower bound on the positive strand.
-        let coordinate = Coordinate::<One>::try_new("seq0", Strand::Positive, 1)?;
-        let result = coordinate.move_backward(1)?;
-
-        assert_eq!(result, None);
-
-        // Positive-stranded overflow (in the negative direction)
-        let coordinate = Coordinate::<One>::try_new("seq0", Strand::Positive, 1)?;
-        let result = coordinate.move_backward(2)?;
-
-        assert_eq!(result, None);
-
-        Ok(())
-    }
-}
+pub use system::System;

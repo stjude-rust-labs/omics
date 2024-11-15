@@ -9,11 +9,36 @@ homepage.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+default = []
+position-u64 = []
+
 [dependencies]
 omics-core = { path = "../omics-core", version = "0.1.0" }
 
+thiserror.workspace = true
+
 [dev-dependencies]
 anyhow.workspace = true
+criterion.workspace = true
 
 [lints]
 workspace = true
+
+# Benchmarks
+
+[[bench]]
+name = "contigs"
+harness = false
+
+[[bench]]
+name = "positions"
+harness = false
+
+[[bench]]
+name = "coordinates"
+harness = false
+
+[[bench]]
+name = "intervals"
+harness = false

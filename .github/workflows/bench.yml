@@ -1,0 +1,22 @@
+name: Benchmarks
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  bencher:
+    name: bencher
+    runs-on: ubuntu-latest
+    env:
+      BENCHER_PROJECT: omics
+      BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bencherdev/bencher@main
+      - run: |
+          bencher run --github-actions "${{ secrets.GITHUB_TOKEN }}" \
+            --testbed "github-actions" \
+            "cargo bench"

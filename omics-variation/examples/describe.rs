@@ -7,14 +7,13 @@
 
 use std::env;
 
-use omics_coordinate::system::One;
 use omics_molecule::polymer::dna;
 use omics_variation::Variant;
 
 fn main() -> anyhow::Result<()> {
     let variant = env::args().nth(1).expect("missing variant");
 
-    let variant = variant.parse::<Variant<dna::Nucleotide, One>>()?;
+    let variant = variant.parse::<Variant<dna::Nucleotide>>()?;
     println!("{:#?}", variant);
 
     Ok(())
