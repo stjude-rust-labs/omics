@@ -6,10 +6,25 @@ use std::cmp::Ordering;
 const LOWER_BOUND_CHAR: &str = "[";
 
 /// The inner representation for a numerical position value.
+///
+/// In this build, the default shorter positions, stored as a `u32`, have been
+/// used, meaning that the maximum numbered position that can be expressed is
+/// around 4.3 billion (`u32::MAX - 1` to allow for the special, lower-bound
+/// position). This is often a good default because (a) most contigs have a size
+/// less than this value and (b) it allows us to cut the amount of space needed
+/// to store a position in half (useful when keeping, say, interval trees in
+/// memory).
+///
+/// That being said, if you need larger positions, you can enable them with the
+/// `position-u64` feature.
 #[cfg(not(feature = "position-u64"))]
 pub type Number = u32;
 
-/// The inner representation for a numerical position value.
+/// The inner representation for a numerical position value in this build.
+///
+/// In this build, larger positions, stored as a `u64`, have been enabled. This
+/// takes up more space for each stored position but, ultimately, enables even
+/// the largest contigs to be represented.
 #[cfg(feature = "position-u64")]
 pub type Number = u64;
 
@@ -93,7 +108,11 @@ impl std::fmt::Display for Kind {
 // Values
 ////////////////////////////////////////////////////////////////////////////////////////
 
-/// A value for a position.
+/// A common value for a backing both in-base and interbase positions.
+///
+/// As alluded to in the [crate's documentation for
+/// positions](crate#positions), `Value`s represent a common underlying type for
+/// both in-base and interbase positions.
 ///
 /// # Notes
 ///
@@ -299,14 +318,14 @@ mod test {
 
     #[test]
     fn deserialization() {
-        let value = "1".parse::<Value>()?;
+        let value = "1".parse::<Value>().unwrap();
         assert!(matches!(value.get(), Some(1)));
     }
 
     #[test]
     fn from_and_try_into_number() {
         let value = Value::try_new(1).unwrap();
-        assert_eq!(TryInto::<Number>::try_into(value)?, 1);
+        assert_eq!(TryInto::<Number>::try_into(value).unwrap(), 1);
     }
 
     #[test]
@@ -339,9 +358,10 @@ mod test {
     #[test]
     fn values_can_be_created_from_u32() {
         #[cfg(feature = "position-u64")]
-        let v = Value::from(u32::MAX);
-        #[cfg(feature = "position-u64")]
-        assert_eq!(v.get(), Some(u32::MAX as Number));
+        {
+            let v = Value::from(u32::MAX);
+            assert_eq!(v.get(), Some(u32::MAX as Number));
+        }
 
         let v = Value::from(u16::MAX);
         assert_eq!(v.get(), Some(u16::MAX as Number));

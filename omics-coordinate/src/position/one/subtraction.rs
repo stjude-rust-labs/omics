@@ -44,13 +44,13 @@ mod tests {
         // Standard subtraction.
         let position = Position::try_from(10)?;
         let result = position.checked_sub(5).unwrap();
-        assert_eq!(result.inner(), &Value::try_from(5).unwrap());
+        assert_eq!(result.inner(), &Value::try_from(5u32).unwrap());
         assert_eq!(result.get(), Some(5));
 
         // Lowest value possible.
         let position = Position::try_from(10)?;
         let result = position.checked_sub(9).unwrap();
-        assert_eq!(result.inner(), &Value::try_from(1).unwrap());
+        assert_eq!(result.inner(), &Value::try_from(1u32).unwrap());
         assert_eq!(result.get(), Some(1));
 
         // Overflow.
