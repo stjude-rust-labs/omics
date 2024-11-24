@@ -271,9 +271,9 @@
 //! to the first nucleotide using a single, numbered position is impossible.
 //! Indeed, in a strict sense, a _range_ of numbered positions must be used to
 //! encapsulate even this single nucleotide (🤯)—namely, the range `[0-1]` (note
-//! that the range of interbase positions is generally considered _exclusive_,
-//! but that does not apply here when the space slots and nucleotide slots are
-//! split).
+//! that the end position in a range of interbase positions is generally
+//! considered _exclusive_, but that does not apply here when the space slots
+//! and nucleotide slots are split).
 //!
 //! #### Starting Position
 //!
@@ -300,7 +300,7 @@
 //!
 //! #### Design Considerations
 //!
-//! The previously decsribed inability to represent interbase positions as a
+//! The previously described inability to represent interbase positions as a
 //! single number presents a number of practical problems.
 //!
 //! For example, to accurately model positions as described above, a crate would
@@ -327,15 +327,15 @@
 //!   interval starts and ends with an even _lower level_ concept of a
 //!   range/interval?
 //!
-//! In pursuit of pragmatism, this crate codifies the heuristic included in many
-//! that precede it: interbase positions are, instead, represented as single
-//! number that includes the nucleotide following the numbered space slot. This
-//! allows for a much simpler and interoperable representation of positions
-//! between coordinate systems, as the interbase position representing the first
-//! nucleotide `G` is now simply `0` while the in-base position for the first
-//! nucleotide is still `1`. Further, this assumption works nicely with the
-//! expected behavior of intervals, which is discussed further in [the intervals
-//! section of the docs](#intervals).
+//! In pursuit of pragmatism, this crate implements the heuristic included in
+//! many that precede it: interbase positions are, instead, represented as
+//! single number that includes the nucleotide following the numbered space
+//! slot. This allows for a much simpler and interoperable representation of
+//! positions between coordinate systems, as the interbase position representing
+//! the first nucleotide `G` is now simply `0` while the in-base position for
+//! the first nucleotide is still `1`. Further, this assumption works nicely
+//! with the expected behavior of intervals, which is discussed further in [the
+//! intervals section of the docs](#intervals).
 //!
 //! #### Final Thoughts
 //!
