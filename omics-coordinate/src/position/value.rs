@@ -58,16 +58,16 @@ pub enum Error {
     /// A parse error.
     ParseError(ParseError),
 
-    /// Cannot convert a lower-bound to a [`usize`].
-    LowerBoundToUsize,
+    /// Cannot convert a lower-bound to a number.
+    LowerBoundToNumber,
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::ParseError(err) => write!(f, "parse error: {err}"),
-            Error::LowerBoundToUsize => {
-                write!(f, "lower-bound cannot be converted to a usize")
+            Error::LowerBoundToNumber => {
+                write!(f, "lower-bound cannot be converted to a number")
             }
         }
     }
@@ -76,7 +76,7 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {}
 
 ////////////////////////////////////////////////////////////////////////////////////////
-// Kinds of values
+// Value kinds
 ////////////////////////////////////////////////////////////////////////////////////////
 
 /// A kind of value.
@@ -84,11 +84,14 @@ impl std::error::Error for Error {}
 pub enum Kind {
     /// A lower-bound position.
     ///
-    /// The lower bound represents a non-resident value at -1. Obviously,
-    /// positions cannot have a value of -1. That being said, intervals that are
+    /// The lower bound represents a non-resident value at `-1`. Obviously,
+    /// positions cannot have a value of `-1`. That being said, intervals that are
     /// non-inclusive of the end position require such a value to ensure that,
     /// when there is an interval on the negative strand, zero can be included
     /// within the interval.
+    ///
+    /// This position kind will only be present on the negative strand as an
+    /// exclusive bound of an interval range.
     LowerBound,
 
     /// A numerical position.
@@ -99,7 +102,7 @@ impl std::fmt::Display for Kind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Kind::LowerBound => write!(f, "lower-bound"),
-            Kind::Numerical => todo!(),
+            Kind::Numerical => write!(f, "numerical"),
         }
     }
 }
@@ -110,22 +113,32 @@ impl std::fmt::Display for Kind {
 
 /// A common value for a backing both in-base and interbase positions.
 ///
-/// As alluded to in the [crate's documentation for
-/// positions](crate#positions), `Value`s represent a common underlying type for
-/// both in-base and interbase positions.
+/// As alluded to in the [crate's documentation for positions](crate#positions),
+/// `Value`s represent a common underlying type for both in-base and interbase
+/// positions. This is useful for a variety of reasons, but the most important
+/// reason is that it greatly simplifies implementation.
 ///
-/// # Notes
+/// Generally, an end-user of the crate won't need to work with [`Value`]s
+/// directly. Instead, they will be created and managed for you behind the
+/// scenes when positions are created.
 ///
+/// # Implementation Notes
+///
+/// * Positions are stored as a `u32` by default. This is to encourage saving
+/// space for the vast majority of genomes that don't require a `u64` backed
+/// position. If you need `u64` positions, you can enable them with the
+/// `position-u64` feature you need `u64` positions, you can enable them with
+/// the `position-u64` feature.
 /// * The maximum value a numbered position can hold is the maximum of the inner
-///   numerical type minus 1. This is because [`Number::MAX`] is used as a
-///   special value to represent the lower-bound.
+/// numerical type minus 1. This is because [`Number::MAX`] is used as a special
+/// value to represent the lower-bound.
 /// * As an end user, you shouldn't have to use this struct because you
-///   shouldn't generally be constructing [`Value`]s directly—they are intended
-///   to be an implementation detail of [`Position`]s. Instead, you should
-///   probably just construct a position in the coordinate system of your
-///   choosing directly.
+/// shouldn't generally be constructing [`Value`]s directly—they are intended to
+/// be an implementation detail of [`Position`]s. Instead, you should probably
+/// just construct a position in the coordinate system of your choosing
+/// directly.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Value(Number);
+pub(crate) struct Value(Number);
 
 impl Ord for Value {
     fn cmp(&self, other: &Self) -> Ordering {
@@ -152,10 +165,6 @@ impl Value {
     ///   wrapped in [`Some`] will be returned.
     /// * Else, [`None`] will be returned.
     ///
-    /// # Notes
-    ///
-    /// See the note on [`Value`] regarding when this method should be used.
-    ///
     /// # Examples
     ///
     /// ```
@@ -181,10 +190,6 @@ impl Value {
     /// Creates a lower-bound value.
     ///
     /// See [`Kind::LowerBound`] for more information.
-    ///
-    /// # Notes
-    ///
-    /// See the note on [`Value`] regarding when this method should be used.
     ///
     /// # Examples
     ///
@@ -219,7 +224,7 @@ impl Value {
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn get(&self) -> Option<Number> {
+    pub(crate) fn get(&self) -> Option<Number> {
         match self.0 {
             LOWER_BOUND_VALUE => None,
             v => Some(v),
@@ -239,7 +244,7 @@ impl Value {
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn kind(&self) -> Kind {
+    pub(crate) fn kind(&self) -> Kind {
         match self.0 {
             LOWER_BOUND_VALUE => Kind::LowerBound,
             _ => Kind::Numerical,
@@ -272,12 +277,8 @@ impl std::fmt::Display for Value {
     }
 }
 
-// NOTE: this is added for convenience—most values that are manually created
-// will be lower than [`u16::MAX`] and, since that will always fit into the
-// allowable range of a value, we can allow creation of a value from one without
-// checking.
 /// A macro to implement [`From`] for smaller integers.
-macro_rules! from_small_int {
+macro_rules! from_smaller_int {
     ($from:ty) => {
         impl From<$from> for Value {
             fn from(value: $from) -> Self {
@@ -288,16 +289,16 @@ macro_rules! from_small_int {
 }
 
 #[cfg(feature = "position-u64")]
-from_small_int!(u32);
-from_small_int!(u16);
-from_small_int!(u8);
+from_smaller_int!(u32);
+from_smaller_int!(u16);
+from_smaller_int!(u8);
 
 impl TryFrom<Value> for Number {
     type Error = Error;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value.0 {
-            LOWER_BOUND_VALUE => Err(Error::LowerBoundToUsize),
+            LOWER_BOUND_VALUE => Err(Error::LowerBoundToNumber),
             v => Ok(v),
         }
     }
@@ -332,7 +333,7 @@ mod test {
     fn a_lower_bound_cannot_convert_to_number() {
         let value = Value::lower_bound();
         let err = TryInto::<Number>::try_into(value).unwrap_err();
-        assert!(matches!(err, Error::LowerBoundToUsize));
+        assert!(matches!(err, Error::LowerBoundToNumber));
     }
 
     #[test]
@@ -356,7 +357,7 @@ mod test {
     }
 
     #[test]
-    fn values_can_be_created_from_u32() {
+    fn values_can_be_created_from_smaller_ints() {
         #[cfg(feature = "position-u64")]
         {
             let v = Value::from(u32::MAX);
@@ -387,10 +388,9 @@ mod test {
                     value.kind() == Kind::Numerical,
                     "any `Value` that `get()`s must be numerical"
                 ),
-                None => assert!(
-                    value.kind() == Kind::LowerBound,
-                    "the only `Value` that doesn't `get()` must be the lower bound"
-                ),
+                // SAFETY: a lower-bound cannot be created from
+                // [`Value::try_new()`], so this should never occur.
+                None => unreachable!(),
             }
         }
     }

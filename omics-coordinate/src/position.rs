@@ -2,10 +2,10 @@
 
 use std::fmt::Debug;
 
-use crate::CheckedAdd;
-use crate::CheckedSub;
 use crate::position::value::Kind;
 use crate::system::System;
+use crate::CheckedAdd;
+use crate::CheckedSub;
 
 pub mod one;
 pub mod value;
@@ -57,7 +57,12 @@ pub enum Error {
     Value(value::Error),
 
     /// Could not create value from [`Number`].
-    InvalidValue(Number),
+    ///
+    /// This is generally because a number was specified that corresponds to a
+    /// reserved position within the numerical space (e.g., the number that
+    /// represents the lower bound was used to try to construct a numerical
+    /// position).
+    InvalidNumbericalPosition(Number),
 }
 
 impl std::fmt::Display for Error {
@@ -68,7 +73,9 @@ impl std::fmt::Display for Error {
             }
             Error::Parse(err) => write!(f, "parse error: {err}"),
             Error::Value(err) => write!(f, "value error: {err}"),
-            Error::InvalidValue(number) => write!(f, "invalid value: {number}"),
+            Error::InvalidNumbericalPosition(number) => {
+                write!(f, "invalid numberical position: {number}")
+            }
         }
     }
 }
@@ -408,7 +415,10 @@ mod tests {
         let position = Position::<Zero>::lower_bound();
         let err = <Position<Zero> as TryInto<Number>>::try_into(position).unwrap_err();
 
-        assert!(matches!(err, Error::Value(value::Error::LowerBoundToUsize)));
+        assert!(matches!(
+            err,
+            Error::Value(value::Error::LowerBoundToNumber)
+        ));
     }
 
     #[test]

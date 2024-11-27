@@ -1,10 +1,10 @@
-//! Addition for 0-based positions.
+//! Addition for 0-based, interbase positions.
 
-use crate::CheckedAdd;
-use crate::position::Value;
 use crate::position::value::Kind;
 use crate::position::value::Number;
 use crate::position::zero::Position;
+use crate::position::Value;
+use crate::CheckedAdd;
 
 impl CheckedAdd<Number> for Position {
     type Output = Self;
@@ -43,8 +43,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_adds_usize_positions_together_correctly()
-    -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn it_adds_usize_positions_together_correctly(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         let position = Position::from(1);
         let result = position.checked_add(2).unwrap();
         assert_eq!(result.inner(), &Value::try_new(3).unwrap());
@@ -58,8 +58,8 @@ mod tests {
     }
 
     #[test]
-    fn it_adds_a_lower_bound_position_and_a_usize_position_together_correctly()
-    -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn it_adds_a_lower_bound_position_and_a_usize_position_together_correctly(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         let position = Position::lower_bound();
         let result = position.checked_add(0).unwrap();
         assert_eq!(result.inner(), &Value::lower_bound());
