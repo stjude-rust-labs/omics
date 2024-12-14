@@ -34,6 +34,11 @@
   </p>
 </p>
 
+**NOTE: this crate is highly experimental and is not ready for production or even really 
+experimenting with. There are many things I already don't like about or are arguably
+up incorrect within the existing implementation. As I find time, I'll continue to update
+the crate with these changes.
+
 ## 🎨 Features
 
 The `omics` crate provides foundational data structures for working with omics data. The
