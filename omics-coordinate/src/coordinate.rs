@@ -6,10 +6,10 @@ use thiserror::Error;
 use crate::Contig;
 use crate::Position;
 use crate::Strand;
-use crate::System;
 use crate::position;
 use crate::position::Number;
 use crate::strand;
+use crate::system::r#trait::System;
 
 pub mod base;
 pub mod interbase;

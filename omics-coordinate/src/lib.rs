@@ -544,4 +544,3 @@ pub use coordinate::interbase;
 pub use interval::Interval;
 pub use position::Position;
 pub use strand::Strand;
-pub use system::System;

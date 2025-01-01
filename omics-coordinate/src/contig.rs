@@ -1,12 +1,8 @@
 //! Contiguous molecules.
 
-mod corpus;
-
 use std::convert::Infallible;
 
 use string_interner::symbol::SymbolU32;
-
-use crate::contig::corpus::CORPUS;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // Contig

@@ -9,7 +9,7 @@ use omics_coordinate::Contig;
 #[derive(Parser, Debug)]
 pub struct Args {
     /// The number of allocations to use.
-    #[arg(default_value_t = 100_000_000)]
+    #[arg(default_value_t = 5_000_000_000)]
     n: usize,
 }
 

@@ -9,3 +9,5 @@ rustc-ice*
 .idea
 
 flamegraph.svg
+perf.data
+perf.data.old

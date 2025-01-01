@@ -4,11 +4,11 @@ use std::num::ParseIntError;
 
 use thiserror::Error;
 
-use crate::System;
 use crate::math::CheckedAdd;
 use crate::math::CheckedSub;
 use crate::system::Base;
 use crate::system::Interbase;
+use crate::system::r#trait::System;
 
 pub mod base;
 pub mod interbase;
