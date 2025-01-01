@@ -70,7 +70,7 @@ mod tests {
 
         match variant {
             Variant::SingleNucleotideVariation(snv) => {
-                assert_eq!(snv.coordinate().contig().as_str(), "seq0");
+                assert_eq!(snv.coordinate().contig().value(), "seq0");
                 assert_eq!(snv.coordinate().strand(), Strand::Positive);
                 assert_eq!(snv.coordinate().position().get(), 1);
                 assert_eq!(snv.reference(), &dna::Nucleotide::A);

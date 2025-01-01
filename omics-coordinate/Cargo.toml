@@ -17,6 +17,7 @@ position-u64 = []
 omics-core = { path = "../omics-core", version = "0.1.0" }
 
 thiserror.workspace = true
+string-interner.workspace = true
 
 [dev-dependencies]
 anyhow.workspace = true

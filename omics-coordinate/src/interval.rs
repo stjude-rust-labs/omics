@@ -418,7 +418,7 @@ where
     /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
     /// let interval = Interval::try_new(start, end)?;
     ///
-    /// assert_eq!(interval.contig().as_str(), "seq0");
+    /// assert_eq!(interval.contig().value(), "seq0");
     ///
     /// //======//
     /// // Base //
@@ -428,7 +428,7 @@ where
     /// let end = Coordinate::<Base>::try_new("seq0", "+", 20)?;
     /// let interval = Interval::try_new(start, end)?;
     ///
-    /// assert_eq!(interval.contig().as_str(), "seq0");
+    /// assert_eq!(interval.contig().value(), "seq0");
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -1359,14 +1359,14 @@ mod tests {
     fn parse() {
         let value = format!("seq0:+:0-{}", Number::MAX);
         let interval = value.parse::<Interval<Interbase>>().unwrap();
-        assert_eq!(interval.contig().as_str(), "seq0");
+        assert_eq!(interval.contig().value(), "seq0");
         assert_eq!(interval.strand(), Strand::Positive);
         assert_eq!(interval.start().position().get(), 0);
         assert_eq!(interval.end().position().get(), Number::MAX);
 
         let value = format!("seq0:-:{}-0", Number::MAX);
         let interval = value.parse::<Interval<Interbase>>().unwrap();
-        assert_eq!(interval.contig().as_str(), "seq0");
+        assert_eq!(interval.contig().value(), "seq0");
         assert_eq!(interval.strand(), Strand::Negative);
         assert_eq!(interval.start().position().get(), Number::MAX);
         assert_eq!(interval.end().position().get(), 0);

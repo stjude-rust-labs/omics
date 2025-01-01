@@ -312,7 +312,7 @@ mod tests {
     fn it_creates_a_variant_in_a_dna_context() -> Result<(), Box<dyn std::error::Error>> {
         let variant = "seq0:+:1:A:C".parse::<Variant<dna::Nucleotide>>()?;
 
-        assert_eq!(variant.coordinate().contig().as_str(), "seq0");
+        assert_eq!(variant.coordinate().contig().value(), "seq0");
         assert_eq!(variant.coordinate().strand(), Strand::Positive);
         assert_eq!(variant.coordinate().position().get(), 1);
         assert_eq!(variant.reference(), &dna::Nucleotide::A);
@@ -325,7 +325,7 @@ mod tests {
     fn it_creates_a_variant_in_a_rna_context() -> Result<(), Box<dyn std::error::Error>> {
         let variant = "seq0:+:1:U:C".parse::<Variant<rna::Nucleotide>>()?;
 
-        assert_eq!(variant.coordinate().contig().as_str(), "seq0");
+        assert_eq!(variant.coordinate().contig().value(), "seq0");
         assert_eq!(variant.coordinate().strand(), Strand::Positive);
         assert_eq!(variant.coordinate().position().get(), 1);
         assert_eq!(variant.reference(), &rna::Nucleotide::U);
@@ -339,7 +339,7 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         let variant = "seq0:-:1:A:C".parse::<Variant<dna::Nucleotide>>()?;
 
-        assert_eq!(variant.coordinate().contig().as_str(), "seq0");
+        assert_eq!(variant.coordinate().contig().value(), "seq0");
         assert_eq!(variant.coordinate().strand(), Strand::Negative);
         assert_eq!(variant.coordinate().position().get(), 1);
         assert_eq!(variant.reference(), &dna::Nucleotide::A);
@@ -353,7 +353,7 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         let variant = "seq0:-:1:U:C".parse::<Variant<rna::Nucleotide>>()?;
 
-        assert_eq!(variant.coordinate().contig().as_str(), "seq0");
+        assert_eq!(variant.coordinate().contig().value(), "seq0");
         assert_eq!(variant.coordinate().strand(), Strand::Negative);
         assert_eq!(variant.coordinate().position().get(), 1);
         assert_eq!(variant.reference(), &rna::Nucleotide::U);
@@ -367,7 +367,7 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         let variant = "seq0:1:A:C".parse::<Variant<dna::Nucleotide>>()?;
 
-        assert_eq!(variant.coordinate().contig().as_str(), "seq0");
+        assert_eq!(variant.coordinate().contig().value(), "seq0");
         assert_eq!(variant.coordinate().strand(), Strand::Positive);
         assert_eq!(variant.coordinate().position().get(), 1);
         assert_eq!(variant.reference(), &dna::Nucleotide::A);
@@ -381,7 +381,7 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         let variant = "seq0:1:U:C".parse::<Variant<rna::Nucleotide>>()?;
 
-        assert_eq!(variant.coordinate().contig().as_str(), "seq0");
+        assert_eq!(variant.coordinate().contig().value(), "seq0");
         assert_eq!(variant.coordinate().strand(), Strand::Positive);
         assert_eq!(variant.coordinate().position().get(), 1);
         assert_eq!(variant.reference(), &rna::Nucleotide::U);

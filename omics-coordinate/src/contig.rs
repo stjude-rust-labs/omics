@@ -1,6 +1,12 @@
 //! Contiguous molecules.
 
+mod corpus;
+
 use std::convert::Infallible;
+
+use string_interner::symbol::SymbolU32;
+
+use crate::contig::corpus::CORPUS;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // Contig
@@ -18,7 +24,7 @@ use std::convert::Infallible;
 /// For a more in-depth discussion on this, please see [this section of the
 /// docs](crate#contigs).
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Contig(String);
+pub struct Contig(SymbolU32);
 
 impl Contig {
     /// Attempts to create a new contig.
@@ -30,15 +36,16 @@ impl Contig {
     ///
     /// let contig = Contig::new("chr1");
     /// ```
-    pub fn new(value: impl Into<String>) -> Self {
-        Self(value.into())
+    pub fn new(value: &str) -> Self {
+        let id = CORPUS.write().unwrap().get_or_intern(value);
+        Self(id)
     }
 
     // NOTE: an `inner()` method is explicitly not included as the type
     // dereferences `String`. This means that the `as_str()` method is usable
     // for this purpose.
 
-    /// Consumes `self` and returns the inner value.
+    /// Returns the value of the contig.
     ///
     /// # Examples
     ///
@@ -46,10 +53,10 @@ impl Contig {
     /// use omics_coordinate::Contig;
     ///
     /// let contig = Contig::new("chr1");
-    /// assert_eq!(contig.into_inner(), String::from("chr1"));
+    /// assert_eq!(contig.value(), String::from("chr1"));
     /// ```
-    pub fn into_inner(self) -> String {
-        self.0
+    pub fn value(&self) -> String {
+        CORPUS.read().unwrap().resolve(self.0).unwrap().to_owned()
     }
 }
 
@@ -59,7 +66,7 @@ impl Contig {
 
 impl std::fmt::Display for Contig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.value())
     }
 }
 
@@ -77,14 +84,6 @@ impl From<&str> for Contig {
     }
 }
 
-impl std::ops::Deref for Contig {
-    type Target = String;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -92,6 +91,6 @@ mod tests {
     #[test]
     fn parse() {
         let contig = "chr1".parse::<Contig>().expect("contig to parse");
-        assert_eq!(contig.as_str(), "chr1");
+        assert_eq!(contig.value().as_str(), "chr1");
     }
 }
