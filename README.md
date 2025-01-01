@@ -31,13 +31,19 @@
     ·
     ⭐ Consider starring the repo! ⭐
     <br />
+
   </p>
 </p>
 
-**NOTE: this crate is highly experimental and is not ready for production or even really 
-experimenting with. There are many things I already don't like about or are arguably
-up incorrect within the existing implementation. As I find time, I'll continue to update
-the crate with these changes.**
+> [!WARNING]
+>
+> **Project Status**: 🔴 Incubating 🔴
+>
+> This crate is incubating and is not ready to be depended on—either in terms of
+> correctness or stability. Certainly this is true for production, though we
+> welcome anyone developing a tool to try out some of the more mature crates and
+> give feeback. Just beware that the crate may change out from under you, may
+> not be feature complete soon (or ever), or anything in-between.
 
 ## 🎨 Features
 
