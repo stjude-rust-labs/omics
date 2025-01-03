@@ -77,6 +77,12 @@ impl From<&str> for Contig {
     }
 }
 
+impl From<String> for Contig {
+    fn from(value: String) -> Self {
+        Self::new(value)
+    }
+}
+
 impl std::ops::Deref for Contig {
     type Target = String;
 
