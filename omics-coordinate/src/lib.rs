@@ -18,10 +18,15 @@
 //! Coordinates, via their positions, can fall within the _interbase_ coordinate
 //! system (which is closely related to the 0-based, half-open coordinate
 //! system) or the _in-base_ coordinate system (closely related to the 1-based,
-//! full-closed coordinate system). If you want to learn more about the
-//! supported coordinate systems, or if you want to learn why this crate uses
-//! the terms that it does (e.g., "in-base" instead of "1-based"), please jump
-//! to [this section](crate#positions) of the docs.
+//! full-closed coordinate system). In this crate, the interbase coordinate
+//! system is denoted using the `interbase`/`Interbase` identifiers, and the
+//! in-base coordinate system is denoted using the `base`/`Base` identifiers (we
+//! didn't like the way `in_base`/`InBase` looked).
+//!
+//! If you want to learn more about the supported coordinate systems, or if you
+//! want to learn why this crate uses the terms that it does (e.g., "in-base"
+//! instead of "1-based"), please jump to [this section](crate#positions) of the
+//! docs.
 //!
 //! ### Scope
 //!
@@ -31,14 +36,14 @@
 //!
 //! ### Quickstart
 //!
-//! To get started, you'll need to decide if you want to use 0-based or 1-based
-//! coordinates. This decision largely depends on your use case, the consumers
-//! of the data, and the context of both (a) where input data is coming from and
-//! (b) where output data will be shared. Note that, if you're working with a
-//! common bioinformatics file format, the coordinate system is often dictated
-//! by the format itself. If you need help deciding which coordinate system to
-//! use, you should start by reading [the positions section](#positions) of the
-//! docs.
+//! To get started, you'll need to decide if you want to use interbase or
+//! in-base coordinates. This decision largely depends on your use case, the
+//! consumers of the data, and the context of both (a) where input data is
+//! coming from and (b) where output data will be shared. Note that, if you're
+//! working with a common bioinformatics file format, the coordinate system is
+//! often dictated by the format itself. If you need help deciding which
+//! coordinate system to use, you should start by reading [the positions
+//! section](#positions) of the docs.
 //!
 //! Once you've decided on which coordinate system you'd like to use, you can
 //! create coordinates like so:
@@ -48,19 +53,19 @@
 //! use omics_coordinate::system::Base;
 //! use omics_coordinate::system::Interbase;
 //!
-//! // An 0-based, interbase coordinate.
+//! // An interbase coordinate.
 //! let coordinate = Coordinate::<Interbase>::try_new("seq0", "+", 0)?;
 //! println!("{:#}", coordinate);
 //!
-//! // A 1-based, in-base coordinate.
+//! // A in-base coordinate.
 //! let coordinate = Coordinate::<Base>::try_new("seq0", "+", 1)?;
 //! println!("{:#}", coordinate);
 //!
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
-//! For convenience, the crate also provides type aliases for the 0-based and
-//! 1-based variants of the relevant concepts. For example, you can use a
+//! For convenience, the crate also provides type aliases for the interbase and
+//! in-base variants of the relevant concepts. For example, you can use a
 //! [`Position<Interbase>`] by instead simply importing a
 //! [`zero::Position`](crate::position::zero::Position).
 //!
@@ -187,14 +192,15 @@
 //!
 //! In the authors' opinion, not only is this not true, it also doesn't serve
 //! you well to think of the coordinate systems as anything less than entirely
-//! different universes that must be responsibly traversed between. To be clear,
-//! we're not suggesting that the existing materials are _wrong_—often, you can
-//! follow the conventions laid out, and, as long as the baked-in assumptions
-//! are consistently true for your use case, everything will be well. That said,
-//! we endeavour to go futher within this crate—to explore the very fabric of
-//! these coordinate systems, point out the assumptions made in each coordinate
-//! system, and enable you to understand and write code that works across the
-//! spectrum of possible position representations.
+//! different universes that must be explicitly and responsibly traversed
+//! between. To be clear, we're not suggesting that the existing materials are
+//! _wrong_—often, you can follow the conventions laid out, and, as long as the
+//! baked-in assumptions are consistently true for your use case, everything
+//! will be well. That said, we endeavour to go futher within this crate—to
+//! explore the very fabric of these coordinate systems, point out the
+//! assumptions made in each coordinate system, and enable you to understand and
+//! write code that works across the spectrum of possible position
+//! representations.
 //!
 //! #### In-base and Interbase Positions
 //!
@@ -292,77 +298,22 @@
 //! or know of other reasons):
 //!
 //! * **History.** Biological coordinate systems and databases have historically
-//!   used a starting position of `1`. Thus, in-base coordinates (which, again,
-//!   are generally considered to be more suitable for a broader biological
-//!   audience) tend to follow these same conventions.
-//! * **Intention.** Interbase coordinates, on the other hand, depart from a
-//!   biologically intuitive model in favor of a more computationally intuitive
-//!   model. To that end, interbase positions typically mirror programming
-//!   languages in that counting starts at `0`. This suggests that, many times,
-//!   interbase coordinates are a more natural fit for existing data structures
-//!   and algorithms.
+//!   started with the first entity of a sequence at position `1`. Thus, in-base
+//!   coordinates (which, again, are generally considered to be more suitable
+//!   for a broader biological audience) tend to follow these same conventions.
+//!   Because interbase positions effectively capture the space _around_ these
+//!   entities, a number before one is needed to represent the space before the
+//!   first entity.
+//! * **Intention.** This interplay works out well, as interbase coordinates
+//!   depart from a biologically intuitive model in favor of a more
+//!   computationally intuitive model. To that end, interbase positions
+//!   typically mirror programming languages in that counting starts at `0`.
+//!   This suggests that, many times, interbase coordinates are a more natural
+//!   fit for existing data structures and algorithms.
 //! * **Convention.** Beyond the reasons above (and, further, not strictly
 //!   imposed by the definitions of interbase and in-base coordinate systems),
 //!   the community has evolved to use the starting position of `0` or `1` to
 //!   allude to the use of interbase and in-base positions, respectively.
-//!
-//! #### Design Considerations
-//!
-//! The previously decsribed inability to represent interbase positions as a
-//! single number presents a number of practical problems.
-//!
-//! For example, to accurately model positions as described above, a crate would
-//! need to support both _numerical_ positions and _interval-based_ positions at
-//! the same time. All higher-order concepts that include positions, such as
-//! coordinates and intervals, would need to somehow present an ergonomic
-//! interface and mental model for working with these very different models of a
-//! position. Among other drawbacks, modeling things in this way would introduce
-//! an incredible duplication of effort and additional opportunities for bugs to
-//! be introduced.
-//!
-//! Beyond these practical considerations, designing a range-based, singular
-//! position is not trivial. For example, any range must have a more
-//! fundamental, singular type that represents the start and the end of the
-//! range:
-//!
-//! * Should the crate introduce an even lower level concept into the crate
-//!   below positions (e.g., a "number"?) that enables this design? If so, this
-//!   many levels of abstraction introduce significant additional mental load
-//!   for would-be users of such a crate.
-//! * How would these range-based positions interact with the aforementioned
-//!   upstream facilities, such as intervals? Intervals start and end with a
-//!   position—isn't it much more confusing for users of the crate if an
-//!   interval starts and ends with an even _lower level_ concept of a
-//!   range/interval?
-//!
-//! In pursuit of pragmatism, this crate codifies the heuristic included in many
-//! that precede it: interbase positions are, instead, represented as single
-//! number that includes the nucleotide following the numbered space slot. This
-//! allows for a much simpler and interoperable representation of positions
-//! between coordinate systems, as the interbase position representing the first
-//! nucleotide `G` is now simply `0` while the in-base position for the first
-//! nucleotide is still `1`. Further, this assumption works nicely with the
-//! expected behavior of intervals, which is discussed further in [the intervals
-//! section of the docs](#intervals).
-//!
-//! #### Final Thoughts
-//!
-//! Though the authors feel it is more intuitive to teach the positioning
-//! systems using the "interbase" and "in-base" nomenclature (and, explicitly,
-//! we wish these designations were used more pervasively in the community!),
-//! these terms are not frequently used in the literature today. Indeed, it is
-//! much more common to hear interbase positions referred to as "0-based"
-//! positions and in-base positions referred to as "1-based" positions.
-//!
-//! As such, the following statements are true throughout the rest of this
-//! document and within the crate itself:
-//!
-//! * The term **0-based** is used in place of and is interchangeable with the
-//!   term "interbase" with the codified assumption that the coordinate system
-//!   will always start at position zero.
-//! * The term **1-based** is used in place of and is interchangeable with the
-//!   terms "in-base" and "base" with the codified assumption that the
-//!   coordinate system will always start at position one.
 //!
 //! ## Strand
 //!
@@ -427,20 +378,8 @@
 //!
 //! Intervals describe a range of positions upon a contiguous molecule.
 //! Generally speaking, you can think of an interval as simply a start
-//! coordinate and end coordinate.
-//!
-//! As described above, positions can be either interbase (includes the
-//! nucletide following the specified numbered space slot) or in-base (includes
-//! the nucleotide at the specified numbered nucleotide slot). Given these
-//! characteristics, intervals that are comprised of these two different types
-//! of positions generally behave differently to accentuate their strong points:
-//!
-//! - Interbase intervals tend to be **half-open**, meaning that all nucleotides
-//!   contained between the start and end positions (but not including the last
-//!   position) are included within the range.
-//! - In-base intervals tend to be **fully-closed**, meaning that both the
-//!   nucleotides at the start and end positions of the interval are included in
-//!   the range.
+//! coordinate and end coordinate within one of the coordinate systems.
+//! Intervals are always closed _with respect to their comprising coordinates_.
 //!
 //! The following figure illustrates this concept using the notation described
 //! in [the position section of the docs](#positions).
@@ -452,28 +391,15 @@
 //! ║   1   ║   2   ║   3   ║   4   ║   5   ║   6   ║   7   ║   In-base Positions
 //! 0       1       2       3       4       5       6       7   Interbase Positions
 //! ===========================================================
-//! ┃   ┃                                               ┃   ░
-//! ┃   ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛   ░   seq0:+:1-7 (1-based, fully-closed)
-//! ┃                Both contain "GATATGA"                 ░
-//! ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   ░   seq0:+:0-7 (0-based, half-open)
+//! ┃   ┃                                               ┃   ┃
+//! ┃   ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛   ┃   seq0:+:1-7 (In-base interval)
+//! ┃                Both contain "GATATGA"                 ┃
+//! ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛   seq0:+:0-7 (Interbase interval)
 //! ```
-//!
-//! By looking at this figure, the reason for not including the end position in
-//! the interbase coordinate system should be relatively intuitive: inclusion of
-//! position seven (`7`) in the interbase interval would mean that the
-//! nucleotide following position seven would also be included in the range.
-//!
-//! Notably, this means that intervals in the two systems need to be treated
-//! carefully internally. For example, the length of an interval in the
-//! interbase coordinate system is found with the formula `end - start`, while
-//! the length of an interval in the in-base coordinate system is `end - start +
-//! 1`. That being said, this crate largely handles the differences in
-//! implementation for these two coordiante systems, meaning that you can use
-//! either with confidence via a common interface.
 //!
 //! # Crate Design
 //!
-//! Throughout the crate, you will see references to 0-based and 1-based
+//! Throughout the crate, you will see references to interbase and in-base
 //! variants of the concepts above. For example, there is a core [`Position`]
 //! struct that is defined like so:
 //!
@@ -488,12 +414,12 @@
 // TODO: this is a false positive missing doc link, remove this when it gets fixed.
 #![allow(rustdoc::broken_intra_doc_links)]
 //! The struct takes a single, generic parameter that is a [`System`]. In this
-//! design, functionality that is fundamental to both 0-based and 1-based
+//! design, functionality that is fundamental to both interbase and in-base
 //! position types are implemented in the core [`Position`] struct.
 //! Functionality that is different between the two coordinate systems is
-//! implemented through traits (in the case of positions,
-//! [the `Position` trait](crate::position::r#trait::Position<S>)) and exposed
-//! through trait-constrained methods (e.g., [`Position::try_new`]).
+//! implemented through traits (in the case of positions, [the `Position`
+//! trait](crate::position::r#trait::Position<S>)) and exposed through
+//! trait-constrained methods (e.g., [`Position::checked_add`]).
 
 //! Note that some concepts, such as [`Contig`] and [`Strand`] are coordinate
 //! system invariant. As such, they don't take a [`System`] generic type
