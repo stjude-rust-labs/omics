@@ -7,6 +7,8 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Unreleased
 
+## 0.2.0 - 01-03-2025
+
 ### Revise
 
 - Promotes the `position-u64` feature of `omics-coordinate` to the top-level
