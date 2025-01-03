@@ -1,6 +1,6 @@
 [package]
 name = "omics-variation"
-version = "0.1.0"
+version = "0.2.0"
 description = "Foundational representations of variation in the Rust omics ecosystem"
 authors.workspace = true
 license.workspace = true
