@@ -12,6 +12,11 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Promotes the `position-u64` feature of `omics-coordinate` to the top-level
   `omics` crate ([#4](https://github.com/stjude-rust-labs/omics/pull/4)).
 
+### Crate Updates
+
+- `omics-coordinate`: bumped to v0.2.0
+  ([release](https://github.com/stjude-rust-labs/omics/releases/tag/omics-coordinate-v0.2.0))
+
 ## 0.1.0 - 10-09-2024
 
 ### Crate Updates

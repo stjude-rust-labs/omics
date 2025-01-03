@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Crate Updates
+
+- `omics-coordinate`: bumped to v0.2.0
+  ([release](https://github.com/stjude-rust-labs/omics/releases/tag/omics-coordinate-v0.2.0))
+
 ## 0.1.0 - 10-09-2024
 
 ### Added
 
-* Added the initial version of `omics-variation` crate.
+- Added the initial version of `omics-variation` crate.
