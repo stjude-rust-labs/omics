@@ -324,6 +324,42 @@ where
         &self.start
     }
 
+    /// Consumes `self` and returns the start coordinate.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_coordinate::Coordinate;
+    /// use omics_coordinate::Interval;
+    /// use omics_coordinate::system::Base;
+    /// use omics_coordinate::system::Interbase;
+    ///
+    /// //===========//
+    /// // Interbase //
+    /// //===========//
+    ///
+    /// let start = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
+    /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
+    /// let interval = Interval::try_new(start.clone(), end)?;
+    ///
+    /// assert_eq!(interval.into_start(), start);
+    ///
+    /// //======//
+    /// // Base //
+    /// //======//
+    ///
+    /// let start = Coordinate::<Base>::try_new("seq0", "+", 10)?;
+    /// let end = Coordinate::<Base>::try_new("seq0", "+", 20)?;
+    /// let interval = Interval::try_new(start.clone(), end)?;
+    ///
+    /// assert_eq!(interval.into_start(), start);
+    ///
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn into_start(self) -> Coordinate<S> {
+        self.start
+    }
+
     /// Gets a reference to the end coordinate.
     ///
     /// # Examples
@@ -358,6 +394,42 @@ where
     /// ```
     pub fn end(&self) -> &Coordinate<S> {
         &self.end
+    }
+
+    /// Consumes `self` and returns the end coordinate.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_coordinate::Coordinate;
+    /// use omics_coordinate::Interval;
+    /// use omics_coordinate::system::Base;
+    /// use omics_coordinate::system::Interbase;
+    ///
+    /// //===========//
+    /// // Interbase //
+    /// //===========//
+    ///
+    /// let start = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
+    /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
+    /// let interval = Interval::try_new(start, end.clone())?;
+    ///
+    /// assert_eq!(interval.into_end(), end);
+    ///
+    /// //======//
+    /// // Base //
+    /// //======//
+    ///
+    /// let start = Coordinate::<Base>::try_new("seq0", "+", 10)?;
+    /// let end = Coordinate::<Base>::try_new("seq0", "+", 20)?;
+    /// let interval = Interval::try_new(start, end.clone())?;
+    ///
+    /// assert_eq!(interval.into_end(), end);
+    ///
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn into_end(self) -> Coordinate<S> {
+        self.end
     }
 
     /// Consumes `self` and returns the start and end coordinates.
@@ -876,6 +948,86 @@ where
                 .position()
                 .distance_unchecked(self.start().position()),
         )
+    }
+
+    /// Returns the coordinate at the offset within the interval.
+    ///
+    /// This method only returns the coordinate if the coordinate falls within
+    /// the interval.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_coordinate::Coordinate;
+    /// use omics_coordinate::Interval;
+    /// use omics_coordinate::system::Base;
+    /// use omics_coordinate::system::Interbase;
+    ///
+    /// //===========//
+    /// // Interbase //
+    /// //===========//
+    ///
+    /// // Positive strand.
+    ///
+    /// let interval = "seq0:+:0-1000".parse::<Interval<Interbase>>()?;
+    ///
+    /// let expected = "seq0:+:5".parse::<Coordinate<Interbase>>()?;
+    /// assert_eq!(interval.coordinate_at_offset(5).unwrap(), expected);
+    ///
+    /// let expected = "seq0:+:1000".parse::<Coordinate<Interbase>>()?;
+    /// assert_eq!(interval.coordinate_at_offset(1000).unwrap(), expected);
+    ///
+    /// assert!(interval.coordinate_at_offset(1001).is_none());
+    ///
+    /// // Negative strand.
+    ///
+    /// let interval = "seq0:-:1000-0".parse::<Interval<Interbase>>()?;
+    ///
+    /// let expected = "seq0:-:995".parse::<Coordinate<Interbase>>()?;
+    /// assert_eq!(interval.coordinate_at_offset(5).unwrap(), expected);
+    ///
+    /// let expected = "seq0:-:0".parse::<Coordinate<Interbase>>()?;
+    /// assert_eq!(interval.coordinate_at_offset(1000).unwrap(), expected);
+    ///
+    /// assert_eq!(interval.coordinate_at_offset(1001), None);
+    ///
+    /// //======//
+    /// // Base //
+    /// //======//
+    ///
+    /// // Positive strand.
+    ///
+    /// let interval = "seq0:+:1-1000".parse::<Interval<Base>>()?;
+    ///
+    /// let expected = "seq0:+:6".parse::<Coordinate<Base>>()?;
+    /// assert_eq!(interval.coordinate_at_offset(5).unwrap(), expected);
+    ///
+    /// let expected = "seq0:+:1000".parse::<Coordinate<Base>>()?;
+    /// assert_eq!(interval.coordinate_at_offset(999).unwrap(), expected);
+    ///
+    /// assert!(interval.coordinate_at_offset(1000).is_none());
+    ///
+    /// // Negative strand.
+    ///
+    /// let interval = "seq0:-:1000-1".parse::<Interval<Base>>()?;
+    ///
+    /// let expected = "seq0:-:995".parse::<Coordinate<Base>>()?;
+    /// assert_eq!(interval.coordinate_at_offset(5).unwrap(), expected);
+    ///
+    /// let expected = "seq0:-:1".parse::<Coordinate<Base>>()?;
+    /// assert_eq!(interval.coordinate_at_offset(999).unwrap(), expected);
+    ///
+    /// assert_eq!(interval.coordinate_at_offset(1000), None);
+    ///
+    /// Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn coordinate_at_offset(&self, offset: Number) -> Option<Coordinate<S>> {
+        let coordinate = self.start().clone().move_forward(offset)?;
+
+        match self.contains_coordinate(&coordinate) {
+            true => Some(coordinate),
+            false => None,
+        }
     }
 
     /// Reverse complements the interval, meaning that:

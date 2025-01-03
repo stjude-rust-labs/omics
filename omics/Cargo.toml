@@ -17,10 +17,15 @@ omics-variation = { path = "../omics-variation", version = "0.1.0", optional = t
 
 [features]
 default = []
+
+# Components
 coordinate = ["dep:omics-coordinate"]
 core = ["dep:omics-core"]
 molecule = ["dep:omics-molecule"]
 variation = ["dep:omics-variation"]
+
+# Functionality
+position-u64 = ["omics-coordinate/position-u64"]
 
 [lints]
 workspace = true

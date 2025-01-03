@@ -71,20 +71,6 @@ impl std::str::FromStr for Position {
     }
 }
 
-impl TryFrom<Number> for Position {
-    type Error = Error;
-
-    fn try_from(value: Number) -> std::result::Result<Self, Self::Error> {
-        Ok(Self::new(value))
-    }
-}
-
-impl From<NonZero<Number>> for Position {
-    fn from(value: NonZero<Number>) -> Self {
-        Self::try_from(value.get()).unwrap()
-    }
-}
-
 /// Creates implementations to convert from smaller numbers to a position.
 macro_rules! position_from_smaller_number {
     ($from:ty) => {
@@ -103,6 +89,7 @@ macro_rules! position_from_smaller_number {
 }
 
 #[cfg(feature = "position-u64")]
+position_from_smaller_number!(u64);
 position_from_smaller_number!(u32);
 position_from_smaller_number!(u16);
 position_from_smaller_number!(u8);
@@ -121,7 +108,7 @@ mod tests {
 
     #[test]
     fn try_from_number() {
-        let position: Position<Interbase> = 1u32.try_into().unwrap();
+        let position: Position<Interbase> = 1u32.into();
         assert_eq!(position.get(), 1);
     }
 

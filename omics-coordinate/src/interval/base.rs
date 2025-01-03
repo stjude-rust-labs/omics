@@ -4,6 +4,7 @@ use crate::base::Coordinate;
 use crate::interval::r#trait;
 use crate::position::Number;
 use crate::system::Base;
+use crate::system::Interbase;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // Intervals
@@ -14,6 +15,37 @@ use crate::system::Base;
 /// Base intervals consist of two in-base positions. The range is represented by
 /// the interval `[start, end]`.
 pub type Interval = crate::Interval<Base>;
+
+impl Interval {
+    /// Consumes `self` and returns the equivalent interbase interval.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_coordinate::Interval;
+    /// use omics_coordinate::system::Base;
+    /// use omics_coordinate::system::Interbase;
+    ///
+    /// let interval = "seq0:+:1-1000".parse::<Interval<Base>>()?;
+    /// let equivalent = interval.into_equivalent_interbase();
+    ///
+    /// assert_eq!("seq0:+:0-1000".parse::<Interval<Interbase>>()?, equivalent);
+    ///
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn into_equivalent_interbase(self) -> crate::interval::Interval<Interbase> {
+        let (start, end) = self.into_coordinates();
+
+        // SAFETY: given the rules of how interbase and base coordinate systems
+        // work, this should always unwrap.
+        let start = start.nudge_backward().unwrap();
+        let end = end.nudge_forward().unwrap();
+
+        // SAFETY: since this was previously a valid interbase interval, as long
+        // as the two nudges above succeed, this should always unwrap.
+        crate::interval::Interval::<Interbase>::try_new(start, end).unwrap()
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // Trait implementations

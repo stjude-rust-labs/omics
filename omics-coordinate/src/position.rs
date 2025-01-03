@@ -115,7 +115,7 @@ pub mod r#trait {
         + std::str::FromStr<Err = Error>
         + CheckedAdd<Number, Output = Self>
         + CheckedSub<Number, Output = Self>
-        + TryFrom<Number, Error = Error>
+        + TryFrom<Number>
         + From<NonZero<Number>>
     where
         Self: Sized,
