@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added the `into_start()`, `into_end()`, and `coordinate_at_offset()` methods
   for `Interval` ([#4](https://github.com/stjude-rust-labs/omics/pull/4)).
 - Added the `into_equivalent_base()` and `into_equivalent_interbase()` methods
-  for interbase and base intervals repectively
+  for interbase and base intervals respectively
   ([#4](https://github.com/stjude-rust-labs/omics/pull/4)).
 
 ## 0.1.0 - 10-09-2024
