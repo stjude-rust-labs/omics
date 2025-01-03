@@ -11,7 +11,7 @@ rust-version.workspace = true
 
 [dependencies]
 omics-core = { path = "../omics-core", version = "0.1.0", optional = true }
-omics-coordinate = { path = "../omics-coordinate", version = "0.1.0", optional = true }
+omics-coordinate = { path = "../omics-coordinate", version = "0.2.0", optional = true }
 omics-molecule = { path = "../omics-molecule", version = "0.1.0", optional = true }
 omics-variation = { path = "../omics-variation", version = "0.1.0", optional = true }
 

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## 0.2.0 - 01-03-2025
+
 ### Added
 
 - An initial set of benchmarks for some of the foundation data elements
