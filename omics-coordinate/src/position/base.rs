@@ -139,10 +139,13 @@ mod tests {
     #[test]
     fn from_number() {
         let error: Result<Position<Base>> = 0u32.try_into();
-        assert_eq!(error.unwrap_err(), Error::IncompatibleValue {
-            system: Base::NAME,
-            value: 0,
-        });
+        assert_eq!(
+            error.unwrap_err(),
+            Error::IncompatibleValue {
+                system: Base::NAME,
+                value: 0,
+            }
+        );
 
         let position: Position<Base> = 1u32.try_into().unwrap();
         assert_eq!(position.get(), 1);

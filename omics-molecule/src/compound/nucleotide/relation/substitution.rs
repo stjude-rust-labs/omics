@@ -5,26 +5,16 @@ use crate::compound::Nucleotide;
 mod kind;
 
 pub use kind::Kind;
+use thiserror::Error;
 
 /// An error related to a [`Substitution`].
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum Error<N: Nucleotide> {
     /// Attempted to create a [`Substitution`] with identical reference and
     /// alternate nucleotides.
+    #[error("identical nucleotides in substitution: {0}")]
     Identical(N),
 }
-
-impl<N: Nucleotide> std::fmt::Display for Error<N> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::Identical(nucleotide) => {
-                write!(f, "identical nucleotides for substitution: {nucleotide}")
-            }
-        }
-    }
-}
-
-impl<N: Nucleotide> std::error::Error for Error<N> {}
 
 /// A [`Result`](std::result::Result) with an [`Error<N>`].
 type Result<T, N> = std::result::Result<T, Error<N>>;
