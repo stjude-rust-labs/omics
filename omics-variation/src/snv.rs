@@ -10,82 +10,51 @@ use omics_core::VARIANT_SEPARATOR;
 use omics_molecule::compound::Nucleotide;
 use omics_molecule::compound::nucleotide::relation;
 use omics_molecule::compound::nucleotide::relation::Relation;
+use thiserror::Error;
 
 /// A parse error related to a [`Variant`].
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum ParseError<N: Nucleotide>
 where
     <N as FromStr>::Err: std::fmt::Debug + std::fmt::Display,
 {
     /// An invalid format was encountered when parsing a [`Variant`].
+    #[error("invalid format: {0}")]
     InvalidFormat(String),
 
     /// An issue occurred when parsing the coordinate of the [`Variant`].
-    CoordinateError(coordinate::Error),
+    #[error(transparent)]
+    CoordinateError(#[from] coordinate::Error),
 
     /// An issue occurred when parsing the reference nucleotide of the
     /// [`Variant`].
+    #[error("reference nucleotide error: {0}")]
     ReferenceNucleotide(<N as FromStr>::Err),
 
     /// An issue occurred when parsing the alternate nucleotide of the
     /// [`Variant`].
+    #[error("alternate nucleotide error: {0}")]
     AlternateNucleotide(<N as FromStr>::Err),
 }
 
-impl<N: Nucleotide> std::fmt::Display for ParseError<N>
-where
-    <N as FromStr>::Err: std::fmt::Debug + std::fmt::Display,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ParseError::InvalidFormat(value) => write!(f, "invalid format: {value}"),
-            ParseError::CoordinateError(err) => write!(f, "coordinate error: {err}"),
-            ParseError::ReferenceNucleotide(err) => write!(f, "reference nucleotide error: {err}"),
-            ParseError::AlternateNucleotide(err) => write!(f, "alternate nucleotide error: {err}"),
-        }
-    }
-}
-
-impl<N: Nucleotide> std::error::Error for ParseError<N> where
-    <N as FromStr>::Err: std::fmt::Debug + std::fmt::Display
-{
-}
-
 /// An error related to a [`Variant`].
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum Error<N: Nucleotide>
 where
     <N as FromStr>::Err: std::fmt::Debug + std::fmt::Display,
 {
     /// Attempted to create a [`Variant`] with identical reference and
     /// alternate nucleotides.
+    #[error("identical nucleotides for snv: {0}")]
     Identical(N),
 
     /// Unsuccessfully attempted to parse a [`Variant`] from a string.
-    Parse(ParseError<N>),
+    #[error(transparent)]
+    Parse(#[from] ParseError<N>),
 
     /// An error constructing a relation.
-    Relation(relation::Error<N>),
-}
-
-impl<N: Nucleotide> std::fmt::Display for Error<N>
-where
-    <N as FromStr>::Err: std::fmt::Debug + std::fmt::Display,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::Identical(nucleotide) => {
-                write!(f, "identical nucleotides for snv: {nucleotide}")
-            }
-            Error::Parse(err) => write!(f, "parse error: {err}"),
-            Error::Relation(err) => write!(f, "relation error: {err}"),
-        }
-    }
-}
-
-impl<N: Nucleotide> std::error::Error for Error<N> where
-    <N as FromStr>::Err: std::fmt::Debug + std::fmt::Display
-{
+    #[error(transparent)]
+    Relation(#[from] relation::Error<N>),
 }
 
 /// A single nucleotide variant.
@@ -407,7 +376,7 @@ mod tests {
 
         assert_eq!(
             err.to_string(),
-            "parse error: reference nucleotide error: parse error: invalid nucleotide: ."
+            "reference nucleotide error: invalid nucleotide `.`"
         );
     }
 
@@ -419,7 +388,7 @@ mod tests {
 
         assert_eq!(
             err.to_string(),
-            "parse error: alternate nucleotide error: parse error: invalid nucleotide: ."
+            "alternate nucleotide error: invalid nucleotide `.`"
         );
     }
 
@@ -431,7 +400,7 @@ mod tests {
 
         assert_eq!(
             err.to_string(),
-            "parse error: reference nucleotide error: parse error: invalid nucleotide: ."
+            "reference nucleotide error: invalid nucleotide `.`"
         );
     }
 }

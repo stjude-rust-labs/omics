@@ -14,6 +14,8 @@ omics-coordinate = { path = "../omics-coordinate", version = "0.2.0" }
 omics-core = { path = "../omics-core", version = "0.1.0" }
 omics-molecule = { path = "../omics-molecule", version = "0.1.0" }
 
+thiserror.workspace = true
+
 [dev-dependencies]
 anyhow.workspace = true
 

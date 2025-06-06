@@ -1,5 +1,7 @@
 //! Nucleotides in RNA.
 
+use thiserror::Error;
+
 use crate::compound::Kind;
 use crate::compound::nucleotide::Analogous;
 use crate::compound::nucleotide::ReverseTranscribe;
@@ -17,46 +19,28 @@ use crate::polymer::dna;
 // the signatures look identical (they will be converted to string differently).
 
 /// An error when parsing a nucleotide.
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum ParseError {
     /// An invalid format was attempted to be parsed.
+    #[error("invalid nucleotide format `{0}`")]
     InvalidFormat(String),
 
     /// An invalid nucleotide was attempted to be parsed.
+    #[error("invalid nucleotide `{0}`")]
     InvalidNucleotide(char),
 }
 
-impl std::fmt::Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ParseError::InvalidFormat(value) => write!(f, "invalid format: {value}"),
-            ParseError::InvalidNucleotide(c) => write!(f, "invalid nucleotide: {c}"),
-        }
-    }
-}
-
-impl std::error::Error for ParseError {}
-
 /// An error related to a [`Nucleotide`].
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
     /// An invalid nucleotide was attempted to be created from a [`char`].
+    #[error("invalid nucleotide `{0}`")]
     InvalidNucleotide(char),
 
     /// A parse error.
-    ParseError(ParseError),
+    #[error(transparent)]
+    ParseError(#[from] ParseError),
 }
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::InvalidNucleotide(c) => write!(f, "invalid nucleotide: {c}"),
-            Error::ParseError(err) => write!(f, "parse error: {err}"),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
 
 /// A nucleotide in an RNA context.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -193,13 +177,13 @@ mod tests {
         assert_eq!(Nucleotide::try_from('U')?, Nucleotide::U);
 
         let err = Nucleotide::try_from('t').unwrap_err();
-        assert_eq!(err.to_string(), "invalid nucleotide: t");
+        assert_eq!(err.to_string(), "invalid nucleotide `t`");
 
         let err = Nucleotide::try_from('T').unwrap_err();
-        assert_eq!(err.to_string(), "invalid nucleotide: T");
+        assert_eq!(err.to_string(), "invalid nucleotide `T`");
 
         let err = Nucleotide::try_from('q').unwrap_err();
-        assert_eq!(err.to_string(), "invalid nucleotide: q");
+        assert_eq!(err.to_string(), "invalid nucleotide `q`");
 
         Ok(())
     }
@@ -220,28 +204,28 @@ mod tests {
             err,
             Error::ParseError(ParseError::InvalidFormat(_))
         ));
-        assert_eq!(err.to_string(), "parse error: invalid format: word");
+        assert_eq!(err.to_string(), "invalid nucleotide format `word`");
 
         let err = "q".parse::<Nucleotide>().unwrap_err();
         assert!(matches!(
             err,
             Error::ParseError(ParseError::InvalidNucleotide(_))
         ));
-        assert_eq!(err.to_string(), "parse error: invalid nucleotide: q");
+        assert_eq!(err.to_string(), "invalid nucleotide `q`");
 
         let err = "t".parse::<Nucleotide>().unwrap_err();
         assert!(matches!(
             err,
             Error::ParseError(ParseError::InvalidNucleotide(_))
         ));
-        assert_eq!(err.to_string(), "parse error: invalid nucleotide: t");
+        assert_eq!(err.to_string(), "invalid nucleotide `t`");
 
         let err = "T".parse::<Nucleotide>().unwrap_err();
         assert!(matches!(
             err,
             Error::ParseError(ParseError::InvalidNucleotide(_))
         ));
-        assert_eq!(err.to_string(), "parse error: invalid nucleotide: T");
+        assert_eq!(err.to_string(), "invalid nucleotide `T`");
 
         Ok(())
     }

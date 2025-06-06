@@ -3,25 +3,17 @@
 use std::str::FromStr;
 
 use omics_molecule::compound::Nucleotide;
+use thiserror::Error;
 
 pub mod snv;
 
 /// An error related to a [`Variant`].
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
     /// Unsuccessfully attempted to parse a [`Variant`] from a string.
+    #[error("unable to parse a variant from `{0}`")]
     ParseError(String),
 }
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::ParseError(v) => write!(f, "unable to parse a variant from string: {v}"),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
 
 /// A variant.
 #[derive(Debug)]
@@ -85,15 +77,12 @@ mod tests {
     fn it_errors_when_attempting_to_parse_invalid_variants()
     -> Result<(), Box<dyn std::error::Error>> {
         let err = "seq0:1:A".parse::<Variant<dna::Nucleotide>>().unwrap_err();
-        assert_eq!(
-            err.to_string(),
-            "unable to parse a variant from string: seq0:1:A"
-        );
+        assert_eq!(err.to_string(), "unable to parse a variant from `seq0:1:A`");
 
         let err = "seq0:1:A:".parse::<Variant<dna::Nucleotide>>().unwrap_err();
         assert_eq!(
             err.to_string(),
-            "unable to parse a variant from string: seq0:1:A:"
+            "unable to parse a variant from `seq0:1:A:`"
         );
 
         let err = "seq0:A:C:1"
@@ -101,7 +90,7 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             err.to_string(),
-            "unable to parse a variant from string: seq0:A:C:1"
+            "unable to parse a variant from `seq0:A:C:1`"
         );
 
         Ok(())

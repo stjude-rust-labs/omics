@@ -20,33 +20,25 @@ pub mod substitution;
 use omics_core::MISSING_NUCLEOTIDE;
 use omics_core::VARIANT_SEPARATOR;
 pub use substitution::Substitution;
+use thiserror::Error;
 
 use crate::compound::Nucleotide;
 
 /// An error related to a [`Relation`].
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum Error<N: Nucleotide> {
     /// Attempted to create a relation with no nucleotides.
+    #[error("cannot create a relation with no nucleotides")]
     Empty,
 
     /// A parse error.
+    #[error("parse error: {0}")]
     ParseError(String),
 
     /// A substitution error.
-    Substitution(substitution::Error<N>),
+    #[error(transparent)]
+    Substitution(#[from] substitution::Error<N>),
 }
-
-impl<N: Nucleotide> std::fmt::Display for Error<N> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::Empty => write!(f, "attempted to create a relation with no nucleotides"),
-            Error::ParseError(v) => write!(f, "parse error: {v}"),
-            Error::Substitution(err) => write!(f, "subsitution error: {err}"),
-        }
-    }
-}
-
-impl<N: Nucleotide> std::error::Error for Error<N> {}
 
 /// A [`Result`](std::result::Result) with an [`Error`].
 type Result<T, N> = std::result::Result<T, Error<N>>;
@@ -431,7 +423,7 @@ mod tests {
                 .parse::<Relation<dna::Nucleotide>>()
                 .unwrap_err()
                 .to_string(),
-            "attempted to create a relation with no nucleotides"
+            "cannot create a relation with no nucleotides"
         );
 
         Ok(())

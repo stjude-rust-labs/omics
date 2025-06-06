@@ -3,23 +3,15 @@
 mod nucleotide;
 
 pub use nucleotide::Nucleotide;
+use thiserror::Error;
 
 /// An error related to a [`Molecule`].
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
     /// An error when processing a [`Nucleotide`].
-    NucleotideError(nucleotide::Error),
+    #[error(transparent)]
+    NucleotideError(#[from] nucleotide::Error),
 }
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::NucleotideError(err) => write!(f, "nucleotide error: {err}"),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
 
 /// A molecule representing Deoxyribonucleic Acid, otherwise known as DNA.
 #[derive(Debug)]
@@ -53,12 +45,10 @@ impl Molecule {
     /// let m = "ACGT".parse::<Molecule>()?;
     /// let nucleotides = m.into_inner();
     ///
-    /// assert_eq!(nucleotides, vec![
-    ///     Nucleotide::A,
-    ///     Nucleotide::C,
-    ///     Nucleotide::G,
-    ///     Nucleotide::T,
-    /// ]);
+    /// assert_eq!(
+    ///     nucleotides,
+    ///     vec![Nucleotide::A, Nucleotide::C, Nucleotide::G, Nucleotide::T,]
+    /// );
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -126,6 +116,6 @@ mod tests {
     #[test]
     fn it_fails_to_parse_a_molecule_from_an_invalid_string() {
         let err = "QQQQ".parse::<Molecule>().unwrap_err();
-        assert_eq!(err.to_string(), "nucleotide error: invalid nucleotide: Q");
+        assert_eq!(err.to_string(), "invalid nucleotide `Q`");
     }
 }
