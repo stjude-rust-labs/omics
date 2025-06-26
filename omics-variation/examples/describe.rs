@@ -14,7 +14,7 @@ fn main() -> anyhow::Result<()> {
     let variant = env::args().nth(1).expect("missing variant");
 
     let variant = variant.parse::<Variant<dna::Nucleotide>>()?;
-    println!("{:#?}", variant);
+    println!("{variant:#?}");
 
     Ok(())
 }

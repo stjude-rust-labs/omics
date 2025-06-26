@@ -248,11 +248,11 @@ mod tests {
         let position = Position::<Interbase>::from(0u8);
 
         let mut buffer = String::new();
-        write!(&mut buffer, "{}", position).unwrap();
+        write!(&mut buffer, "{position}").unwrap();
         assert_eq!(buffer, "0");
 
         buffer.clear();
-        write!(&mut buffer, "{:#}", position).unwrap();
+        write!(&mut buffer, "{position:#}").unwrap();
         assert_eq!(buffer, "0 (interbase coordinate system)");
     }
 }
