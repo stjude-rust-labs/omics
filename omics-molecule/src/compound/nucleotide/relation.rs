@@ -100,22 +100,22 @@ impl<N: Nucleotide> Relation<N> {
     /// use omics_molecule::polymer::dna::Nucleotide;
     ///
     /// let relation = Relation::<Nucleotide>::try_new(Some(Nucleotide::A), Some(Nucleotide::C))?;
-    /// assert_eq!(relation.reference(), Some(&Nucleotide::A));
+    /// assert_eq!(relation.reference(), Some(Nucleotide::A));
     ///
     /// let relation = Relation::<Nucleotide>::try_new(Some(Nucleotide::A), None)?;
-    /// assert_eq!(relation.reference(), Some(&Nucleotide::A));
+    /// assert_eq!(relation.reference(), Some(Nucleotide::A));
     ///
     /// let relation = Relation::<Nucleotide>::try_new(None, Some(Nucleotide::C))?;
     /// assert_eq!(relation.reference(), None);
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn reference(&self) -> Option<&N> {
+    pub fn reference(&self) -> Option<N> {
         match self {
-            Relation::Identical(reference) => Some(reference),
-            Relation::Substitution(substitution) => Some(substitution.reference()),
+            Relation::Identical(reference) => Some(*reference),
+            Relation::Substitution(substitution) => Some(*substitution.reference()),
             Relation::Insertion(_) => None,
-            Relation::Deletion(reference) => Some(reference),
+            Relation::Deletion(reference) => Some(*reference),
         }
     }
 
@@ -128,21 +128,21 @@ impl<N: Nucleotide> Relation<N> {
     /// use omics_molecule::polymer::dna::Nucleotide;
     ///
     /// let relation = Relation::<Nucleotide>::try_new(Some(Nucleotide::A), Some(Nucleotide::C))?;
-    /// assert_eq!(relation.alternate(), Some(&Nucleotide::C));
+    /// assert_eq!(relation.alternate(), Some(Nucleotide::C));
     ///
     /// let relation = Relation::<Nucleotide>::try_new(Some(Nucleotide::A), None)?;
     /// assert_eq!(relation.alternate(), None);
     ///
     /// let relation = Relation::<Nucleotide>::try_new(None, Some(Nucleotide::C))?;
-    /// assert_eq!(relation.alternate(), Some(&Nucleotide::C));
+    /// assert_eq!(relation.alternate(), Some(Nucleotide::C));
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn alternate(&self) -> Option<&N> {
+    pub fn alternate(&self) -> Option<N> {
         match self {
-            Relation::Identical(reference) => Some(reference),
-            Relation::Substitution(substitution) => Some(substitution.alternate()),
-            Relation::Insertion(alternate) => Some(alternate),
+            Relation::Identical(reference) => Some(*reference),
+            Relation::Substitution(substitution) => Some(*substitution.alternate()),
+            Relation::Insertion(alternate) => Some(*alternate),
             Relation::Deletion(_) => None,
         }
     }
@@ -211,7 +211,7 @@ impl<N: Nucleotide> Relation<N> {
     /// ```
     pub fn into_nucleotides(self) -> (Option<N>, Option<N>) {
         match self {
-            Relation::Identical(reference) => (Some(reference.clone()), Some(reference)),
+            Relation::Identical(reference) => (Some(reference), Some(reference)),
             Relation::Substitution(substitution) => {
                 let (reference, alternate) = substitution.into_parts();
                 (Some(reference), Some(alternate))

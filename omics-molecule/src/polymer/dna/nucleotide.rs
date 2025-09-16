@@ -43,7 +43,7 @@ pub enum Error {
 }
 
 /// A nucleotide in an DNA context.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Nucleotide {
     /// Adenine.
     A,

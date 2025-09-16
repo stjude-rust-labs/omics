@@ -8,7 +8,7 @@ use crate::compound::Kind;
 
 /// A marker trait that denotes a type of nucleotide.
 pub trait Nucleotide:
-    std::fmt::Debug + std::fmt::Display + Clone + Eq + PartialEq + std::str::FromStr
+    std::fmt::Debug + std::fmt::Display + Copy + Eq + PartialEq + std::str::FromStr
 {
     /// Gets the [`Kind`] type for a given [`Nucleotide`].
     fn kind(&self) -> Kind;

@@ -149,11 +149,11 @@ where
     /// use omics_variation::snv::Variant;
     ///
     /// let variant = "seq0:+:1:A:T".parse::<Variant<dna::Nucleotide>>()?;
-    /// assert_eq!(variant.reference(), &dna::Nucleotide::A);
+    /// assert_eq!(variant.reference(), dna::Nucleotide::A);
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn reference(&self) -> &N {
+    pub fn reference(&self) -> N {
         // SAFETY: because a single nucleotide variant is guaranteed to have a
         // reference nucleotide within the inner [`Relation`], this will
         // always unwrap successfully.
@@ -171,11 +171,11 @@ where
     /// use omics_variation::snv::Variant;
     ///
     /// let variant = "seq0:+:1:A:T".parse::<Variant<dna::Nucleotide>>()?;
-    /// assert_eq!(variant.alternate(), &dna::Nucleotide::T);
+    /// assert_eq!(variant.alternate(), dna::Nucleotide::T);
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn alternate(&self) -> &N {
+    pub fn alternate(&self) -> N {
         // SAFETY: because a single nucleotide variant is guaranteed to have a
         // alternate nucleotide within the inner [`Relation`], this will
         // always unwrap successfully.
@@ -284,8 +284,8 @@ mod tests {
         assert_eq!(variant.coordinate().contig().as_str(), "seq0");
         assert_eq!(variant.coordinate().strand(), Strand::Positive);
         assert_eq!(variant.coordinate().position().get(), 1);
-        assert_eq!(variant.reference(), &dna::Nucleotide::A);
-        assert_eq!(variant.alternate(), &dna::Nucleotide::C);
+        assert_eq!(variant.reference(), dna::Nucleotide::A);
+        assert_eq!(variant.alternate(), dna::Nucleotide::C);
 
         Ok(())
     }
@@ -297,8 +297,8 @@ mod tests {
         assert_eq!(variant.coordinate().contig().as_str(), "seq0");
         assert_eq!(variant.coordinate().strand(), Strand::Positive);
         assert_eq!(variant.coordinate().position().get(), 1);
-        assert_eq!(variant.reference(), &rna::Nucleotide::U);
-        assert_eq!(variant.alternate(), &rna::Nucleotide::C);
+        assert_eq!(variant.reference(), rna::Nucleotide::U);
+        assert_eq!(variant.alternate(), rna::Nucleotide::C);
 
         Ok(())
     }
@@ -311,8 +311,8 @@ mod tests {
         assert_eq!(variant.coordinate().contig().as_str(), "seq0");
         assert_eq!(variant.coordinate().strand(), Strand::Negative);
         assert_eq!(variant.coordinate().position().get(), 1);
-        assert_eq!(variant.reference(), &dna::Nucleotide::A);
-        assert_eq!(variant.alternate(), &dna::Nucleotide::C);
+        assert_eq!(variant.reference(), dna::Nucleotide::A);
+        assert_eq!(variant.alternate(), dna::Nucleotide::C);
 
         Ok(())
     }
@@ -325,8 +325,8 @@ mod tests {
         assert_eq!(variant.coordinate().contig().as_str(), "seq0");
         assert_eq!(variant.coordinate().strand(), Strand::Negative);
         assert_eq!(variant.coordinate().position().get(), 1);
-        assert_eq!(variant.reference(), &rna::Nucleotide::U);
-        assert_eq!(variant.alternate(), &rna::Nucleotide::C);
+        assert_eq!(variant.reference(), rna::Nucleotide::U);
+        assert_eq!(variant.alternate(), rna::Nucleotide::C);
 
         Ok(())
     }
@@ -339,8 +339,8 @@ mod tests {
         assert_eq!(variant.coordinate().contig().as_str(), "seq0");
         assert_eq!(variant.coordinate().strand(), Strand::Positive);
         assert_eq!(variant.coordinate().position().get(), 1);
-        assert_eq!(variant.reference(), &dna::Nucleotide::A);
-        assert_eq!(variant.alternate(), &dna::Nucleotide::C);
+        assert_eq!(variant.reference(), dna::Nucleotide::A);
+        assert_eq!(variant.alternate(), dna::Nucleotide::C);
 
         Ok(())
     }
@@ -353,8 +353,8 @@ mod tests {
         assert_eq!(variant.coordinate().contig().as_str(), "seq0");
         assert_eq!(variant.coordinate().strand(), Strand::Positive);
         assert_eq!(variant.coordinate().position().get(), 1);
-        assert_eq!(variant.reference(), &rna::Nucleotide::U);
-        assert_eq!(variant.alternate(), &rna::Nucleotide::C);
+        assert_eq!(variant.reference(), rna::Nucleotide::U);
+        assert_eq!(variant.alternate(), rna::Nucleotide::C);
 
         Ok(())
     }

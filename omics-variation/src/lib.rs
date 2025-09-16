@@ -65,8 +65,8 @@ mod tests {
                 assert_eq!(snv.coordinate().contig().as_str(), "seq0");
                 assert_eq!(snv.coordinate().strand(), Strand::Positive);
                 assert_eq!(snv.coordinate().position().get(), 1);
-                assert_eq!(snv.reference(), &dna::Nucleotide::A);
-                assert_eq!(snv.alternate(), &dna::Nucleotide::C);
+                assert_eq!(snv.reference(), dna::Nucleotide::A);
+                assert_eq!(snv.alternate(), dna::Nucleotide::C);
             }
         }
 
