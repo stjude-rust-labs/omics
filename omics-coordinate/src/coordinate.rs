@@ -320,6 +320,7 @@ where
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    #[must_use = "this method returns a new coordinate"]
     pub fn move_forward(self, magnitude: Number) -> Option<Coordinate<S>> {
         if magnitude == 0 {
             return Some(self);
@@ -391,6 +392,7 @@ where
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    #[must_use = "this method returns a new coordinate"]
     pub fn move_backward(self, magnitude: Number) -> Option<Coordinate<S>> {
         if magnitude == 0 {
             return Some(self);
@@ -435,6 +437,7 @@ where
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    #[must_use = "this method returns a new coordinate"]
     pub fn swap_strand(self) -> Coordinate<S> {
         let (contig, strand, position) = self.into_parts();
         Coordinate::new(contig, strand.complement(), position)

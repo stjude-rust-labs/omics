@@ -850,6 +850,7 @@ where
     ///
     /// Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    #[must_use = "this method returns a new interval"]
     pub fn clamp(self, interval: Interval<S>) -> Result<Interval<S>> {
         let (start, end) = self.into_coordinates();
         let (operand_start, operand_end) = interval.into_coordinates();
@@ -1073,6 +1074,7 @@ where
     ///
     /// Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    #[must_use = "this method returns a new interval"]
     pub fn reverse_complement(self) -> super::Interval<S> {
         let (start, end) = self.into_coordinates();
         // SAFETY: because (a) intervals are inclusive of both of their start
