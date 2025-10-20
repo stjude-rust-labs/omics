@@ -14,9 +14,9 @@ pub mod interbase {
     use criterion::Criterion;
     use omics_coordinate::Contig;
 
-    /// Benchmarks for the [`Contig::new()`] method.
+    /// Benchmarks for the [`Contig::new_unchecked()`] method.
     fn new() {
-        let _ = black_box(Contig::new("seq0"));
+        let _ = black_box(Contig::new_unchecked("seq0"));
     }
 
     pub fn benches(c: &mut Criterion) {

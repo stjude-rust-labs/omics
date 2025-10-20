@@ -1128,12 +1128,11 @@ where
         // SAFETY: we checked that there are three parts above. Given that we
         // haven't pulled anything from the iterator, we can always safely
         // unwrap this.
-        let contig = parts
-            .next()
-            .unwrap()
-            .parse::<Contig>()
-            // SAFETY: this is infallible.
-            .unwrap();
+        let contig = parts.next().unwrap().parse::<Contig>().map_err(|_| {
+            Error::Parse(ParseError::Format {
+                value: s.to_string(),
+            })
+        })?;
 
         // SAFETY: we checked that there are three parts above. Given that we
         // have only pulled one item from the iterator, we can always safely
@@ -1200,8 +1199,8 @@ mod tests {
         assert_eq!(
             err,
             Error::Nonsensical(NonsensicalError::MismatchedContigs {
-                start: Contig::new("seq0"),
-                end: Contig::new("seq1")
+                start: Contig::new_unchecked("seq0"),
+                end: Contig::new_unchecked("seq1")
             })
         );
 
@@ -1308,8 +1307,8 @@ mod tests {
                 .clone()
                 .clamp("seq1:+:0-3000".parse::<Interval<Interbase>>().unwrap()),
             Err(Error::Clamp(ClampError::MismatchedContigs {
-                original: Contig::new("seq0"),
-                operand: Contig::new("seq1")
+                original: Contig::new_unchecked("seq0"),
+                operand: Contig::new_unchecked("seq1")
             }))
         );
 
@@ -1365,8 +1364,8 @@ mod tests {
                 .clone()
                 .clamp("seq1:-:3000-0".parse::<Interval<Interbase>>().unwrap()),
             Err(Error::Clamp(ClampError::MismatchedContigs {
-                original: Contig::new("seq0"),
-                operand: Contig::new("seq1")
+                original: Contig::new_unchecked("seq0"),
+                operand: Contig::new_unchecked("seq1")
             }))
         );
 

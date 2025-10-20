@@ -1,6 +1,7 @@
 //! Convenient access to a base [`Coordinate`](crate::Coordinate).
 
 use crate::Strand;
+use crate::contig;
 use crate::coordinate::Error;
 use crate::position;
 use crate::position::base::Position;
@@ -63,11 +64,11 @@ impl Coordinate {
 
 impl crate::coordinate::r#trait::Coordinate<Base> for Coordinate {
     fn try_new(
-        contig: impl Into<crate::Contig>,
+        contig: impl TryInto<crate::Contig, Error = contig::Error>,
         strand: impl TryInto<crate::Strand, Error = strand::Error>,
         position: position::Number,
     ) -> super::Result<Self> {
-        let contig = contig.into();
+        let contig = contig.try_into().map_err(Error::Contig)?;
         let strand = strand.try_into().map_err(Error::Strand)?;
         let position = Position::try_new(position).map_err(Error::Position)?;
 

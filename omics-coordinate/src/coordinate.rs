@@ -7,6 +7,7 @@ use crate::Contig;
 use crate::Position;
 use crate::Strand;
 use crate::System;
+use crate::contig;
 use crate::position;
 use crate::position::Number;
 use crate::strand;
@@ -37,6 +38,10 @@ pub type ParseResult<T> = std::result::Result<T, ParseError>;
 /// An error related to a coordinate.
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum Error {
+    /// A contig error.
+    #[error("contig error: {0}")]
+    Contig(#[from] contig::Error),
+
     /// A strand error.
     #[error("strand error: {0}")]
     Strand(#[from] strand::Error),
@@ -75,7 +80,7 @@ pub mod r#trait {
     {
         /// Attempts to create a new coordinate.
         fn try_new(
-            contig: impl Into<Contig>,
+            contig: impl TryInto<Contig, Error = contig::Error>,
             strand: impl TryInto<Strand, Error = strand::Error>,
             position: Number,
         ) -> Result<Self>;
@@ -117,7 +122,7 @@ where
     /// use omics_coordinate::position::interbase::Position;
     /// use omics_coordinate::system::Interbase;
     ///
-    /// let contig = Contig::new("chr1");
+    /// let contig = Contig::new_unchecked("chr1");
     /// let position = Position::new(0);
     /// let strand = Strand::Positive;
     ///
@@ -142,7 +147,7 @@ where
 
     /// Attempts to create a new coordinate.
     pub fn try_new(
-        contig: impl Into<Contig>,
+        contig: impl TryInto<Contig, Error = contig::Error>,
         strand: impl TryInto<Strand, Error = strand::Error>,
         position: Number,
     ) -> Result<Self>
@@ -482,12 +487,11 @@ where
         // SAFETY: we checked that there are three parts above. Given that we
         // haven't pulled anything from the iterator, we can always safely
         // unwrap this.
-        let contig = parts
-            .next()
-            .unwrap()
-            .parse::<Contig>()
-            // SAFETY: this conversion is infallible.
-            .unwrap();
+        let contig = parts.next().unwrap().parse::<Contig>().map_err(|_| {
+            Error::Parse(ParseError::Format {
+                value: s.to_string(),
+            })
+        })?;
 
         // SAFETY: we checked that there are three parts above. Given that we
         // have only pulled one item from the iterator, we can always safely

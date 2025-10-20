@@ -16,6 +16,6 @@ pub struct Args {
 /// The main method.
 pub fn main(args: Args) {
     for _ in 0..args.n {
-        let _ = black_box(Contig::new("seq0"));
+        let _ = black_box(Contig::new_unchecked("seq0"));
     }
 }
