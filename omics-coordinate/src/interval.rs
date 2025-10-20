@@ -556,9 +556,11 @@ where
     /// checks the coordinates themselves and, in-so-doing, considers both the
     /// start and the end positions of the interval to be inclusive.
     ///
-    /// If you'd like to check whether a particular nucleotide, amino acid, or
-    /// other entity is contained within the interval, use the
-    /// [`contains_entity()`](Interval::contains_entity) method.
+    /// This method checks containment using coordinates in the interval's
+    /// native coordinate system (the generic type `S`). If you'd like to
+    /// check whether a particular nucleotide, amino acid, or other entity
+    /// is contained within the interval (using in-base coordinates), use
+    /// the [`contains_entity()`](Interval::contains_entity) method.
     ///
     /// # Examples
     ///
@@ -635,7 +637,13 @@ where
     /// Returns whether or not the entity at the in-base coordinate is
     /// contained within this interval.
     ///
-    /// /// # Examples
+    /// This method always works with in-base coordinates (which directly point
+    /// to entities like nucleotides or amino acids), regardless of the
+    /// interval's coordinate system. Use
+    /// [`contains_coordinate()`](Self::contains_coordinate) if you need to
+    /// check containment using the interval's native coordinate system.
+    ///
+    /// # Examples
     ///
     /// ```
     /// use omics_coordinate::Coordinate;
