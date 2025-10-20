@@ -14,7 +14,7 @@ pub enum Error {
     Empty,
 }
 
-/// A [`Result`](std::result::Result) with an [`Error`].
+/// A [`Result`](std::result::Result) with an [`Error`](enum@Error).
 pub type Result<T> = std::result::Result<T, Error>;
 
 ////////////////////////////////////////////////////////////////////////////////////////

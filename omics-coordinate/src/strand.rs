@@ -43,7 +43,7 @@ pub enum Error {
     Parse(#[from] ParseError),
 }
 
-/// A [`Result`](std::result::Result) with an [`Error`].
+/// A [`Result`](std::result::Result) with an [`Error`](enum@Error).
 pub type Result<T> = std::result::Result<T, Error>;
 
 ////////////////////////////////////////////////////////////////////////////////////////

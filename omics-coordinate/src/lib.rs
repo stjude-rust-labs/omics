@@ -67,7 +67,7 @@
 //! For convenience, the crate also provides type aliases for the interbase and
 //! in-base variants of the relevant concepts. For example, you can use a
 //! [`Position<Interbase>`] by instead simply importing a
-//! [`zero::Position`](crate::position::zero::Position).
+//! [`interbase::Position`](crate::position::interbase::Position).
 //!
 //! ```
 //! use omics_coordinate::interbase::Coordinate;
@@ -410,15 +410,13 @@
 //!     // private fields
 //! }
 //! ```
-
-// TODO: this is a false positive missing doc link, remove this when it gets fixed.
-#![allow(rustdoc::broken_intra_doc_links)]
+//!
 //! The struct takes a single, generic parameter that is a [`System`]. In this
 //! design, functionality that is fundamental to both interbase and in-base
 //! position types are implemented in the core [`Position`] struct.
 //! Functionality that is different between the two coordinate systems is
-//! implemented through traits (in the case of positions, [the `Position`
-//! trait](crate::position::r#trait::Position<S>)) and exposed through
+//! implemented through traits (in the case of positions, the [`Position`
+//! trait](crate::position::trait::Position)) and exposed through
 //! trait-constrained methods (e.g., [`Position::checked_add`]).
 
 //! Note that some concepts, such as [`Contig`] and [`Strand`] are coordinate
