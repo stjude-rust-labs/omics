@@ -64,6 +64,7 @@ impl std::str::FromStr for Position {
     fn from_str(s: &str) -> Result<Self> {
         Ok(Self::new(s.parse::<Number>().map_err(|error| {
             Error::Parse(ParseError::Int {
+                system: Interbase::NAME,
                 inner: error,
                 value: s.to_string(),
             })
@@ -138,7 +139,8 @@ mod tests {
         let err = "a".parse::<Position<Interbase>>().unwrap_err();
         assert_eq!(
             err.to_string(),
-            "parse error: invalid digit found in string: `a`"
+            "parse error: failed to parse interbase coordinate system position from `a`: invalid \
+             digit found in string"
         );
     }
 

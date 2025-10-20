@@ -56,8 +56,11 @@ pub enum ParseError {
     /// An integer parsing error.
     ///
     /// Occurs when an integer position value cannot be parsed.
-    #[error("{inner}: `{value}`")]
+    #[error("failed to parse {system} position from `{value}`: {inner}")]
     Int {
+        /// The coordinate system being parsed.
+        system: &'static str,
+
         /// The inner error.
         inner: ParseIntError,
 

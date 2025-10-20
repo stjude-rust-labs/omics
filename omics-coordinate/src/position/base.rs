@@ -73,6 +73,7 @@ impl std::str::FromStr for Position {
 
     fn from_str(s: &str) -> Result<Self> {
         Self::try_new(s.parse::<Number>().map_err(|error| ParseError::Int {
+            system: Base::NAME,
             inner: error,
             value: s.to_string(),
         })?)
@@ -180,7 +181,8 @@ mod tests {
         let err = "a".parse::<Position<Base>>().unwrap_err();
         assert_eq!(
             err.to_string(),
-            "parse error: invalid digit found in string: `a`"
+            "parse error: failed to parse base coordinate system position from `a`: invalid digit \
+             found in string"
         );
     }
 
