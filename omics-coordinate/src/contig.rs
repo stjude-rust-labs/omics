@@ -1,5 +1,7 @@
 //! Contiguous molecules.
 
+use std::sync::Arc;
+
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -23,7 +25,9 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// A named, contiguous molecule within a genome.
 ///
-/// At present, a contig is simply a wrapper around a non-empty string.
+/// Internally, a contig wraps an `Arc<str>`, making `clone` operations
+/// `O(1)` (an atomic reference count increment rather than a heap
+/// allocation).
 ///
 /// Notably, the internal representation of [`Contig`] may change in the future
 /// (though the interface to this type will remain stable with respect to
@@ -32,7 +36,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// For a more in-depth discussion on this, please see [this section of the
 /// docs](crate#contigs).
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Contig(String);
+pub struct Contig(Arc<str>);
 
 impl Contig {
     /// Attempts to create a new contig.
@@ -53,11 +57,11 @@ impl Contig {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn try_new(value: impl Into<String>) -> Result<Self> {
-        let s = value.into();
+        let s: String = value.into();
         if s.is_empty() {
             return Err(Error::Empty);
         }
-        Ok(Self(s))
+        Ok(Self(Arc::from(s)))
     }
 
     /// Creates a new contig without validating that the name is non-empty.
@@ -77,25 +81,12 @@ impl Contig {
     /// assert_eq!(contig.as_str(), "chr1");
     /// ```
     pub fn new_unchecked(value: impl Into<String>) -> Self {
-        Self(value.into())
+        Self(Arc::from(value.into()))
     }
 
-    // NOTE: an `inner()` method is explicitly not included as the type
-    // dereferences `String`. This means that the `as_str()` method is usable
-    // for this purpose.
-
-    /// Consumes `self` and returns the inner value.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use omics_coordinate::Contig;
-    ///
-    /// let contig = Contig::new_unchecked("chr1");
-    /// assert_eq!(contig.into_inner(), String::from("chr1"));
-    /// ```
-    pub fn into_inner(self) -> String {
-        self.0
+    /// Returns a reference to the contig name as a string slice.
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
@@ -134,7 +125,7 @@ impl TryFrom<String> for Contig {
 }
 
 impl std::ops::Deref for Contig {
-    type Target = String;
+    type Target = str;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -172,6 +163,15 @@ mod tests {
         // new_unchecked allows empty strings (though not recommended)
         let contig = Contig::new_unchecked("");
         assert_eq!(contig.as_str(), "");
+    }
+
+    #[test]
+    fn clone_is_shallow() {
+        let a = Contig::new_unchecked("chr1");
+        let b = a.clone();
+        assert_eq!(a, b);
+        // Both point to the same underlying `str`.
+        assert!(std::ptr::eq(a.as_str(), b.as_str()));
     }
 
     #[test]

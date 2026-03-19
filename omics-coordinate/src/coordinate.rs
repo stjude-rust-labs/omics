@@ -184,7 +184,7 @@ where
     /// use omics_coordinate::system::Interbase;
     ///
     /// let coordinate = "seq0:+:1".parse::<Coordinate<Interbase>>()?;
-    /// assert_eq!(coordinate.into_contig().into_inner(), String::from("seq0"));
+    /// assert_eq!(coordinate.into_contig().to_string(), String::from("seq0"));
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -260,7 +260,7 @@ where
     /// let coordinate = "seq0:+:1".parse::<Coordinate<Interbase>>()?;
     ///
     /// let (contig, strand, position) = coordinate.into_parts();
-    /// assert_eq!(contig.into_inner(), String::from("seq0"));
+    /// assert_eq!(contig.to_string(), String::from("seq0"));
     /// assert_eq!(strand, Strand::Positive);
     /// assert_eq!(position.get(), 1);
     ///
