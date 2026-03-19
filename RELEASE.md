@@ -54,7 +54,9 @@ For every component crate that has changes:
 - [ ] Push release: `git push && git push --tags`.
 - [ ] Publish the component crate: `cargo publish --all-features`.
 - [ ] Go to the Releases page in Github, create a Release for this tag, and
-      copy the notes from the `CHANGELOG.md` file.
+      copy the notes from the `CHANGELOG.md` file. When pasting, remove the
+      hard line breaks from the changelog entries so that GitHub can reflow the
+      text properly. The hard line breaks should remain in `CHANGELOG.md` itself.
 
 After all component crates with changes have been released, release the
 top-level `omics` crate:
@@ -76,5 +78,6 @@ top-level `omics` crate:
 - [ ] Push release: `git push && git push --tags`.
 - [ ] Publish the crate: `cd omics && cargo publish --all-features`.
 - [ ] Go to the Releases page in Github, create a Release for this tag, and
-      copy the notes from the `CHANGELOG.md` file. This should be the main
-      release for the version.
+      copy the notes from the `CHANGELOG.md` file. When pasting, remove the
+      hard line breaks from the changelog entries so that GitHub can reflow the
+      text properly. This should be the main release for the version.
