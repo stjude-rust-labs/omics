@@ -351,7 +351,9 @@ where
     /// // Interbase.
     ///
     /// let coordinate = "seq0:+:0".parse::<Coordinate<Interbase>>()?;
-    /// let moved = coordinate.into_move_forward(10).expect("coordinate to move");
+    /// let moved = coordinate
+    ///     .into_move_forward(10)
+    ///     .expect("coordinate to move");
     /// assert_eq!(moved.position().get(), 10);
     ///
     /// let coordinate = "seq0:+:0".parse::<Coordinate<Interbase>>()?;
@@ -361,7 +363,9 @@ where
     /// // Base.
     ///
     /// let coordinate = "seq0:+:1".parse::<Coordinate<Base>>()?;
-    /// let moved = coordinate.into_move_forward(10).expect("coordinate to move");
+    /// let moved = coordinate
+    ///     .into_move_forward(10)
+    ///     .expect("coordinate to move");
     /// assert_eq!(moved.position().get(), 11);
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -460,7 +464,9 @@ where
     /// // Interbase.
     ///
     /// let coordinate = value.clone().parse::<Coordinate<Interbase>>()?;
-    /// let moved = coordinate.into_move_backward(10).expect("coordinate to move");
+    /// let moved = coordinate
+    ///     .into_move_backward(10)
+    ///     .expect("coordinate to move");
     /// assert_eq!(moved.position().get(), Number::MAX - 10);
     ///
     /// let coordinate = "seq0:+:0".parse::<Coordinate<Interbase>>()?;
@@ -469,7 +475,9 @@ where
     /// // Base.
     ///
     /// let coordinate = value.parse::<Coordinate<Base>>()?;
-    /// let moved = coordinate.into_move_backward(10).expect("coordinate to move");
+    /// let moved = coordinate
+    ///     .into_move_backward(10)
+    ///     .expect("coordinate to move");
     /// assert_eq!(moved.position().get(), Number::MAX - 10);
     ///
     /// let coordinate = "seq0:+:1".parse::<Coordinate<Base>>()?;
