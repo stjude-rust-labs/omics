@@ -1031,7 +1031,7 @@ where
     /// Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn coordinate_at_offset(&self, offset: Number) -> Option<Coordinate<S>> {
-        let coordinate = self.start().clone().move_forward(offset)?;
+        let coordinate = self.start().clone().into_move_forward(offset)?;
 
         match self.contains_coordinate(&coordinate) {
             true => Some(coordinate),
