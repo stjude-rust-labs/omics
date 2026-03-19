@@ -55,3 +55,26 @@ For every component crate that has changes:
 - [ ] Publish the component crate: `cargo publish --all-features`.
 - [ ] Go to the Releases page in Github, create a Release for this tag, and
       copy the notes from the `CHANGELOG.md` file.
+
+After all component crates with changes have been released, release the
+top-level `omics` crate:
+
+- [ ] Update version in `omics/Cargo.toml`.
+- [ ] Update `omics/CHANGELOG.md` with version and publication date.
+- [ ] Run tests: `cargo test --all-features`.
+- [ ] Run linting: `cargo clippy --all-features`.
+- [ ] Run fmt: `cargo fmt --check`.
+- [ ] Run doc: `cargo doc`.
+- [ ] Create git commit:
+  ```
+  git commit -m "release: bumps `omics` version to `v0.3.0`"
+  ```
+- [ ] Create git tag:
+  ```
+  git tag -a omics-v0.3.0 -m "omics v0.3.0"
+  ```
+- [ ] Push release: `git push && git push --tags`.
+- [ ] Publish the crate: `cd omics && cargo publish --all-features`.
+- [ ] Go to the Releases page in Github, create a Release for this tag, and
+      copy the notes from the `CHANGELOG.md` file. This should be the main
+      release for the version.
