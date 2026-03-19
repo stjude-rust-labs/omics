@@ -45,11 +45,11 @@ For every component crate that has changes:
 - [ ] Stage changes: `git add Cargo.toml CHANGELOG.md`.
 - [ ] Create git commit:
   ```
-  git commit -m "release: bumps `omics-core` version to v0.1.0"
+  git commit -m "release: bumps `omics-core` version to `v0.1.0`"
   ```
 - [ ] Create git tag:
   ```
-  git tag omics-core-v0.1.0
+  git tag -a omics-core-v0.1.0 -m "omics-core v0.1.0"
   ```
 - [ ] Push release: `git push && git push --tags`.
 - [ ] Publish the component crate: `cargo publish --all-features`.

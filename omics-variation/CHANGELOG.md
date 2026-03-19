@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Used `thiserror` for better error messages and improved existing error
   messages ([#5](https://github.com/stjude-rust-labs/omics/pull/5)).
 
+### Crate Updates
+
+- `omics-coordinate`: bumped to v0.3.0
+  ([release](https://github.com/stjude-rust-labs/omics/releases/tag/omics-coordinate-v0.3.0))
+
 ## 0.2.0 - 01-03-2025
 
 ### Crate Updates

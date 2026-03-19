@@ -7,6 +7,11 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Unreleased
 
+### Crate Updates
+
+- `omics-coordinate`: bumped to v0.3.0
+  ([release](https://github.com/stjude-rust-labs/omics/releases/tag/omics-coordinate-v0.3.0))
+
 ## 0.2.0 - 01-03-2025
 
 ### Revise
