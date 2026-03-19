@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- Added in-place `move_forward(&mut self)` and `move_backward(&mut self)`
+  methods to `Coordinate` that modify the position without cloning
+  ([#7](https://github.com/stjude-rust-labs/omics/pull/7)).
+
+### Revise
+
+- Renamed consuming `move_forward(self)` and `move_backward(self)` to
+  `into_move_forward` and `into_move_backward` respectively
+  ([#7](https://github.com/stjude-rust-labs/omics/pull/7)).
+- Fixed unnecessary `self.contig.clone()` in consuming move methods, which
+  already own `self`
+  ([#7](https://github.com/stjude-rust-labs/omics/pull/7)).
+
 ## 0.2.0 - 01-03-2025
 
 ### Added

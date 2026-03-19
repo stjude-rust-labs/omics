@@ -270,20 +270,19 @@ where
         (self.contig, self.strand, self.position)
     }
 
-    /// Consumes `self` and attempts to move the position forward by
-    /// `magnitude`.
+    /// Attempts to move the position forward by `magnitude` in place.
     ///
     /// This method is dependent on the strand of the coordinate:
     ///
     /// - a coordinate on the [`Strand::Positive`] moves positively, and
-    /// - a coordinate on the [`Strand::Negative`] move negatively.
+    /// - a coordinate on the [`Strand::Negative`] moves negatively.
+    ///
+    /// Returns `true` if the move succeeded, `false` if it would overflow.
     ///
     /// # Examples
     ///
     /// ```
-    /// use omics_coordinate::Contig;
     /// use omics_coordinate::Coordinate;
-    /// use omics_coordinate::Position;
     /// use omics_coordinate::Strand;
     /// use omics_coordinate::position::Number;
     /// use omics_coordinate::system::Base;
@@ -291,42 +290,88 @@ where
     ///
     /// // Interbase.
     ///
-    /// let start = "seq0:+:0".parse::<Coordinate<Interbase>>()?;
-    /// let coordinate = start.clone().move_forward(10).expect("coordinate to move");
-    /// assert_eq!(coordinate.contig().as_str(), "seq0");
-    /// assert_eq!(coordinate.strand(), Strand::Positive);
+    /// let mut coordinate = "seq0:+:0".parse::<Coordinate<Interbase>>()?;
+    /// assert!(coordinate.move_forward(10));
     /// assert_eq!(coordinate.position().get(), 10);
     ///
-    /// let coordinate = start.move_forward(Number::MAX).expect("coordinate to move");
-    /// assert_eq!(coordinate.contig().as_str(), "seq0");
-    /// assert_eq!(coordinate.strand(), Strand::Positive);
+    /// let mut coordinate = "seq0:+:0".parse::<Coordinate<Interbase>>()?;
+    /// assert!(coordinate.move_forward(Number::MAX));
     /// assert_eq!(coordinate.position().get(), Number::MAX);
-    ///
-    /// let coordinate = coordinate.move_forward(1);
-    /// assert!(coordinate.is_none());
+    /// assert!(!coordinate.move_forward(1));
     ///
     /// // Base.
     ///
-    /// let start = "seq0:+:1".parse::<Coordinate<Base>>()?;
-    /// let coordinate = start.clone().move_forward(10).expect("coordinate to move");
-    /// assert_eq!(coordinate.contig().as_str(), "seq0");
-    /// assert_eq!(coordinate.strand(), Strand::Positive);
+    /// let mut coordinate = "seq0:+:1".parse::<Coordinate<Base>>()?;
+    /// assert!(coordinate.move_forward(10));
     /// assert_eq!(coordinate.position().get(), 11);
     ///
-    /// let coordinate = start
-    ///     .move_forward(Number::MAX - 1)
-    ///     .expect("coordinate to move");
-    /// assert_eq!(coordinate.contig().as_str(), "seq0");
-    /// assert_eq!(coordinate.strand(), Strand::Positive);
+    /// let mut coordinate = "seq0:+:1".parse::<Coordinate<Base>>()?;
+    /// assert!(coordinate.move_forward(Number::MAX - 1));
     /// assert_eq!(coordinate.position().get(), Number::MAX);
+    /// assert!(!coordinate.move_forward(1));
     ///
-    /// let coordinate = coordinate.move_forward(1);
-    /// assert!(coordinate.is_none());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn move_forward(&mut self, magnitude: Number) -> bool {
+        if magnitude == 0 {
+            return true;
+        }
+
+        let result = match self.strand {
+            Strand::Positive => self.position.checked_add(magnitude),
+            Strand::Negative => self.position.checked_sub(magnitude),
+        };
+
+        match result {
+            Some(position) => {
+                self.position = position;
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Consumes `self` and attempts to move the position forward by
+    /// `magnitude`.
+    ///
+    /// This method is dependent on the strand of the coordinate:
+    ///
+    /// - a coordinate on the [`Strand::Positive`] moves positively, and
+    /// - a coordinate on the [`Strand::Negative`] moves negatively.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_coordinate::Coordinate;
+    /// use omics_coordinate::Strand;
+    /// use omics_coordinate::position::Number;
+    /// use omics_coordinate::system::Base;
+    /// use omics_coordinate::system::Interbase;
+    ///
+    /// // Interbase.
+    ///
+    /// let coordinate = "seq0:+:0".parse::<Coordinate<Interbase>>()?;
+    /// let moved = coordinate
+    ///     .into_move_forward(10)
+    ///     .expect("coordinate to move");
+    /// assert_eq!(moved.position().get(), 10);
+    ///
+    /// let coordinate = "seq0:+:0".parse::<Coordinate<Interbase>>()?;
+    /// let moved = coordinate.into_move_forward(Number::MAX).unwrap();
+    /// assert!(moved.into_move_forward(1).is_none());
+    ///
+    /// // Base.
+    ///
+    /// let coordinate = "seq0:+:1".parse::<Coordinate<Base>>()?;
+    /// let moved = coordinate
+    ///     .into_move_forward(10)
+    ///     .expect("coordinate to move");
+    /// assert_eq!(moved.position().get(), 11);
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     #[must_use = "this method returns a new coordinate"]
-    pub fn move_forward(self, magnitude: Number) -> Option<Coordinate<S>> {
+    pub fn into_move_forward(self, magnitude: Number) -> Option<Coordinate<S>> {
         if magnitude == 0 {
             return Some(self);
         }
@@ -335,23 +380,22 @@ where
             Strand::Positive => self.position.checked_add(magnitude),
             Strand::Negative => self.position.checked_sub(magnitude),
         }
-        .map(|position| Self::new(self.contig.clone(), self.strand, position))
+        .map(|position| Self::new(self.contig, self.strand, position))
     }
 
-    /// Consumes `self` and attempts to move the position backwards by
-    /// `magnitude`.
+    /// Attempts to move the position backward by `magnitude` in place.
     ///
     /// This method is dependent on the strand of the coordinate:
     ///
     /// - a coordinate on the [`Strand::Positive`] moves negatively, and
-    /// - a coordinate on the [`Strand::Negative`] move positively.
+    /// - a coordinate on the [`Strand::Negative`] moves positively.
+    ///
+    /// Returns `true` if the move succeeded, `false` if it would overflow.
     ///
     /// # Examples
     ///
     /// ```
-    /// use omics_coordinate::Contig;
     /// use omics_coordinate::Coordinate;
-    /// use omics_coordinate::Position;
     /// use omics_coordinate::Strand;
     /// use omics_coordinate::position::Number;
     /// use omics_coordinate::system::Base;
@@ -361,44 +405,88 @@ where
     ///
     /// // Interbase.
     ///
-    /// let start = value.clone().parse::<Coordinate<Interbase>>()?;
-    /// let coordinate = start.clone().move_backward(10).expect("coordinate to move");
-    /// assert_eq!(coordinate.contig().as_str(), "seq0");
-    /// assert_eq!(coordinate.strand(), Strand::Positive);
+    /// let mut coordinate = value.clone().parse::<Coordinate<Interbase>>()?;
+    /// assert!(coordinate.move_backward(10));
     /// assert_eq!(coordinate.position().get(), Number::MAX - 10);
     ///
-    /// let coordinate = start
-    ///     .move_backward(Number::MAX)
-    ///     .expect("coordinate to move");
-    /// assert_eq!(coordinate.contig().as_str(), "seq0");
-    /// assert_eq!(coordinate.strand(), Strand::Positive);
-    /// assert_eq!(coordinate.position().get(), 0);
-    ///
-    /// let coordinate = coordinate.move_backward(1);
-    /// assert!(coordinate.is_none());
+    /// let mut coordinate = "seq0:+:0".parse::<Coordinate<Interbase>>()?;
+    /// assert!(!coordinate.move_backward(1));
     ///
     /// // Base.
     ///
-    /// let start = value.parse::<Coordinate<Base>>()?;
-    /// let coordinate = start.clone().move_backward(10).expect("coordinate to move");
-    /// assert_eq!(coordinate.contig().as_str(), "seq0");
-    /// assert_eq!(coordinate.strand(), Strand::Positive);
+    /// let mut coordinate = value.parse::<Coordinate<Base>>()?;
+    /// assert!(coordinate.move_backward(10));
     /// assert_eq!(coordinate.position().get(), Number::MAX - 10);
     ///
-    /// let coordinate = start
-    ///     .move_backward(Number::MAX - 1)
-    ///     .expect("coordinate to move");
-    /// assert_eq!(coordinate.contig().as_str(), "seq0");
-    /// assert_eq!(coordinate.strand(), Strand::Positive);
-    /// assert_eq!(coordinate.position().get(), 1);
+    /// let mut coordinate = "seq0:+:1".parse::<Coordinate<Base>>()?;
+    /// assert!(!coordinate.move_backward(1));
     ///
-    /// let coordinate = coordinate.move_backward(1);
-    /// assert!(coordinate.is_none());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn move_backward(&mut self, magnitude: Number) -> bool {
+        if magnitude == 0 {
+            return true;
+        }
+
+        let result = match self.strand {
+            Strand::Positive => self.position.checked_sub(magnitude),
+            Strand::Negative => self.position.checked_add(magnitude),
+        };
+
+        match result {
+            Some(position) => {
+                self.position = position;
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Consumes `self` and attempts to move the position backwards by
+    /// `magnitude`.
+    ///
+    /// This method is dependent on the strand of the coordinate:
+    ///
+    /// - a coordinate on the [`Strand::Positive`] moves negatively, and
+    /// - a coordinate on the [`Strand::Negative`] moves positively.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_coordinate::Coordinate;
+    /// use omics_coordinate::Strand;
+    /// use omics_coordinate::position::Number;
+    /// use omics_coordinate::system::Base;
+    /// use omics_coordinate::system::Interbase;
+    ///
+    /// let value = format!("seq0:+:{}", Number::MAX);
+    ///
+    /// // Interbase.
+    ///
+    /// let coordinate = value.clone().parse::<Coordinate<Interbase>>()?;
+    /// let moved = coordinate
+    ///     .into_move_backward(10)
+    ///     .expect("coordinate to move");
+    /// assert_eq!(moved.position().get(), Number::MAX - 10);
+    ///
+    /// let coordinate = "seq0:+:0".parse::<Coordinate<Interbase>>()?;
+    /// assert!(coordinate.into_move_backward(1).is_none());
+    ///
+    /// // Base.
+    ///
+    /// let coordinate = value.parse::<Coordinate<Base>>()?;
+    /// let moved = coordinate
+    ///     .into_move_backward(10)
+    ///     .expect("coordinate to move");
+    /// assert_eq!(moved.position().get(), Number::MAX - 10);
+    ///
+    /// let coordinate = "seq0:+:1".parse::<Coordinate<Base>>()?;
+    /// assert!(coordinate.into_move_backward(1).is_none());
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     #[must_use = "this method returns a new coordinate"]
-    pub fn move_backward(self, magnitude: Number) -> Option<Coordinate<S>> {
+    pub fn into_move_backward(self, magnitude: Number) -> Option<Coordinate<S>> {
         if magnitude == 0 {
             return Some(self);
         }
@@ -407,7 +495,7 @@ where
             Strand::Positive => self.position.checked_sub(magnitude),
             Strand::Negative => self.position.checked_add(magnitude),
         }
-        .map(|position| Self::new(self.contig.clone(), self.strand, position))
+        .map(|position| Self::new(self.contig, self.strand, position))
     }
 
     /// Swaps the strand of the coordinate.
