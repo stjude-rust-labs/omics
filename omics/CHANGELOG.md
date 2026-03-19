@@ -11,6 +11,8 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - `omics-coordinate`: bumped to v0.3.0
   ([release](https://github.com/stjude-rust-labs/omics/releases/tag/omics-coordinate-v0.3.0))
+- `omics-molecule`: bumped to v0.2.0
+  ([release](https://github.com/stjude-rust-labs/omics/releases/tag/omics-molecule-v0.2.0))
 - `omics-variation`: bumped to v0.3.0
   ([release](https://github.com/stjude-rust-labs/omics/releases/tag/omics-variation-v0.3.0))
 
