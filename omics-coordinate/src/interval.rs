@@ -1187,6 +1187,7 @@ mod tests {
     use crate::position::ParseError as PositionParseError;
     use crate::strand::Error as StrandError;
     use crate::strand::ParseError as StrandParseError;
+    use crate::system::Base;
     use crate::system::Interbase;
 
     #[test]
@@ -1474,8 +1475,10 @@ mod tests {
         assert!(interval.coordinate_offset(&coordinate).is_none());
     }
 
+    // count_entities() for interbase vs in-base intervals and both strands.
     #[test]
     fn len() {
+        // Interbase: span length in entities matches start/end distance (positive strand).
         assert_eq!(
             "seq0:+:0-1000"
                 .parse::<Interval<Interbase>>()
@@ -1484,6 +1487,7 @@ mod tests {
             1000
         );
 
+        // Interbase: negative strand (start coordinate is the larger genomic position).
         assert_eq!(
             "seq0:-:1000-0"
                 .parse::<Interval<Interbase>>()
@@ -1491,29 +1495,42 @@ mod tests {
                 .count_entities(),
             1000
         );
-        let interval = "seq0:-:2000-1000".parse::<Interval<Interbase>>().unwrap();
 
-        // Mismatched contigs means the interval does not contain the coordinate.
-        let coordinate = "seq1:-:1000".parse::<Coordinate<Interbase>>().unwrap();
-        assert!(interval.coordinate_offset(&coordinate).is_none());
+        // Interbase: zero-width interval in coordinate space yields zero entities.
+        assert_eq!(
+            "seq0:+:10-10"
+                .parse::<Interval<Interbase>>()
+                .unwrap()
+                .count_entities(),
+            0
+        );
 
-        // Mismatched strands means the interval does not contain the coordinate.
-        let coordinate = "seq0:+:1000".parse::<Coordinate<Interbase>>().unwrap();
-        assert!(interval.coordinate_offset(&coordinate).is_none());
+        // In-base: inclusive range — endpoints both count as entities (positive strand).
+        assert_eq!(
+            "seq0:+:10-20"
+                .parse::<Interval<Base>>()
+                .unwrap()
+                .count_entities(),
+            11
+        );
 
-        // Contained within.
-        let coordinate = "seq0:-:2000".parse::<Coordinate<Interbase>>().unwrap();
-        assert_eq!(interval.coordinate_offset(&coordinate).unwrap(), 0);
+        // In-base: negative strand.
+        assert_eq!(
+            "seq0:-:20-10"
+                .parse::<Interval<Base>>()
+                .unwrap()
+                .count_entities(),
+            11
+        );
 
-        let coordinate = "seq0:-:1000".parse::<Coordinate<Interbase>>().unwrap();
-        assert_eq!(interval.coordinate_offset(&coordinate).unwrap(), 1000);
-
-        // Just outside of range.
-        let coordinate = "seq0:-:999".parse::<Coordinate<Interbase>>().unwrap();
-        assert!(interval.coordinate_offset(&coordinate).is_none());
-
-        let coordinate = "seq0:-:2001".parse::<Coordinate<Interbase>>().unwrap();
-        assert!(interval.coordinate_offset(&coordinate).is_none());
+        // In-base: single position is one entity.
+        assert_eq!(
+            "seq0:+:5-5"
+                .parse::<Interval<Base>>()
+                .unwrap()
+                .count_entities(),
+            1
+        );
     }
 
     #[test]
