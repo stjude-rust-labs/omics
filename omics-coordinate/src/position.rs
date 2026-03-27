@@ -1,4 +1,54 @@
 //! Positions.
+//!
+//! ### Appendix: Advanced Coordinate System Intuitions
+//!
+//! Below are some scattered thoughts and advanced intuitions related to genomic
+//! coordinate systems. While the primary documentation covers practical usage,
+//! this section provides a deeper dive into the conceptual models—specifically the
+//! nuances between 0-based and 1-based nomenclature, and the transformations between them.
+//!
+//! #### The Limits of "0-Based" and "1-Based" Terminology
+//! * The notation of 0-based and 1-based can distract from the core intuition that actually matters:
+//!   **interbase** vs. **in-base**. Furthermore, the assignment of interbase indices starting at 0 and
+//!   in-base positions starting at 1 is an informed, yet arbitrary, decision held together by convention.
+//! * When breaking the model down into nucleotide slots and space slots, the distinctions between
+//!   "fully-closed" and "half-open" intervals are often artifacts of trying to make space and nucleotide
+//!   slots fit into a single concept.
+//!     * **In-base coordinates:** The situation is clear. They include both the start and end nucleotide.
+//!     * **Interbase coordinates:** In a strict sense, whether interbase intervals are closed or open is
+//!       undefined. Because genomic analysis primarily resolves to nucleotide sequences (filtering out the spaces),
+//!       including or excluding the final space has no bearing on the resulting nucleotide sequence.
+//! * Because interbase coordinates do not point to actual nucleotides, resolving them requires a
+//!   directional assumption. For example, the UCSC model silently assumes a right-leaning resolution. 
+//!   Making these assumptions explicit is crucial for accuracy to avoid off-by-one errors.
+//!
+//! #### Transforming In-Base to Interbase
+//!
+//! Let's review the conceptual model of coordinate systems:
+//!
+//! ```text
+//! ========================== seq0 =========================
+//! •   G   •   A   •   T   •   A   •   T   •   G   •   A   •
+//! ║   ║   ║   ║   ║   ║   ║   ║   ║   ║   ║   ║   ║   ║   ║
+//! ║[--1--]║[--2--]║[--3--]║[--4--]║[--5--]║[--6--]║[--7--]║ In-base Positions
+//! 0       1       2       3       4       5       6       7 Interbase Positions
+//! ```
+//!
+//! Considering the ranges that represent the entire sequence in both systems, the transformation
+//! from an in-base coordinate system breaks down into two steps:
+//! 1. The range is shifted forward by half a step (one slot).
+//! 2. A whole step is prepended to the coordinate system.
+//!
+//! Alternatively, the start and end of the in-base range are expanded outward by one half step.
+//!
+//! **Key Takeaways:**
+//! * Under both intuitions, the size of the range increases by one whole step. This is why calculating
+//!   length in the interbase system is easier (`end - start` without needing to add `1`).
+//! * If space slots and nucleotide slots are combined into a singular numerical position, the order switches:
+//!     * **Interbase:** The space slot is *before* the nucleotide slot.
+//!     * **In-base:** The space slot is *after* the nucleotide slot.
+//! * This switching of rules between coordinate systems is why combining both slots into a single numerical
+//!   position often leads to systemic bugs in bioinformatics pipelines.
 
 use std::num::ParseIntError;
 
