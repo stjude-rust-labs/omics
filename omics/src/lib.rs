@@ -2,6 +2,9 @@
 //!
 //! See each individual module's documentation for more information.
 
+#[cfg(feature = "alignment")]
+#[doc(inline)]
+pub use omics_alignment as alignment;
 #[cfg(feature = "coordinate")]
 #[doc(inline)]
 pub use omics_coordinate as coordinate;
