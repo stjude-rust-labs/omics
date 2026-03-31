@@ -1,0 +1,21 @@
+[package]
+name = "omics-alignment"
+version = "0.1.0"
+description = "Sequence alignment primitives and algorithms for the Rust omics ecosystem"
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+omics-molecule = { path = "../omics-molecule", version = "0.2.0" }
+
+thiserror.workspace = true
+
+[dev-dependencies]
+anyhow.workspace = true
+
+[lints]
+workspace = true
