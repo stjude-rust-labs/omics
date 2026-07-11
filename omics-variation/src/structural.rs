@@ -148,7 +148,8 @@ impl<N: Nucleotide> StructuralVariant<N> {
     pub fn kind(&self) -> Kind {
         match self.adjacencies.as_slice() {
             [single] => classify_single(single),
-            // Multi-adjacency classification is added in the next task.
+            [first, second] => classify_pair(first, second),
+            [first, second, third] => classify_triple(first, second, third),
             _ => Kind::Complex,
         }
     }
@@ -186,6 +187,49 @@ fn adjacency_key<N: Nucleotide>(adjacency: &Adjacency<N>) -> (u8, BreakendKey, B
     }
 }
 
+/// Gets the two breakends of a paired adjacency, or `None` for a single one.
+fn paired_breakends<N: Nucleotide>(adjacency: &Adjacency<N>) -> Option<(&Breakend, &Breakend)> {
+    adjacency.paired().map(|(a, b, _)| (a, b))
+}
+
+/// Reports whether every breakend across the adjacencies is on one contig.
+///
+/// A single-ended adjacency has no second known locus, so its presence makes
+/// the answer `false`.
+fn one_contig<N: Nucleotide>(adjacencies: &[&Adjacency<N>]) -> bool {
+    let mut contig: Option<&str> = None;
+    for adjacency in adjacencies {
+        let Some((a, b)) = paired_breakends(adjacency) else {
+            return false;
+        };
+        for breakend in [a, b] {
+            match contig {
+                None => contig = Some(breakend.contig().as_str()),
+                Some(seen) if seen != breakend.contig().as_str() => return false,
+                Some(_) => {}
+            }
+        }
+    }
+    true
+}
+
+/// Gets the shared orientation of a fold-back adjacency, or `None` otherwise.
+///
+/// A fold-back is a paired adjacency whose two breakends share an orientation.
+fn fold_back_orientation<N: Nucleotide>(adjacency: &Adjacency<N>) -> Option<Orientation> {
+    match paired_breakends(adjacency) {
+        Some((a, b)) if a.orientation() == b.orientation() => Some(a.orientation()),
+        _ => None,
+    }
+}
+
+/// Gets the sorted pair of interbase positions of a paired adjacency.
+fn position_pair<N: Nucleotide>(adjacency: &Adjacency<N>) -> Option<(Number, Number)> {
+    let (a, b) = paired_breakends(adjacency)?;
+    let (lo, hi) = (a.position().get(), b.position().get());
+    Some(if lo <= hi { (lo, hi) } else { (hi, lo) })
+}
+
 /// Classifies a structural variant made of exactly one adjacency.
 fn classify_single<N: Nucleotide>(adjacency: &Adjacency<N>) -> Kind {
     let Some((a, b, _)) = adjacency.paired() else {
@@ -211,6 +255,86 @@ fn classify_single<N: Nucleotide>(adjacency: &Adjacency<N>) -> Kind {
                 Kind::Deletion
             }
         }
+    }
+}
+
+/// Classifies a two-adjacency event.
+///
+/// An inversion is exactly two paired fold-back adjacencies on one contig over
+/// the same two boundary positions, one both-`LowerFlank` and one
+/// both-`HigherFlank`. Anything else is [`Kind::Complex`].
+fn classify_pair<N: Nucleotide>(first: &Adjacency<N>, second: &Adjacency<N>) -> Kind {
+    if !one_contig(&[first, second]) {
+        return Kind::Complex;
+    }
+
+    let orientations = (fold_back_orientation(first), fold_back_orientation(second));
+    let positions = (position_pair(first), position_pair(second));
+    if let ((Some(one), Some(two)), (Some(p1), Some(p2))) = (orientations, positions) {
+        if one.is_opposite(two) && p1 == p2 {
+            return Kind::Inversion;
+        }
+    }
+
+    Kind::Complex
+}
+
+/// Classifies a three-adjacency event.
+///
+/// The only recognized signature is the balanced forward intrachromosomal
+/// relocation, namely three paired co-linear (opposite-orientation) junctions
+/// on one contig forming a triangle over exactly three distinct boundaries,
+/// where each boundary appears exactly once as a `LowerFlank` and exactly once
+/// as a `HigherFlank` across the three junctions. Anything else, including a
+/// triple that reuses a flank or one with a fold-back, is [`Kind::Complex`].
+fn classify_triple<N: Nucleotide>(
+    first: &Adjacency<N>,
+    second: &Adjacency<N>,
+    third: &Adjacency<N>,
+) -> Kind {
+    let adjacencies = [first, second, third];
+    if !one_contig(&adjacencies) {
+        return Kind::Complex;
+    }
+
+    // Every junction must be a co-linear (opposite-orientation) paired join.
+    for adjacency in adjacencies {
+        match paired_breakends(adjacency) {
+            Some((a, b)) if a.orientation().is_opposite(b.orientation()) => {}
+            _ => return Kind::Complex,
+        }
+    }
+
+    // Tally, per boundary position, how often it appears as a `LowerFlank` and
+    // as a `HigherFlank`. The triangle requires exactly three distinct
+    // boundaries, each appearing once as each flank.
+    let mut counts: Vec<(Number, usize, usize)> = Vec::new();
+    for adjacency in adjacencies {
+        if let Some((a, b)) = paired_breakends(adjacency) {
+            for breakend in [a, b] {
+                let position = breakend.position().get();
+                if !counts.iter().any(|(p, _, _)| *p == position) {
+                    counts.push((position, 0, 0));
+                }
+                let entry = counts
+                    .iter_mut()
+                    .find(|(p, _, _)| *p == position)
+                    .expect("the position was just inserted");
+                match breakend.orientation() {
+                    Orientation::LowerFlank => entry.1 += 1,
+                    Orientation::HigherFlank => entry.2 += 1,
+                }
+            }
+        }
+    }
+
+    let triangle =
+        counts.len() == 3 && counts.iter().all(|(_, lower, higher)| *lower == 1 && *higher == 1);
+
+    if triangle {
+        Kind::Translocation(Locality::Intrachromosomal)
+    } else {
+        Kind::Complex
     }
 }
 
@@ -298,5 +422,137 @@ mod tests {
             ".",
         );
         assert_eq!(Sv::try_new(vec![adjacency]).unwrap().kind(), Kind::Complex);
+    }
+
+    #[test]
+    fn it_classifies_an_inversion() {
+        // Two fold-back junctions over the same two boundaries {100, 200}, one
+        // both-LowerFlank and one both-HigherFlank.
+        let lower = paired(
+            bnd(Orientation::LowerFlank, 100),
+            bnd(Orientation::LowerFlank, 200),
+            ".",
+        );
+        let higher = paired(
+            bnd(Orientation::HigherFlank, 100),
+            bnd(Orientation::HigherFlank, 200),
+            ".",
+        );
+        assert_eq!(
+            Sv::try_new(vec![lower, higher]).unwrap().kind(),
+            Kind::Inversion
+        );
+    }
+
+    #[test]
+    fn it_classifies_an_intrachromosomal_translocation() {
+        // Three co-linear junctions over boundaries {100, 200, 400}, forming a
+        // triangle where each boundary appears once as each flank.
+        let origin = paired(
+            bnd(Orientation::LowerFlank, 100),
+            bnd(Orientation::HigherFlank, 200),
+            ".",
+        );
+        let target_left = paired(
+            bnd(Orientation::LowerFlank, 400),
+            bnd(Orientation::HigherFlank, 100),
+            ".",
+        );
+        let target_right = paired(
+            bnd(Orientation::LowerFlank, 200),
+            bnd(Orientation::HigherFlank, 400),
+            ".",
+        );
+        assert_eq!(
+            Sv::try_new(vec![origin, target_left, target_right])
+                .unwrap()
+                .kind(),
+            Kind::Translocation(Locality::Intrachromosomal)
+        );
+    }
+
+    #[test]
+    fn it_classifies_two_unrelated_fold_backs_as_complex() {
+        let one = paired(
+            bnd(Orientation::LowerFlank, 100),
+            bnd(Orientation::LowerFlank, 200),
+            ".",
+        );
+        let two = paired(
+            bnd(Orientation::LowerFlank, 300),
+            bnd(Orientation::LowerFlank, 400),
+            ".",
+        );
+        assert_eq!(Sv::try_new(vec![one, two]).unwrap().kind(), Kind::Complex);
+    }
+
+    #[test]
+    fn it_rejects_a_triple_that_reuses_a_flank_as_complex() {
+        // Three co-linear junctions over three distinct boundaries {100, 200,
+        // 300}, each appearing twice overall, but 100 appears twice as a
+        // LowerFlank and never as a HigherFlank, so it is not a proper triangle.
+        let one = paired(
+            bnd(Orientation::LowerFlank, 100),
+            bnd(Orientation::HigherFlank, 200),
+            ".",
+        );
+        let two = paired(
+            bnd(Orientation::LowerFlank, 100),
+            bnd(Orientation::HigherFlank, 300),
+            ".",
+        );
+        let three = paired(
+            bnd(Orientation::LowerFlank, 200),
+            bnd(Orientation::HigherFlank, 300),
+            ".",
+        );
+        assert_eq!(
+            Sv::try_new(vec![one, two, three]).unwrap().kind(),
+            Kind::Complex
+        );
+    }
+
+    #[test]
+    fn it_normalizes_a_permuted_adjacency_list() {
+        let lower = paired(
+            bnd(Orientation::LowerFlank, 100),
+            bnd(Orientation::LowerFlank, 200),
+            ".",
+        );
+        let higher = paired(
+            bnd(Orientation::HigherFlank, 100),
+            bnd(Orientation::HigherFlank, 200),
+            ".",
+        );
+
+        let canonical = Sv::try_new(vec![lower.clone(), higher.clone()]).unwrap();
+        let permuted = Sv::try_new(vec![higher, lower]).unwrap();
+
+        assert_eq!(canonical, permuted);
+        assert_eq!(canonical.kind(), permuted.kind());
+        assert_eq!(permuted.kind(), Kind::Inversion);
+    }
+
+    #[test]
+    fn it_normalizes_a_duplicate_adjacency_list() {
+        let lower = paired(
+            bnd(Orientation::LowerFlank, 100),
+            bnd(Orientation::LowerFlank, 200),
+            ".",
+        );
+        let higher = paired(
+            bnd(Orientation::HigherFlank, 100),
+            bnd(Orientation::HigherFlank, 200),
+            ".",
+        );
+
+        let canonical = Sv::try_new(vec![lower.clone(), higher.clone()]).unwrap();
+        let with_duplicate = Sv::try_new(vec![lower, higher.clone(), higher]).unwrap();
+
+        assert_eq!(canonical, with_duplicate);
+        assert_eq!(canonical.adjacencies().len(), 2);
+        assert_eq!(with_duplicate.adjacencies().len(), 2);
+        assert_eq!(canonical.kind(), with_duplicate.kind());
+        assert_eq!(with_duplicate.kind(), Kind::Inversion);
     }
 }
