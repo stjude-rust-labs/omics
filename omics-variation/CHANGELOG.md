@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+* Added the `MNV`, insertion, deletion, and delins small-variant kinds
+  alongside the existing SNV, backed by a shared `Alteration` core and a new
+  `Kind` classification. The top-level `Variant` now parses and dispatches to
+  each kind and exposes a parsimony `normalize` method.
+
 ### Crate Updates
 
 - `omics-coordinate`: bumped to v0.4.0
