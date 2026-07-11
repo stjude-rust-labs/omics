@@ -5,6 +5,7 @@ use omics_coordinate::Interval;
 use omics_coordinate::coordinate;
 use omics_coordinate::position::Number;
 use omics_coordinate::system::Base;
+use omics_coordinate::system::Interbase;
 use omics_molecule::compound::Nucleotide;
 use omics_molecule::sequence;
 use omics_molecule::sequence::Sequence;
@@ -12,8 +13,14 @@ use omics_molecule::sequence::Sequence;
 use crate::variant::Alteration;
 use crate::variant::Kind;
 use crate::variant::KindError;
+use crate::variant::base_interval;
+use crate::variant::interbase_interval_before_base;
 
 /// A deletion of one or more reference bases.
+///
+/// Serialized top-level variants use base coordinates with the `(b)`
+/// qualifier. Interbase coordinates with `(i)` are rejected because a deletion
+/// removes existing bases over a base interval.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Variant<N: Nucleotide> {
     /// The coordinate of the first deleted base.
@@ -83,7 +90,10 @@ impl<N: Nucleotide> Variant<N> {
         self.alteration.reference()
     }
 
-    /// Gets the interval spanned by the deleted bases.
+    /// Gets the interval spanned by the reference allele.
+    ///
+    /// Use this for reference-facing overlap and annotation queries. This is
+    /// the interval deleted from the reference.
     ///
     /// # Examples
     ///
@@ -94,15 +104,36 @@ impl<N: Nucleotide> Variant<N> {
     /// assert_eq!(variant.interval().end().position().get(), 101);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn interval(&self) -> Interval<Base> {
+    pub fn reference_interval(&self) -> Interval<Base> {
         // SAFETY: construction validated that this span is representable.
-        let span = Number::try_from(self.alteration.reference().len() - 1).unwrap();
-        // SAFETY: construction validated that moving forward by the span
-        // stays within the position bounds.
-        let end = self.coordinate.clone().into_move_forward(span).unwrap();
-        // SAFETY: `start` and `end` share a contig and strand, and `end` is at
-        // or beyond `start` in the strand's forward direction.
-        Interval::try_new(self.coordinate.clone(), end).unwrap()
+        base_interval(&self.coordinate, self.alteration.reference().len()).unwrap()
+    }
+
+    /// Gets the zero-width interval spanned by the alternate allele.
+    ///
+    /// A deletion has an empty alternate allele. Its alternate interval is the
+    /// interbase boundary immediately before the deleted reference interval.
+    /// Use this for local alternate-allele span queries.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use omics_molecule::polymer::dna::Nucleotide;
+    /// # use omics_variation::variant::deletion::Variant;
+    /// let variant = Variant::<Nucleotide>::try_new("seq0:+:100", "AT")?;
+    /// assert_eq!(
+    ///     variant.alternate_interval().start().position().get(),
+    ///     variant.alternate_interval().end().position().get()
+    /// );
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn alternate_interval(&self) -> Interval<Interbase> {
+        interbase_interval_before_base(&self.coordinate)
+    }
+
+    /// Gets the interval spanned by the reference allele.
+    pub fn interval(&self) -> Interval<Base> {
+        self.reference_interval()
     }
 
     /// Gets the underlying [`Alteration`] carrying both alleles.

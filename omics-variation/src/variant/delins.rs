@@ -12,8 +12,13 @@ use omics_molecule::sequence::Sequence;
 use crate::variant::Alteration;
 use crate::variant::Kind;
 use crate::variant::KindError;
+use crate::variant::base_interval;
 
 /// A combined deletion-insertion of differing lengths.
+///
+/// Serialized top-level variants use base coordinates with the `(b)`
+/// qualifier. Interbase coordinates with `(i)` are rejected because a delins
+/// replaces existing bases over a base interval.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Variant<N: Nucleotide> {
     /// The coordinate of the first replaced base.
@@ -100,7 +105,10 @@ impl<N: Nucleotide> Variant<N> {
         self.alteration.alternate()
     }
 
-    /// Gets the interval spanned by the replaced reference bases.
+    /// Gets the interval spanned by the reference allele.
+    ///
+    /// Use this for reference-facing overlap and annotation queries. This is
+    /// the interval replaced on the reference.
     ///
     /// # Examples
     ///
@@ -111,15 +119,42 @@ impl<N: Nucleotide> Variant<N> {
     /// assert_eq!(variant.interval().end().position().get(), 101);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn interval(&self) -> Interval<Base> {
+    pub fn reference_interval(&self) -> Interval<Base> {
         // SAFETY: construction validated that this span is representable.
-        let span = Number::try_from(self.alteration.reference().len() - 1).unwrap();
-        // SAFETY: construction validated that moving forward by the span
-        // stays within the position bounds.
-        let end = self.coordinate.clone().into_move_forward(span).unwrap();
-        // SAFETY: `start` and `end` share a contig and strand, and `end` is at
-        // or beyond `start` in the strand's forward direction.
-        Interval::try_new(self.coordinate.clone(), end).unwrap()
+        base_interval(&self.coordinate, self.alteration.reference().len()).unwrap()
+    }
+
+    /// Gets the local interval spanned by the alternate allele.
+    ///
+    /// The alternate interval starts at the same coordinate as the reference
+    /// interval and spans the alternate allele length. This describes the
+    /// local replacement sequence, not a globally projected query coordinate.
+    /// Use this for local alternate-allele span queries.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use omics_molecule::polymer::dna::Nucleotide;
+    /// # use omics_variation::variant::delins::Variant;
+    /// let variant = Variant::<Nucleotide>::try_new("seq0:+:100", "AT", "G")?;
+    /// assert_eq!(
+    ///     variant
+    ///         .alternate_interval()
+    ///         .unwrap()
+    ///         .start()
+    ///         .position()
+    ///         .get(),
+    ///     100
+    /// );
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn alternate_interval(&self) -> Option<Interval<Base>> {
+        base_interval(&self.coordinate, self.alteration.alternate().len())
+    }
+
+    /// Gets the interval spanned by the reference allele.
+    pub fn interval(&self) -> Interval<Base> {
+        self.reference_interval()
     }
 
     /// Gets the underlying [`Alteration`] carrying both alleles.

@@ -16,9 +16,9 @@
 //! use omics_variation::Variant;
 //! use omics_variation::variant::Kind;
 //!
-//! let variant = "seq0:+:100:A:C".parse::<Variant<dna::Nucleotide>>()?;
+//! let variant = "seq0:+:100(b):A:C".parse::<Variant<dna::Nucleotide>>()?;
 //! assert_eq!(variant.kind(), Kind::Snv);
-//! assert_eq!(variant.to_string(), "seq0:+:100:A:C");
+//! assert_eq!(variant.to_string(), "seq0:+:100(b):A:C");
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -27,39 +27,50 @@
 //! The crate uses a compact, crate-local string format:
 //!
 //! ```text
-//! contig:[strand:]position:reference:alternate
+//! contig:[strand:]position(system):reference:alternate
 //! ```
 //!
 //! The `strand` field is optional when parsing and defaults to `+`.
-//! Serialization always emits the explicit strand. The `reference` and
-//! `alternate` fields are nucleotide sequences; `.` denotes an empty allele.
-//! This format is intentionally not [VCF], `SPDI`, or [HGVS]. Those formats
-//! carry additional metadata and normalization rules that belong in dedicated
-//! adapters.
+//! Serialization always emits the explicit strand. The `position` field must
+//! end in `(b)` for base coordinates or `(i)` for interbase coordinates. The
+//! `reference` and `alternate` fields are nucleotide sequences; `.` denotes an
+//! empty allele. This format is intentionally not [VCF], `SPDI`, or [HGVS].
+//! Those formats carry additional metadata and normalization rules that belong
+//! in dedicated adapters.
 //!
 //! | Kind | Example | Meaning |
 //! | --- | --- | --- |
-//! | [`Kind::Snv`] | `seq0:+:100:A:C` | substitute `A` with `C` |
-//! | [`Kind::Mnv`] | `seq0:+:100:AT:GC` | substitute `AT` with `GC` |
-//! | [`Kind::Insertion`] | `seq0:+:100:.:AT` | insert `AT` at interbase boundary `100` |
-//! | [`Kind::Deletion`] | `seq0:+:100:AT:.` | delete `AT` starting at base `100` |
-//! | [`Kind::Delins`] | `seq0:+:100:AT:G` | replace `AT` with `G` |
+//! | [`Kind::Snv`] | `seq0:+:100(b):A:C` | substitute `A` with `C` at base `100` |
+//! | [`Kind::Mnv`] | `seq0:+:100(b):AT:GC` | substitute `AT` with `GC` starting at base `100` |
+//! | [`Kind::Insertion`] | `seq0:+:100(i):.:AT` | insert `AT` at interbase boundary `100` |
+//! | [`Kind::Deletion`] | `seq0:+:100(b):AT:.` | delete `AT` starting at base `100` |
+//! | [`Kind::Delins`] | `seq0:+:100(b):AT:G` | replace `AT` with `G` starting at base `100` |
 //!
 //! Parsing classifies a variant from its allele lengths. Identical
 //! `reference` and `alternate` alleles are rejected because they do not
 //! describe variation, and `.:.` is rejected because it changes nothing.
+//! `SNV`, `MNV`, deletion, and `delins` records require `(b)` because their
+//! position identifies an existing base. Insertion records require `(i)`
+//! because their position identifies the boundary between bases. The opposite
+//! qualifier is rejected for each kind.
+//! Use [`Variant::reference_interval`] when comparing a variant to a reference
+//! genome or asking which reference bases are consumed. Use
+//! [`Variant::alternate_interval`] when asking about the local span of the
+//! sequence introduced by the alternate allele. The alternate interval is not a
+//! full query-genome coordinate; downstream variants can shift global query
+//! coordinates.
 //!
 //! ```
 //! use omics_molecule::polymer::dna;
 //! use omics_variation::Variant;
 //! use omics_variation::variant::Kind;
 //!
-//! let insertion = "seq0:+:100:.:AT".parse::<Variant<dna::Nucleotide>>()?;
+//! let insertion = "seq0:+:100(i):.:AT".parse::<Variant<dna::Nucleotide>>()?;
 //! assert_eq!(insertion.kind(), Kind::Insertion);
 //!
-//! let deletion = "seq0:100:AT:.".parse::<Variant<dna::Nucleotide>>()?;
+//! let deletion = "seq0:100(b):AT:.".parse::<Variant<dna::Nucleotide>>()?;
 //! assert_eq!(deletion.kind(), Kind::Deletion);
-//! assert_eq!(deletion.to_string(), "seq0:+:100:AT:.");
+//! assert_eq!(deletion.to_string(), "seq0:+:100(b):AT:.");
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -75,7 +86,7 @@
 //! use omics_molecule::polymer::dna;
 //! use omics_variation::Variant;
 //!
-//! let variant = "seq0:+:100:.:AT".parse::<Variant<dna::Nucleotide>>()?;
+//! let variant = "seq0:+:100(i):.:AT".parse::<Variant<dna::Nucleotide>>()?;
 //! let Variant::Insertion(insertion) = variant else {
 //!     unreachable!("the empty reference allele classifies as an insertion");
 //! };
@@ -100,11 +111,11 @@
 //! use omics_molecule::polymer::dna;
 //! use omics_variation::Variant;
 //!
-//! let variant = "seq0:+:100:AT:AG".parse::<Variant<dna::Nucleotide>>()?;
-//! assert_eq!(variant.normalize()?.to_string(), "seq0:+:101:T:G");
+//! let variant = "seq0:+:100(b):AT:AG".parse::<Variant<dna::Nucleotide>>()?;
+//! assert_eq!(variant.normalize()?.to_string(), "seq0:+:101(b):T:G");
 //!
-//! let variant = "seq0:-:100:AT:AG".parse::<Variant<dna::Nucleotide>>()?;
-//! assert_eq!(variant.normalize()?.to_string(), "seq0:-:99:T:G");
+//! let variant = "seq0:-:100(b):AT:AG".parse::<Variant<dna::Nucleotide>>()?;
+//! assert_eq!(variant.normalize()?.to_string(), "seq0:-:99(b):T:G");
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -133,6 +144,7 @@ use std::str::FromStr;
 
 use omics_coordinate::Coordinate;
 use omics_coordinate::Strand;
+use omics_coordinate::position::Number;
 use omics_coordinate::system::Base;
 use omics_coordinate::system::Interbase;
 use omics_core::VARIANT_SEPARATOR;
@@ -161,6 +173,26 @@ pub enum Error {
     #[error(transparent)]
     Coordinate(#[from] omics_coordinate::coordinate::Error),
 
+    /// The coordinate system qualifier was missing or invalid.
+    #[error("position `{position}` must end with `(b)` or `(i)`")]
+    CoordinateSystemQualifier {
+        /// The unqualified or incorrectly qualified position token.
+        position: String,
+    },
+
+    /// The coordinate system qualifier does not match the variant kind.
+    #[error("wrong coordinate system for {kind}; expected `{expected}`, found `{found}`")]
+    CoordinateSystem {
+        /// The variant kind.
+        kind: &'static str,
+
+        /// The expected coordinate system qualifier.
+        expected: &'static str,
+
+        /// The coordinate system qualifier found in the variant string.
+        found: &'static str,
+    },
+
     /// The reference allele failed to parse.
     #[error("reference allele parse error: {0}")]
     ReferenceSequence(omics_molecule::sequence::ParseError),
@@ -182,11 +214,90 @@ pub enum Error {
     NormalizeOverflow,
 }
 
+/// An interval associated with a variant allele.
+///
+/// Use the enum arms to preserve whether an allele interval sits on bases or
+/// between bases. Callers that inspect reference coverage usually want
+/// [`Variant::reference_interval`]. Callers that inspect the replacement
+/// sequence usually want [`Variant::alternate_interval`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VariantInterval {
+    /// A base interval.
+    Base(omics_coordinate::Interval<Base>),
+
+    /// An interbase interval.
+    Interbase(omics_coordinate::Interval<Interbase>),
+}
+
+/// A coordinate-system qualifier parsed from a serialized variant position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PositionQualifier {
+    /// A base coordinate qualifier.
+    Base,
+
+    /// An interbase coordinate qualifier.
+    Interbase,
+}
+
+impl PositionQualifier {
+    /// Gets the required coordinate-system qualifier for a variant kind.
+    pub(crate) fn for_kind(kind: Kind) -> Self {
+        match kind {
+            Kind::Insertion => Self::Interbase,
+            Kind::Snv | Kind::Mnv | Kind::Deletion | Kind::Delins => Self::Base,
+        }
+    }
+
+    /// Gets the serialized suffix for this qualifier.
+    pub(crate) fn suffix(self) -> &'static str {
+        match self {
+            Self::Base => "(b)",
+            Self::Interbase => "(i)",
+        }
+    }
+
+    /// Gets a human-readable description for error messages.
+    pub(crate) fn description(self) -> &'static str {
+        match self {
+            Self::Base => "base `(b)`",
+            Self::Interbase => "interbase `(i)`",
+        }
+    }
+}
+
+/// Gets a human-readable variant kind name for error messages.
+fn kind_name(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Snv => "snv",
+        Kind::Mnv => "mnv",
+        Kind::Insertion => "insertion",
+        Kind::Deletion => "deletion",
+        Kind::Delins => "delins",
+    }
+}
+
+/// Splits a serialized position token into its numeric value and qualifier.
+pub(crate) fn split_qualified_position(position: &str) -> Option<(&str, PositionQualifier)> {
+    position
+        .strip_suffix(PositionQualifier::Base.suffix())
+        .map(|position| (position, PositionQualifier::Base))
+        .or_else(|| {
+            position
+                .strip_suffix(PositionQualifier::Interbase.suffix())
+                .map(|position| (position, PositionQualifier::Interbase))
+        })
+}
+
+/// Formats a numeric position with its coordinate-system qualifier.
+pub(crate) fn qualified_position(position: Number, qualifier: PositionQualifier) -> String {
+    format!("{position}{}", qualifier.suffix())
+}
+
 /// A genomic variant.
 ///
 /// `PartialEq` compares the stored (as-given) form literally: two spellings of
-/// the same variant (for example `seq0:+:100:AT:AG` and `seq0:+:101:T:G`) are
-/// **not** equal unless they are first put through
+/// the same variant (for example `seq0:+:100(b):AT:AG` and `seq0:+:101(b):T:G`)
+/// are **not** equal unless they are first put through
 /// [`normalize`](Self::normalize).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Variant<N: Nucleotide> {
@@ -212,7 +323,7 @@ impl<N: Nucleotide> Variant<N> {
     /// use omics_variation::Variant;
     /// use omics_variation::variant::Kind;
     ///
-    /// let variant = "seq0:+:100:A:C".parse::<Variant<dna::Nucleotide>>()?;
+    /// let variant = "seq0:+:100(b):A:C".parse::<Variant<dna::Nucleotide>>()?;
     /// assert_eq!(variant.kind(), Kind::Snv);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -223,6 +334,77 @@ impl<N: Nucleotide> Variant<N> {
             Variant::Insertion(_) => Kind::Insertion,
             Variant::Deletion(_) => Kind::Deletion,
             Variant::Delins(_) => Kind::Delins,
+        }
+    }
+
+    /// Gets the interval spanned by the reference allele.
+    ///
+    /// Insertions return a zero-width interbase interval because their
+    /// reference allele is empty. All other variant kinds return a base
+    /// interval because they consume one or more reference bases.
+    ///
+    /// Use this method for reference-facing questions such as overlap against a
+    /// reference annotation, determining which reference bases are consumed, or
+    /// deciding whether a variant intersects a reference interval.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_molecule::polymer::dna;
+    /// use omics_variation::Variant;
+    /// use omics_variation::VariantInterval;
+    ///
+    /// let variant = "seq0:+:100(i):.:AT".parse::<Variant<dna::Nucleotide>>()?;
+    /// assert!(matches!(
+    ///     variant.reference_interval(),
+    ///     VariantInterval::Interbase(_)
+    /// ));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn reference_interval(&self) -> VariantInterval {
+        match self {
+            Variant::Snv(variant) => VariantInterval::Base(variant.reference_interval()),
+            Variant::Mnv(variant) => VariantInterval::Base(variant.reference_interval()),
+            Variant::Insertion(variant) => VariantInterval::Interbase(variant.reference_interval()),
+            Variant::Deletion(variant) => VariantInterval::Base(variant.reference_interval()),
+            Variant::Delins(variant) => VariantInterval::Base(variant.reference_interval()),
+        }
+    }
+
+    /// Gets the interval spanned by the alternate allele.
+    ///
+    /// Deletions return a zero-width interbase interval because their
+    /// alternate allele is empty. Insertions and delins return local alternate
+    /// base intervals when that span can be represented.
+    ///
+    /// Use this method for allele-facing questions such as the local span of an
+    /// inserted or replacement sequence. Do not use it as a query-genome
+    /// coordinate after applying multiple variants; this crate does not track
+    /// cumulative coordinate shifts.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_molecule::polymer::dna;
+    /// use omics_variation::Variant;
+    /// use omics_variation::VariantInterval;
+    ///
+    /// let variant = "seq0:+:100(b):AT:.".parse::<Variant<dna::Nucleotide>>()?;
+    /// assert!(matches!(
+    ///     variant.alternate_interval(),
+    ///     Some(VariantInterval::Interbase(_))
+    /// ));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn alternate_interval(&self) -> Option<VariantInterval> {
+        match self {
+            Variant::Snv(variant) => Some(VariantInterval::Base(variant.alternate_interval())),
+            Variant::Mnv(variant) => Some(VariantInterval::Base(variant.alternate_interval())),
+            Variant::Insertion(variant) => variant.alternate_interval().map(VariantInterval::Base),
+            Variant::Deletion(variant) => {
+                Some(VariantInterval::Interbase(variant.alternate_interval()))
+            }
+            Variant::Delins(variant) => variant.alternate_interval().map(VariantInterval::Base),
         }
     }
 
@@ -240,8 +422,8 @@ impl<N: Nucleotide> Variant<N> {
     /// use omics_molecule::polymer::dna;
     /// use omics_variation::Variant;
     ///
-    /// let variant = "seq0:+:100:AT:AG".parse::<Variant<dna::Nucleotide>>()?;
-    /// assert_eq!(variant.normalize()?.to_string(), "seq0:+:101:T:G");
+    /// let variant = "seq0:+:100(b):AT:AG".parse::<Variant<dna::Nucleotide>>()?;
+    /// assert_eq!(variant.normalize()?.to_string(), "seq0:+:101(b):T:G");
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn normalize(&self) -> Result<Variant<N>, Error> {
@@ -308,6 +490,11 @@ impl<N: Nucleotide> FromStr for Variant<N> {
             _ => return Err(Error::InvalidFormat(s.to_owned())),
         };
 
+        let (position, found_qualifier) =
+            split_qualified_position(position).ok_or_else(|| Error::CoordinateSystemQualifier {
+                position: position.to_owned(),
+            })?;
+
         let reference = reference
             .parse::<Sequence<N>>()
             .map_err(Error::ReferenceSequence)?;
@@ -315,10 +502,20 @@ impl<N: Nucleotide> FromStr for Variant<N> {
             .parse::<Sequence<N>>()
             .map_err(Error::AlternateSequence)?;
         let alteration = Alteration::try_new(reference, alternate)?;
+        let kind = alteration.kind();
+        let expected_qualifier = PositionQualifier::for_kind(kind);
+
+        if found_qualifier != expected_qualifier {
+            return Err(Error::CoordinateSystem {
+                kind: kind_name(kind),
+                expected: expected_qualifier.description(),
+                found: found_qualifier.description(),
+            });
+        }
 
         let coord = [contig, strand.as_str(), position].join(VARIANT_SEPARATOR);
 
-        Ok(match alteration.kind() {
+        Ok(match kind {
             Kind::Insertion => {
                 let coordinate = coord.parse::<Coordinate<Interbase>>()?;
                 Variant::Insertion(insertion::Variant::try_from((coordinate, alteration))?)
@@ -347,38 +544,44 @@ impl<N: Nucleotide> std::fmt::Display for Variant<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // The coordinate types differ (insertion is interbase), so read the
         // display primitives per arm rather than unifying the coordinate type.
-        let (contig, strand, position, alteration) = match self {
+        let (contig, strand, position, qualifier, alteration) = match self {
             Variant::Snv(v) => (
                 v.coordinate().contig(),
                 v.coordinate().strand(),
                 v.coordinate().position().get(),
+                PositionQualifier::Base,
                 v.alteration(),
             ),
             Variant::Mnv(v) => (
                 v.coordinate().contig(),
                 v.coordinate().strand(),
                 v.coordinate().position().get(),
+                PositionQualifier::Base,
                 v.alteration(),
             ),
             Variant::Deletion(v) => (
                 v.coordinate().contig(),
                 v.coordinate().strand(),
                 v.coordinate().position().get(),
+                PositionQualifier::Base,
                 v.alteration(),
             ),
             Variant::Delins(v) => (
                 v.coordinate().contig(),
                 v.coordinate().strand(),
                 v.coordinate().position().get(),
+                PositionQualifier::Base,
                 v.alteration(),
             ),
             Variant::Insertion(v) => (
                 v.coordinate().contig(),
                 v.coordinate().strand(),
                 v.coordinate().position().get(),
+                PositionQualifier::Interbase,
                 v.alteration(),
             ),
         };
+        let position = qualified_position(position, qualifier);
 
         write!(
             f,
@@ -401,29 +604,31 @@ mod tests {
     #[test]
     fn it_parses_and_classifies_all_small_variants() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(
-            "seq0:+:100:A:C".parse::<Variant<dna::Nucleotide>>()?.kind(),
+            "seq0:+:100(b):A:C"
+                .parse::<Variant<dna::Nucleotide>>()?
+                .kind(),
             Kind::Snv
         );
         assert_eq!(
-            "seq0:+:100:AT:GC"
+            "seq0:+:100(b):AT:GC"
                 .parse::<Variant<dna::Nucleotide>>()?
                 .kind(),
             Kind::Mnv
         );
         assert_eq!(
-            "seq0:+:100:.:AT"
+            "seq0:+:100(i):.:AT"
                 .parse::<Variant<dna::Nucleotide>>()?
                 .kind(),
             Kind::Insertion
         );
         assert_eq!(
-            "seq0:+:100:AT:."
+            "seq0:+:100(b):AT:."
                 .parse::<Variant<dna::Nucleotide>>()?
                 .kind(),
             Kind::Deletion
         );
         assert_eq!(
-            "seq0:+:100:AT:G"
+            "seq0:+:100(b):AT:G"
                 .parse::<Variant<dna::Nucleotide>>()?
                 .kind(),
             Kind::Delins
@@ -433,7 +638,7 @@ mod tests {
 
     #[test]
     fn it_defaults_missing_strand_to_positive() -> Result<(), Box<dyn std::error::Error>> {
-        let variant = "seq0:100:A:C".parse::<Variant<dna::Nucleotide>>()?;
+        let variant = "seq0:100(b):A:C".parse::<Variant<dna::Nucleotide>>()?;
         match variant {
             Variant::Snv(snv) => assert_eq!(snv.coordinate().strand(), Strand::Positive),
             _ => panic!("expected SNV"),
@@ -444,24 +649,92 @@ mod tests {
     #[test]
     fn display_round_trips_with_explicit_strand() -> Result<(), Box<dyn std::error::Error>> {
         for input in [
-            "seq0:+:100:A:C",
-            "seq0:+:100:AT:GC",
-            "seq0:+:100:.:AT",
-            "seq0:+:100:AT:.",
-            "seq0:+:100:AT:G",
+            "seq0:+:100(b):A:C",
+            "seq0:+:100(b):AT:GC",
+            "seq0:+:100(i):.:AT",
+            "seq0:+:100(b):AT:.",
+            "seq0:+:100(b):AT:G",
+            "seq0:-:100(b):A:C",
+            "seq0:-:100(b):AT:GC",
+            "seq0:-:100(i):.:AT",
+            "seq0:-:100(b):AT:.",
+            "seq0:-:100(b):AT:G",
         ] {
             let variant = input.parse::<Variant<dna::Nucleotide>>()?;
             assert_eq!(variant.to_string(), input);
         }
         // Missing strand canonicalizes to explicit `+`.
-        let variant = "seq0:100:A:C".parse::<Variant<dna::Nucleotide>>()?;
-        assert_eq!(variant.to_string(), "seq0:+:100:A:C");
+        let variant = "seq0:100(b):A:C".parse::<Variant<dna::Nucleotide>>()?;
+        assert_eq!(variant.to_string(), "seq0:+:100(b):A:C");
+
+        let variant = "seq0:100(i):.:AT".parse::<Variant<dna::Nucleotide>>()?;
+        assert_eq!(variant.to_string(), "seq0:+:100(i):.:AT");
         Ok(())
     }
 
     #[test]
+    fn it_rejects_missing_coordinate_system_qualifiers() {
+        let err = "seq0:+:100:A:C"
+            .parse::<Variant<dna::Nucleotide>>()
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            Error::CoordinateSystemQualifier { position } if position == "100"
+        ));
+    }
+
+    #[test]
+    fn it_rejects_coordinate_system_mismatches() {
+        for input in [
+            "seq0:+:100(i):A:C",
+            "seq0:+:100(i):AT:GC",
+            "seq0:+:100(b):.:AT",
+            "seq0:+:100(i):AT:.",
+            "seq0:+:100(i):AT:G",
+        ] {
+            assert!(matches!(
+                input.parse::<Variant<dna::Nucleotide>>().unwrap_err(),
+                Error::CoordinateSystem { .. }
+            ));
+        }
+    }
+
+    #[test]
+    fn it_reports_reference_and_alternate_intervals() {
+        let insertion = "seq0:+:100(i):.:AT"
+            .parse::<Variant<dna::Nucleotide>>()
+            .unwrap();
+        assert!(matches!(
+            insertion.reference_interval(),
+            VariantInterval::Interbase(_)
+        ));
+        match insertion.alternate_interval().unwrap() {
+            VariantInterval::Base(interval) => {
+                assert_eq!(interval.start().position().get(), 101);
+                assert_eq!(interval.end().position().get(), 102);
+            }
+            VariantInterval::Interbase(_) => panic!("expected base alternate interval"),
+        }
+
+        let deletion = "seq0:+:100(b):AT:."
+            .parse::<Variant<dna::Nucleotide>>()
+            .unwrap();
+        assert!(matches!(
+            deletion.reference_interval(),
+            VariantInterval::Base(_)
+        ));
+        match deletion.alternate_interval().unwrap() {
+            VariantInterval::Interbase(interval) => {
+                assert_eq!(interval.start().position().get(), 99);
+                assert_eq!(interval.end().position().get(), 99);
+            }
+            VariantInterval::Base(_) => panic!("expected interbase alternate interval"),
+        }
+    }
+
+    #[test]
     fn it_rejects_both_empty_alleles() {
-        let err = "seq0:+:100:.:."
+        let err = "seq0:+:100(b):.:."
             .parse::<Variant<dna::Nucleotide>>()
             .unwrap_err();
         assert!(matches!(err, Error::Alteration(variant::Error::BothEmpty)));
@@ -470,7 +743,7 @@ mod tests {
     #[test]
     fn it_rejects_wrong_part_counts() {
         assert!(matches!(
-            "seq0:100:A"
+            "seq0:100(b):A"
                 .parse::<Variant<dna::Nucleotide>>()
                 .unwrap_err(),
             Error::InvalidFormat(_)
@@ -488,46 +761,46 @@ mod tests {
 
     #[test]
     fn it_normalizes_mnv_to_snv() {
-        assert_eq!(normalized("seq0:+:100:AT:AG"), "seq0:+:101:T:G");
+        assert_eq!(normalized("seq0:+:100(b):AT:AG"), "seq0:+:101(b):T:G");
     }
 
     #[test]
     fn it_normalizes_on_the_negative_strand() {
         // Trimming the shared prefix `A` moves the coordinate in the strand's
         // forward direction, which is downward on the negative strand.
-        assert_eq!(normalized("seq0:-:100:AT:AG"), "seq0:-:99:T:G");
+        assert_eq!(normalized("seq0:-:100(b):AT:AG"), "seq0:-:99(b):T:G");
     }
 
     #[test]
     fn it_collapses_to_an_insertion_at_the_correct_boundary() {
         // `A:AT` at base 100 inserts `T` after base 100 -> interbase 100.
-        let variant = "seq0:+:100:A:AT"
+        let variant = "seq0:+:100(b):A:AT"
             .parse::<Variant<dna::Nucleotide>>()
             .unwrap();
         let normalized = variant.normalize().unwrap();
         assert_eq!(normalized.kind(), Kind::Insertion);
-        assert_eq!(normalized.to_string(), "seq0:+:100:.:T");
+        assert_eq!(normalized.to_string(), "seq0:+:100(i):.:T");
 
         // `A:TA` at base 100 inserts `T` before base 100 -> interbase 99.
         assert_eq!(
-            normalized_kind_and_string("seq0:+:100:A:TA"),
-            (Kind::Insertion, "seq0:+:99:.:T".to_string())
+            normalized_kind_and_string("seq0:+:100(b):A:TA"),
+            (Kind::Insertion, "seq0:+:99(i):.:T".to_string())
         );
     }
 
     #[test]
     fn it_collapses_delins_to_a_deletion() {
-        let variant = "seq0:+:100:ATG:AG"
+        let variant = "seq0:+:100(b):ATG:AG"
             .parse::<Variant<dna::Nucleotide>>()
             .unwrap();
         let normalized = variant.normalize().unwrap();
         assert_eq!(normalized.kind(), Kind::Deletion);
-        assert_eq!(normalized.to_string(), "seq0:+:101:T:.");
+        assert_eq!(normalized.to_string(), "seq0:+:101(b):T:.");
     }
 
     #[test]
     fn it_passes_insertions_through_unchanged() {
-        assert_eq!(normalized("seq0:+:100:.:AT"), "seq0:+:100:.:AT");
+        assert_eq!(normalized("seq0:+:100(i):.:AT"), "seq0:+:100(i):.:AT");
     }
 
     fn normalized_kind_and_string(input: &str) -> (Kind, String) {
@@ -543,28 +816,28 @@ mod tests {
     fn it_collapses_to_an_insertion_on_the_negative_strand() {
         // Trimming moves in the strand's forward direction (downward on `-`).
         assert_eq!(
-            normalized_kind_and_string("seq0:-:100:A:AT"),
-            (Kind::Insertion, "seq0:-:99:.:T".to_string())
+            normalized_kind_and_string("seq0:-:100(b):A:AT"),
+            (Kind::Insertion, "seq0:-:99(i):.:T".to_string())
         );
         assert_eq!(
-            normalized_kind_and_string("seq0:-:100:A:TA"),
-            (Kind::Insertion, "seq0:-:100:.:T".to_string())
+            normalized_kind_and_string("seq0:-:100(b):A:TA"),
+            (Kind::Insertion, "seq0:-:100(i):.:T".to_string())
         );
     }
 
     #[test]
     fn it_parses_a_direct_interbase_insertion_at_zero() -> Result<(), Box<dyn std::error::Error>> {
         // Interbase 0 (start of contig) is a valid insertion anchor.
-        let variant = "seq0:+:0:.:AT".parse::<Variant<dna::Nucleotide>>()?;
+        let variant = "seq0:+:0(i):.:AT".parse::<Variant<dna::Nucleotide>>()?;
         assert_eq!(variant.kind(), Kind::Insertion);
-        assert_eq!(variant.to_string(), "seq0:+:0:.:AT");
+        assert_eq!(variant.to_string(), "seq0:+:0(i):.:AT");
         Ok(())
     }
 
     #[test]
     fn it_rejects_a_negative_strand_span_underflow() {
         // A two-base MNV at base 1 on the negative strand would need base 0.
-        let err = "seq0:-:1:AT:GC"
+        let err = "seq0:-:1(b):AT:GC"
             .parse::<Variant<dna::Nucleotide>>()
             .unwrap_err();
         assert!(matches!(err, Error::Kind(variant::KindError::SpanOverflow)));
@@ -574,11 +847,11 @@ mod tests {
     fn it_round_trips_every_kind_on_the_negative_strand() -> Result<(), Box<dyn std::error::Error>>
     {
         for input in [
-            "seq0:-:100:A:C",
-            "seq0:-:100:AT:GC",
-            "seq0:-:100:.:AT",
-            "seq0:-:100:AT:.",
-            "seq0:-:100:AT:G",
+            "seq0:-:100(b):A:C",
+            "seq0:-:100(b):AT:GC",
+            "seq0:-:100(i):.:AT",
+            "seq0:-:100(b):AT:.",
+            "seq0:-:100(b):AT:G",
         ] {
             let variant = input.parse::<Variant<dna::Nucleotide>>()?;
             assert_eq!(variant.to_string(), input);

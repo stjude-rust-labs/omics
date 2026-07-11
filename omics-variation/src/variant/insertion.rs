@@ -3,6 +3,7 @@
 use omics_coordinate::Coordinate;
 use omics_coordinate::Interval;
 use omics_coordinate::coordinate;
+use omics_coordinate::system::Base;
 use omics_coordinate::system::Interbase;
 use omics_molecule::compound::Nucleotide;
 use omics_molecule::sequence;
@@ -11,8 +12,14 @@ use omics_molecule::sequence::Sequence;
 use crate::variant::Alteration;
 use crate::variant::Kind;
 use crate::variant::KindError;
+use crate::variant::base_interval;
+use crate::variant::interbase_interval;
 
 /// An insertion of one or more bases at an interbase boundary.
+///
+/// Serialized top-level variants use interbase coordinates with the `(i)`
+/// qualifier. Base coordinates with `(b)` are rejected because an insertion
+/// occurs at a boundary between bases rather than on an existing base.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Variant<N: Nucleotide> {
     /// The interbase boundary at which the alternate allele is inserted.
@@ -78,7 +85,10 @@ impl<N: Nucleotide> Variant<N> {
         self.alteration.alternate()
     }
 
-    /// Gets the zero-width interbase interval at the insertion boundary.
+    /// Gets the zero-width interval spanned by the reference allele.
+    ///
+    /// Use this for reference-facing overlap and annotation queries. This is
+    /// the interbase boundary where the insertion occurs.
     ///
     /// # Examples
     ///
@@ -93,10 +103,42 @@ impl<N: Nucleotide> Variant<N> {
     /// );
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    pub fn reference_interval(&self) -> Interval<Interbase> {
+        interbase_interval(&self.coordinate)
+    }
+
+    /// Gets the local interval spanned by the alternate allele.
+    ///
+    /// The alternate interval starts at the base immediately after the
+    /// insertion boundary and spans the inserted allele length. This describes
+    /// the local inserted sequence, not a globally projected query coordinate.
+    /// Use this for local alternate-allele span queries.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use omics_molecule::polymer::dna::Nucleotide;
+    /// # use omics_variation::variant::insertion::Variant;
+    /// let variant = Variant::<Nucleotide>::try_new("seq0:+:100", "AT")?;
+    /// assert_eq!(
+    ///     variant
+    ///         .alternate_interval()
+    ///         .unwrap()
+    ///         .start()
+    ///         .position()
+    ///         .get(),
+    ///     101
+    /// );
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn alternate_interval(&self) -> Option<Interval<Base>> {
+        let start = self.coordinate.clone().nudge_forward()?;
+        base_interval(&start, self.alteration.alternate().len())
+    }
+
+    /// Gets the zero-width interbase interval at the insertion boundary.
     pub fn interbase_interval(&self) -> Interval<Interbase> {
-        // SAFETY: an interbase interval whose start equals its end is always
-        // valid.
-        Interval::try_new(self.coordinate.clone(), self.coordinate.clone()).unwrap()
+        self.reference_interval()
     }
 
     /// Gets the underlying [`Alteration`] carrying both alleles.

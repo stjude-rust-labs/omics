@@ -25,6 +25,11 @@
 //! [`deletion::Variant`], or [`delins::Variant`] when code needs a fully
 //! anchored variant with span accessors.
 
+use omics_coordinate::Coordinate;
+use omics_coordinate::Interval;
+use omics_coordinate::position::Number;
+use omics_coordinate::system::Base;
+use omics_coordinate::system::Interbase;
 use omics_molecule::compound::Nucleotide;
 use omics_molecule::sequence::Sequence;
 use thiserror::Error;
@@ -48,6 +53,27 @@ pub enum Kind {
     Deletion,
     /// A combined deletion and insertion of differing lengths.
     Delins,
+}
+
+/// Builds a base interval from a start coordinate and allele length.
+pub(crate) fn base_interval(start: &Coordinate<Base>, len: usize) -> Option<Interval<Base>> {
+    let span = Number::try_from(len.checked_sub(1)?).ok()?;
+    let end = start.clone().into_move_forward(span)?;
+    Interval::try_new(start.clone(), end).ok()
+}
+
+/// Builds a zero-width interbase interval at a boundary coordinate.
+pub(crate) fn interbase_interval(coordinate: &Coordinate<Interbase>) -> Interval<Interbase> {
+    // SAFETY: an interbase interval whose start equals its end is always
+    // valid.
+    Interval::try_new(coordinate.clone(), coordinate.clone()).unwrap()
+}
+
+/// Builds a zero-width interbase interval immediately before a base coordinate.
+pub(crate) fn interbase_interval_before_base(coordinate: &Coordinate<Base>) -> Interval<Interbase> {
+    // SAFETY: every valid base coordinate has a preceding interbase boundary.
+    let boundary = coordinate.clone().nudge_backward().unwrap();
+    interbase_interval(&boundary)
 }
 
 /// An error related to an [`Alteration`].
