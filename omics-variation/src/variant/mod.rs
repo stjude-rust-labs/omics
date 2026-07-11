@@ -10,6 +10,7 @@ use thiserror::Error;
 
 pub mod deletion;
 pub mod delins;
+pub mod insertion;
 pub mod mnv;
 pub mod snv;
 
