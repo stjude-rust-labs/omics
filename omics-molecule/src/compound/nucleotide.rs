@@ -55,5 +55,14 @@ where
     Self: Nucleotide,
 {
     /// Gets the complement of this [`Nucleotide`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_molecule::compound::Complement;
+    /// use omics_molecule::polymer::dna::Nucleotide;
+    ///
+    /// assert_eq!(Nucleotide::A.complement(), Nucleotide::T);
+    /// ```
     fn complement(&self) -> Self;
 }

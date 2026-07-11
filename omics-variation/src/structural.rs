@@ -338,7 +338,13 @@ fn classify_pair<N: Nucleotide>(first: &Adjacency<N>, second: &Adjacency<N>) -> 
     let orientations = (fold_back_orientation(first), fold_back_orientation(second));
     let positions = (position_pair(first), position_pair(second));
     if let ((Some(one), Some(two)), (Some(p1), Some(p2))) = (orientations, positions) {
-        if one.is_opposite(two) && p1 == p2 {
+        // The shared boundary pair must span two distinct positions. A pair
+        // with `lo == hi` is a zero-length fold-back that cannot form a real
+        // inversion, so it falls through to `Kind::Complex`. With the
+        // self-junction rejection in `Adjacency::try_new_paired`, such a pair is
+        // already unconstructable, so this guard is defense-in-depth.
+        let (lo, hi) = p1;
+        if one.is_opposite(two) && p1 == p2 && lo != hi {
             return Kind::Inversion;
         }
     }
@@ -514,6 +520,27 @@ mod tests {
         let higher = paired(
             bnd(Orientation::HigherFlank, 100),
             bnd(Orientation::HigherFlank, 200),
+            ".",
+        );
+        assert_eq!(
+            Sv::try_new(vec![lower, higher]).unwrap().kind(),
+            Kind::Inversion
+        );
+    }
+
+    #[test]
+    fn it_classifies_a_genuine_inversion_over_distinct_boundaries() {
+        // Two fold-back junctions over two distinct boundaries {100, 300}, one
+        // both-LowerFlank and one both-HigherFlank. The distinct-position guard
+        // in `classify_pair` is satisfied, so this classifies as an inversion.
+        let lower = paired(
+            bnd(Orientation::LowerFlank, 100),
+            bnd(Orientation::LowerFlank, 300),
+            ".",
+        );
+        let higher = paired(
+            bnd(Orientation::HigherFlank, 100),
+            bnd(Orientation::HigherFlank, 300),
             ".",
         );
         assert_eq!(

@@ -31,6 +31,11 @@ pub enum Error {
     /// an empty insertion, which encodes no change.
     #[error("adjacency is an identity join and encodes no change")]
     IdentityJoin,
+
+    /// The two breakends are fully identical, meaning the same contig,
+    /// position, and orientation, so the adjacency joins a breakend to itself.
+    #[error("adjacency cannot join a breakend to itself")]
+    SelfJunction,
 }
 
 /// A parse error related to an [`Adjacency`].
@@ -147,6 +152,14 @@ impl<N: Nucleotide + Complement> Adjacency<N> {
         };
 
         let same_locus = a.contig() == b.contig() && a.position().get() == b.position().get();
+
+        // Reject a breakend joined to itself. Fully identical breakends, meaning
+        // the same contig, position, and orientation, encode a meaningless
+        // zero-length self-loop that would otherwise misclassify downstream.
+        if same_locus && a.orientation() == b.orientation() {
+            return Err(Error::SelfJunction);
+        }
+
         let opposite = a.orientation().is_opposite(b.orientation());
         if same_locus && opposite && insertion.is_empty() {
             return Err(Error::IdentityJoin);
@@ -331,6 +344,28 @@ mod tests {
         let b = bnd("seq0", Orientation::HigherFlank, 100);
         let err = Adjacency::try_new_paired(a, b, seq(".")).unwrap_err();
         assert!(matches!(err, Error::IdentityJoin));
+    }
+
+    #[test]
+    fn it_rejects_a_self_junction() {
+        // Fully identical breakends, meaning the same contig, position, and
+        // orientation, join a breakend to itself and are rejected, both with an
+        // empty and with a non-empty insertion.
+        let empty = Adjacency::try_new_paired(
+            bnd("seq0", Orientation::LowerFlank, 100),
+            bnd("seq0", Orientation::LowerFlank, 100),
+            seq("."),
+        )
+        .unwrap_err();
+        assert!(matches!(empty, Error::SelfJunction));
+
+        let inserted = Adjacency::try_new_paired(
+            bnd("seq0", Orientation::HigherFlank, 100),
+            bnd("seq0", Orientation::HigherFlank, 100),
+            seq("AAAC"),
+        )
+        .unwrap_err();
+        assert!(matches!(inserted, Error::SelfJunction));
     }
 
     fn round_trip(adjacency: Adjacency<dna::Nucleotide>) {
