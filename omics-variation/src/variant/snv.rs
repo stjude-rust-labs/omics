@@ -3,14 +3,22 @@
 use std::str::FromStr;
 
 use omics_coordinate::Coordinate;
+use omics_coordinate::Interval;
 use omics_coordinate::Strand;
 use omics_coordinate::coordinate;
 use omics_coordinate::system::Base;
 use omics_core::VARIANT_SEPARATOR;
 use omics_molecule::compound::Nucleotide;
-use omics_molecule::compound::nucleotide::relation;
-use omics_molecule::compound::nucleotide::relation::Relation;
+use omics_molecule::sequence::Sequence;
 use thiserror::Error;
+
+use crate::PositionQualifier;
+use crate::qualified_position;
+use crate::split_qualified_position;
+use crate::variant::Alteration;
+use crate::variant::Kind;
+use crate::variant::KindError;
+use crate::variant::base_interval;
 
 /// A parse error related to a [`Variant`].
 #[derive(Error, Debug)]
@@ -25,6 +33,13 @@ where
     /// An issue occurred when parsing the coordinate of the [`Variant`].
     #[error(transparent)]
     CoordinateError(#[from] coordinate::Error),
+
+    /// The coordinate system qualifier was missing or invalid.
+    #[error("position `{position}` must end with `(b)` for a base coordinate")]
+    CoordinateSystemQualifier {
+        /// The unqualified or incorrectly qualified position token.
+        position: String,
+    },
 
     /// An issue occurred when parsing the reference nucleotide of the
     /// [`Variant`].
@@ -52,19 +67,25 @@ where
     #[error(transparent)]
     Parse(#[from] ParseError<N>),
 
-    /// An error constructing a relation.
+    /// The alleles did not form a valid alteration.
     #[error(transparent)]
-    Relation(#[from] relation::Error<N>),
+    Alteration(crate::variant::Error),
 }
 
 /// A single nucleotide variant.
-#[derive(Debug)]
+///
+/// Serialized `SNV` strings use base coordinates with the `(b)` qualifier.
+/// Interbase coordinates with `(i)` are rejected because an `SNV` substitutes
+/// one existing base.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Variant<N: Nucleotide> {
-    /// The coordinate.
+    /// The coordinate of the substituted base.
     coordinate: Coordinate<Base>,
 
-    /// The relation.
-    relation: Relation<N>,
+    /// Reference and alternate alleles, each exactly one base.
+    ///
+    /// Construction guarantees `kind()` is [`Kind::Snv`].
+    alteration: Alteration<N>,
 }
 
 impl<N: Nucleotide> Variant<N>
@@ -98,19 +119,23 @@ where
         let reference_nucleotide = reference_nucleotide.into();
         let alternate_nucleotide = alternate_nucleotide.into();
 
-        let relation = Relation::try_new(Some(reference_nucleotide), Some(alternate_nucleotide))
-            .map_err(Error::Relation)?;
-
-        if let Relation::Identical(nucleotide) = relation {
-            return Err(Error::Identical(nucleotide));
-        }
+        let alteration = Alteration::try_new(
+            Sequence::new(vec![reference_nucleotide]),
+            Sequence::new(vec![alternate_nucleotide]),
+        )
+        .map_err(|err| match err {
+            crate::variant::Error::Identical(_) => Error::Identical(reference_nucleotide),
+            other => Error::Alteration(other),
+        })?;
 
         Ok(Self {
             coordinate,
-            relation,
+            alteration,
         })
     }
+}
 
+impl<N: Nucleotide> Variant<N> {
     /// Gets the [`Coordinate`] for this [`Variant`].
     ///
     /// # Examples
@@ -122,11 +147,7 @@ where
     /// use omics_molecule::polymer::dna;
     /// use omics_variation::snv::Variant;
     ///
-    /// let variant = Variant::<dna::Nucleotide>::try_new(
-    ///     "seq0:+:1".parse::<Coordinate>()?,
-    ///     dna::Nucleotide::A,
-    ///     dna::Nucleotide::T,
-    /// )?;
+    /// let variant = "seq0:+:1(b):A:T".parse::<Variant<dna::Nucleotide>>()?;
     ///
     /// assert_eq!(variant.coordinate().contig().as_str(), "seq0");
     /// assert_eq!(variant.coordinate().strand(), Strand::Positive);
@@ -143,21 +164,18 @@ where
     /// # Examples
     ///
     /// ```
-    /// use omics_coordinate::base::Coordinate;
-    /// use omics_coordinate::system::Base;
     /// use omics_molecule::polymer::dna;
     /// use omics_variation::snv::Variant;
     ///
-    /// let variant = "seq0:+:1:A:T".parse::<Variant<dna::Nucleotide>>()?;
+    /// let variant = "seq0:+:1(b):A:T".parse::<Variant<dna::Nucleotide>>()?;
     /// assert_eq!(variant.reference(), dna::Nucleotide::A);
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn reference(&self) -> N {
-        // SAFETY: because a single nucleotide variant is guaranteed to have a
-        // reference nucleotide within the inner [`Relation`], this will
-        // always unwrap successfully.
-        self.relation.reference().unwrap()
+        // SAFETY: a single nucleotide variant always has exactly one reference
+        // base.
+        self.alteration.reference().inner()[0]
     }
 
     /// Gets the alternate nucleotide as a [`Nucleotide`] from the [`Variant`].
@@ -165,21 +183,99 @@ where
     /// # Examples
     ///
     /// ```
-    /// use omics_coordinate::base::Coordinate;
-    /// use omics_coordinate::system::Base;
     /// use omics_molecule::polymer::dna;
     /// use omics_variation::snv::Variant;
     ///
-    /// let variant = "seq0:+:1:A:T".parse::<Variant<dna::Nucleotide>>()?;
+    /// let variant = "seq0:+:1(b):A:T".parse::<Variant<dna::Nucleotide>>()?;
     /// assert_eq!(variant.alternate(), dna::Nucleotide::T);
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn alternate(&self) -> N {
-        // SAFETY: because a single nucleotide variant is guaranteed to have a
-        // alternate nucleotide within the inner [`Relation`], this will
-        // always unwrap successfully.
-        self.relation.alternate().unwrap()
+        // SAFETY: a single nucleotide variant always has exactly one alternate
+        // base.
+        self.alteration.alternate().inner()[0]
+    }
+
+    /// Gets the interval spanned by the variant.
+    ///
+    /// An `SNV` has the same interval for the reference and alternate alleles
+    /// because it substitutes one existing base with one alternate base.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_molecule::polymer::dna;
+    /// use omics_variation::snv::Variant;
+    ///
+    /// let variant = "seq0:+:1(b):A:C".parse::<Variant<dna::Nucleotide>>()?;
+    /// let interval = variant.interval();
+    /// assert_eq!(interval.start().position().get(), 1);
+    /// assert_eq!(interval.end().position().get(), 1);
+    ///
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn interval(&self) -> Interval<Base> {
+        // SAFETY: an SNV reference allele always has exactly one base.
+        base_interval(&self.coordinate, self.alteration.reference().len()).unwrap()
+    }
+
+    /// Gets the underlying [`Alteration`] carrying both alleles.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_molecule::polymer::dna;
+    /// use omics_variation::snv::Variant;
+    ///
+    /// let variant = "seq0:+:1(b):A:C".parse::<Variant<dna::Nucleotide>>()?;
+    /// assert_eq!(variant.alteration().reference().to_string(), "A");
+    /// assert_eq!(variant.alteration().alternate().to_string(), "C");
+    ///
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn alteration(&self) -> &Alteration<N> {
+        &self.alteration
+    }
+}
+
+impl<N: Nucleotide> TryFrom<(Coordinate<Base>, Alteration<N>)> for Variant<N> {
+    type Error = KindError;
+
+    /// Builds a single nucleotide [`Variant`] from a base [`Coordinate`] and a
+    /// classified single-base [`Alteration`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_coordinate::Coordinate;
+    /// use omics_coordinate::system::Base;
+    /// use omics_molecule::polymer::dna::Nucleotide;
+    /// use omics_variation::snv::Variant;
+    /// use omics_variation::variant::Alteration;
+    ///
+    /// let coordinate = "seq0:+:1".parse::<Coordinate<Base>>()?;
+    /// let alteration = Alteration::<Nucleotide>::try_new("A".parse()?, "C".parse()?)?;
+    /// let variant = Variant::try_from((coordinate, alteration))?;
+    /// assert_eq!(variant.reference(), Nucleotide::A);
+    ///
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    fn try_from(
+        (coordinate, alteration): (Coordinate<Base>, Alteration<N>),
+    ) -> Result<Self, Self::Error> {
+        let found = alteration.kind();
+        if found != Kind::Snv {
+            return Err(KindError::WrongKind {
+                expected: Kind::Snv,
+                found,
+            });
+        }
+
+        Ok(Self {
+            coordinate,
+            alteration,
+        })
     }
 }
 
@@ -199,34 +295,39 @@ where
 
         let mut parts = parts.into_iter();
 
-        let coordinate = match num_parts {
+        let (contig, strand, position) = match num_parts {
             4 => {
-                let positive = Strand::Positive.to_string();
-
                 // SAFETY: we just ensured that the number of parts is four.
                 // Since we have not taken any items from the iterator, these
                 // two items will always unwrap.
-                [
-                    parts.next().unwrap(),
-                    positive.as_str(),
-                    parts.next().unwrap(),
-                ]
-                .join(VARIANT_SEPARATOR)
+                let contig = parts.next().unwrap();
+                let position = parts.next().unwrap();
+                (contig, Strand::Positive.to_string(), position)
             }
             5 => {
                 // SAFETY: we just ensured that the number of parts is five.
                 // Since we have not taken any items from the iterator, these
                 // three items will always unwrap.
-                [
-                    parts.next().unwrap(),
-                    parts.next().unwrap(),
-                    parts.next().unwrap(),
-                ]
-                .join(VARIANT_SEPARATOR)
+                let contig = parts.next().unwrap();
+                let strand = parts.next().unwrap();
+                let position = parts.next().unwrap();
+                (contig, strand.to_string(), position)
             }
             // SAFETY: we ensured above that the number of parts must be either four or five.
             _ => unreachable!(),
         };
+        let (position, qualifier) = split_qualified_position(position).ok_or_else(|| {
+            Error::Parse(ParseError::CoordinateSystemQualifier {
+                position: position.to_owned(),
+            })
+        })?;
+
+        if qualifier != PositionQualifier::Base {
+            return Err(Error::Parse(ParseError::CoordinateSystemQualifier {
+                position: format!("{position}{}", qualifier.suffix()),
+            }));
+        }
+        let coordinate = [contig, strand.as_str(), position].join(VARIANT_SEPARATOR);
 
         let coordinate = match coordinate.parse::<Coordinate<Base>>() {
             Ok(coordinate) => coordinate,
@@ -253,12 +354,14 @@ where
     }
 }
 
-impl<N: Nucleotide> std::fmt::Display for Variant<N>
-where
-    <N as FromStr>::Err: std::fmt::Debug + std::fmt::Display,
-{
+impl<N: Nucleotide> std::fmt::Display for Variant<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let coordinate = self.coordinate().to_string();
+        let coordinate = [
+            self.coordinate().contig().to_string(),
+            self.coordinate().strand().to_string(),
+            qualified_position(self.coordinate().position().get(), PositionQualifier::Base),
+        ]
+        .join(VARIANT_SEPARATOR);
 
         let parts = [
             coordinate.as_str(),
@@ -272,6 +375,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use omics_coordinate::Strand;
     use omics_molecule::polymer::dna;
     use omics_molecule::polymer::rna;
 
@@ -279,7 +383,7 @@ mod tests {
 
     #[test]
     fn it_creates_a_variant_in_a_dna_context() -> Result<(), Box<dyn std::error::Error>> {
-        let variant = "seq0:+:1:A:C".parse::<Variant<dna::Nucleotide>>()?;
+        let variant = "seq0:+:1(b):A:C".parse::<Variant<dna::Nucleotide>>()?;
 
         assert_eq!(variant.coordinate().contig().as_str(), "seq0");
         assert_eq!(variant.coordinate().strand(), Strand::Positive);
@@ -292,7 +396,7 @@ mod tests {
 
     #[test]
     fn it_creates_a_variant_in_a_rna_context() -> Result<(), Box<dyn std::error::Error>> {
-        let variant = "seq0:+:1:U:C".parse::<Variant<rna::Nucleotide>>()?;
+        let variant = "seq0:+:1(b):U:C".parse::<Variant<rna::Nucleotide>>()?;
 
         assert_eq!(variant.coordinate().contig().as_str(), "seq0");
         assert_eq!(variant.coordinate().strand(), Strand::Positive);
@@ -306,7 +410,7 @@ mod tests {
     #[test]
     fn it_creates_a_variant_on_the_negative_strand_in_a_dna_context()
     -> Result<(), Box<dyn std::error::Error>> {
-        let variant = "seq0:-:1:A:C".parse::<Variant<dna::Nucleotide>>()?;
+        let variant = "seq0:-:1(b):A:C".parse::<Variant<dna::Nucleotide>>()?;
 
         assert_eq!(variant.coordinate().contig().as_str(), "seq0");
         assert_eq!(variant.coordinate().strand(), Strand::Negative);
@@ -320,7 +424,7 @@ mod tests {
     #[test]
     fn it_creates_a_variant_on_the_negative_strand_in_a_rna_context()
     -> Result<(), Box<dyn std::error::Error>> {
-        let variant = "seq0:-:1:U:C".parse::<Variant<rna::Nucleotide>>()?;
+        let variant = "seq0:-:1(b):U:C".parse::<Variant<rna::Nucleotide>>()?;
 
         assert_eq!(variant.coordinate().contig().as_str(), "seq0");
         assert_eq!(variant.coordinate().strand(), Strand::Negative);
@@ -334,7 +438,7 @@ mod tests {
     #[test]
     fn it_creates_a_variant_with_no_specified_strand_in_a_dna_context()
     -> Result<(), Box<dyn std::error::Error>> {
-        let variant = "seq0:1:A:C".parse::<Variant<dna::Nucleotide>>()?;
+        let variant = "seq0:1(b):A:C".parse::<Variant<dna::Nucleotide>>()?;
 
         assert_eq!(variant.coordinate().contig().as_str(), "seq0");
         assert_eq!(variant.coordinate().strand(), Strand::Positive);
@@ -348,7 +452,7 @@ mod tests {
     #[test]
     fn it_creates_a_variant_with_no_specified_strand_in_a_rna_context()
     -> Result<(), Box<dyn std::error::Error>> {
-        let variant = "seq0:1:U:C".parse::<Variant<rna::Nucleotide>>()?;
+        let variant = "seq0:1(b):U:C".parse::<Variant<rna::Nucleotide>>()?;
 
         assert_eq!(variant.coordinate().contig().as_str(), "seq0");
         assert_eq!(variant.coordinate().strand(), Strand::Positive);
@@ -361,7 +465,7 @@ mod tests {
 
     #[test]
     fn it_fails_when_creating_a_variant_with_identical_nucleotides() {
-        let err = "seq0:+:1:A:A"
+        let err = "seq0:+:1(b):A:A"
             .parse::<Variant<dna::Nucleotide>>()
             .unwrap_err();
 
@@ -370,7 +474,7 @@ mod tests {
 
     #[test]
     fn it_fails_when_attempting_to_represent_an_insertion() {
-        let err = "seq0:+:1:.:A"
+        let err = "seq0:+:1(b):.:A"
             .parse::<Variant<dna::Nucleotide>>()
             .unwrap_err();
 
@@ -382,7 +486,7 @@ mod tests {
 
     #[test]
     fn it_fails_when_attempting_to_represent_a_deletion() {
-        let err = "seq0:+:1:A:."
+        let err = "seq0:+:1(b):A:."
             .parse::<Variant<dna::Nucleotide>>()
             .unwrap_err();
 
@@ -394,13 +498,37 @@ mod tests {
 
     #[test]
     fn it_fails_when_attempting_to_represent_an_empty_pair() {
-        let err = "seq0:+:1:.:."
+        let err = "seq0:+:1(b):.:."
             .parse::<Variant<dna::Nucleotide>>()
             .unwrap_err();
 
         assert_eq!(
             err.to_string(),
             "reference nucleotide error: invalid nucleotide `.`"
+        );
+    }
+
+    #[test]
+    fn it_fails_without_a_base_coordinate_system_qualifier() {
+        let err = "seq0:+:1:A:C"
+            .parse::<Variant<dna::Nucleotide>>()
+            .unwrap_err();
+
+        assert_eq!(
+            err.to_string(),
+            "position `1` must end with `(b)` for a base coordinate"
+        );
+    }
+
+    #[test]
+    fn it_fails_with_an_interbase_coordinate_system_qualifier() {
+        let err = "seq0:+:1(i):A:C"
+            .parse::<Variant<dna::Nucleotide>>()
+            .unwrap_err();
+
+        assert_eq!(
+            err.to_string(),
+            "position `1(i)` must end with `(b)` for a base coordinate"
         );
     }
 }

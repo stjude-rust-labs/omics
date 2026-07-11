@@ -555,6 +555,30 @@ impl<S: System> std::fmt::Display for Coordinate<S> {
     }
 }
 
+impl<S: System> TryFrom<&str> for Coordinate<S>
+where
+    Position<S>: position::r#trait::Position<S>,
+{
+    type Error = Error;
+
+    /// Parses a coordinate from its `contig:strand:position` string form.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_coordinate::Coordinate;
+    /// use omics_coordinate::system::Base;
+    ///
+    /// let coordinate = Coordinate::<Base>::try_from("seq0:+:1")?;
+    /// assert_eq!(coordinate.position().get(), 1);
+    ///
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    fn try_from(s: &str) -> Result<Self> {
+        s.parse()
+    }
+}
+
 impl<S: System> std::str::FromStr for Coordinate<S>
 where
     Position<S>: position::r#trait::Position<S>,

@@ -3,7 +3,7 @@
 //! # Examples
 //!
 //! * A single-nucleotide variation: `cargo run --example variation_describe
-//!   chr1:+:1:A:T`
+//!   chr1:+:1(b):A:T`
 
 use std::env;
 
