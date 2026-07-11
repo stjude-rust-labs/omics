@@ -3,14 +3,18 @@
 use std::str::FromStr;
 
 use omics_coordinate::Coordinate;
+use omics_coordinate::Interval;
 use omics_coordinate::Strand;
 use omics_coordinate::coordinate;
 use omics_coordinate::system::Base;
 use omics_core::VARIANT_SEPARATOR;
 use omics_molecule::compound::Nucleotide;
-use omics_molecule::compound::nucleotide::relation;
-use omics_molecule::compound::nucleotide::relation::Relation;
+use omics_molecule::sequence::Sequence;
 use thiserror::Error;
+
+use crate::variant::Alteration;
+use crate::variant::Kind;
+use crate::variant::KindError;
 
 /// A parse error related to a [`Variant`].
 #[derive(Error, Debug)]
@@ -52,19 +56,19 @@ where
     #[error(transparent)]
     Parse(#[from] ParseError<N>),
 
-    /// An error constructing a relation.
+    /// The alleles did not form a valid alteration.
     #[error(transparent)]
-    Relation(#[from] relation::Error<N>),
+    Alteration(crate::variant::Error),
 }
 
 /// A single nucleotide variant.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Variant<N: Nucleotide> {
-    /// The coordinate.
+    /// The coordinate of the substituted base.
     coordinate: Coordinate<Base>,
 
-    /// The relation.
-    relation: Relation<N>,
+    /// The reference and alternate alleles (each exactly one base).
+    alteration: Alteration<N>,
 }
 
 impl<N: Nucleotide> Variant<N>
@@ -98,16 +102,57 @@ where
         let reference_nucleotide = reference_nucleotide.into();
         let alternate_nucleotide = alternate_nucleotide.into();
 
-        let relation = Relation::try_new(Some(reference_nucleotide), Some(alternate_nucleotide))
-            .map_err(Error::Relation)?;
-
-        if let Relation::Identical(nucleotide) = relation {
-            return Err(Error::Identical(nucleotide));
-        }
+        let alteration = Alteration::try_new(
+            Sequence::new(vec![reference_nucleotide]),
+            Sequence::new(vec![alternate_nucleotide]),
+        )
+        .map_err(|err| match err {
+            crate::variant::Error::Identical(_) => Error::Identical(reference_nucleotide),
+            other => Error::Alteration(other),
+        })?;
 
         Ok(Self {
             coordinate,
-            relation,
+            alteration,
+        })
+    }
+}
+
+impl<N: Nucleotide> Variant<N> {
+    /// Creates a single nucleotide [`Variant`] from a classified single-base
+    /// [`Alteration`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_coordinate::Coordinate;
+    /// use omics_coordinate::system::Base;
+    /// use omics_molecule::polymer::dna::Nucleotide;
+    /// use omics_variation::snv::Variant;
+    /// use omics_variation::variant::Alteration;
+    ///
+    /// let coordinate = "seq0:+:1".parse::<Coordinate<Base>>()?;
+    /// let alteration = Alteration::<Nucleotide>::try_new("A".parse()?, "C".parse()?)?;
+    /// let variant = Variant::from_alteration(coordinate, alteration)?;
+    /// assert_eq!(variant.reference(), Nucleotide::A);
+    ///
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn from_alteration(
+        coordinate: impl Into<Coordinate<Base>>,
+        alteration: Alteration<N>,
+    ) -> Result<Self, KindError> {
+        let found = alteration.kind();
+        if found != Kind::Snv {
+            return Err(KindError::WrongKind {
+                expected: Kind::Snv,
+                found,
+            });
+        }
+
+        Ok(Self {
+            coordinate: coordinate.into(),
+            alteration,
         })
     }
 
@@ -122,11 +167,7 @@ where
     /// use omics_molecule::polymer::dna;
     /// use omics_variation::snv::Variant;
     ///
-    /// let variant = Variant::<dna::Nucleotide>::try_new(
-    ///     "seq0:+:1".parse::<Coordinate>()?,
-    ///     dna::Nucleotide::A,
-    ///     dna::Nucleotide::T,
-    /// )?;
+    /// let variant = "seq0:+:1:A:T".parse::<Variant<dna::Nucleotide>>()?;
     ///
     /// assert_eq!(variant.coordinate().contig().as_str(), "seq0");
     /// assert_eq!(variant.coordinate().strand(), Strand::Positive);
@@ -143,8 +184,6 @@ where
     /// # Examples
     ///
     /// ```
-    /// use omics_coordinate::base::Coordinate;
-    /// use omics_coordinate::system::Base;
     /// use omics_molecule::polymer::dna;
     /// use omics_variation::snv::Variant;
     ///
@@ -154,10 +193,9 @@ where
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn reference(&self) -> N {
-        // SAFETY: because a single nucleotide variant is guaranteed to have a
-        // reference nucleotide within the inner [`Relation`], this will
-        // always unwrap successfully.
-        self.relation.reference().unwrap()
+        // SAFETY: a single nucleotide variant always has exactly one reference
+        // base.
+        self.alteration.reference().inner()[0]
     }
 
     /// Gets the alternate nucleotide as a [`Nucleotide`] from the [`Variant`].
@@ -165,8 +203,6 @@ where
     /// # Examples
     ///
     /// ```
-    /// use omics_coordinate::base::Coordinate;
-    /// use omics_coordinate::system::Base;
     /// use omics_molecule::polymer::dna;
     /// use omics_variation::snv::Variant;
     ///
@@ -176,10 +212,47 @@ where
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn alternate(&self) -> N {
-        // SAFETY: because a single nucleotide variant is guaranteed to have a
-        // alternate nucleotide within the inner [`Relation`], this will
-        // always unwrap successfully.
-        self.relation.alternate().unwrap()
+        // SAFETY: a single nucleotide variant always has exactly one alternate
+        // base.
+        self.alteration.alternate().inner()[0]
+    }
+
+    /// Gets the interval spanned by this [`Variant`] (a single base).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_molecule::polymer::dna;
+    /// use omics_variation::snv::Variant;
+    ///
+    /// let variant = "seq0:+:1:A:C".parse::<Variant<dna::Nucleotide>>()?;
+    /// let interval = variant.interval();
+    /// assert_eq!(interval.start().position().get(), 1);
+    /// assert_eq!(interval.end().position().get(), 1);
+    ///
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn interval(&self) -> Interval<Base> {
+        // SAFETY: an interval whose start equals its end is always valid.
+        Interval::try_new(self.coordinate.clone(), self.coordinate.clone()).unwrap()
+    }
+
+    /// Gets the underlying [`Alteration`] carrying both alleles.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_molecule::polymer::dna;
+    /// use omics_variation::snv::Variant;
+    ///
+    /// let variant = "seq0:+:1:A:C".parse::<Variant<dna::Nucleotide>>()?;
+    /// assert_eq!(variant.alteration().reference().to_string(), "A");
+    /// assert_eq!(variant.alteration().alternate().to_string(), "C");
+    ///
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn alteration(&self) -> &Alteration<N> {
+        &self.alteration
     }
 }
 
@@ -253,10 +326,7 @@ where
     }
 }
 
-impl<N: Nucleotide> std::fmt::Display for Variant<N>
-where
-    <N as FromStr>::Err: std::fmt::Debug + std::fmt::Display,
-{
+impl<N: Nucleotide> std::fmt::Display for Variant<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let coordinate = self.coordinate().to_string();
 
@@ -272,6 +342,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use omics_coordinate::Strand;
     use omics_molecule::polymer::dna;
     use omics_molecule::polymer::rna;
 

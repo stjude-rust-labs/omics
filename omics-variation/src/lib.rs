@@ -5,8 +5,9 @@ use std::str::FromStr;
 use omics_molecule::compound::Nucleotide;
 use thiserror::Error;
 
-pub mod snv;
 pub mod variant;
+
+pub use variant::snv;
 
 /// An error related to a [`Variant`].
 #[derive(Error, Debug)]
