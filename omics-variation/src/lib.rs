@@ -409,4 +409,51 @@ mod tests {
             .unwrap();
         (normalized.kind(), normalized.to_string())
     }
+
+    #[test]
+    fn it_collapses_to_an_insertion_on_the_negative_strand() {
+        // Trimming moves in the strand's forward direction (downward on `-`).
+        assert_eq!(
+            normalized_kind_and_string("seq0:-:100:A:AT"),
+            (Kind::Insertion, "seq0:-:99:.:T".to_string())
+        );
+        assert_eq!(
+            normalized_kind_and_string("seq0:-:100:A:TA"),
+            (Kind::Insertion, "seq0:-:100:.:T".to_string())
+        );
+    }
+
+    #[test]
+    fn it_parses_a_direct_interbase_insertion_at_zero() -> Result<(), Box<dyn std::error::Error>> {
+        // Interbase 0 (start of contig) is a valid insertion anchor.
+        let variant = "seq0:+:0:.:AT".parse::<Variant<dna::Nucleotide>>()?;
+        assert_eq!(variant.kind(), Kind::Insertion);
+        assert_eq!(variant.to_string(), "seq0:+:0:.:AT");
+        Ok(())
+    }
+
+    #[test]
+    fn it_rejects_a_negative_strand_span_underflow() {
+        // A two-base MNV at base 1 on the negative strand would need base 0.
+        let err = "seq0:-:1:AT:GC"
+            .parse::<Variant<dna::Nucleotide>>()
+            .unwrap_err();
+        assert!(matches!(err, Error::Kind(variant::KindError::SpanOverflow)));
+    }
+
+    #[test]
+    fn it_round_trips_every_kind_on_the_negative_strand() -> Result<(), Box<dyn std::error::Error>>
+    {
+        for input in [
+            "seq0:-:100:A:C",
+            "seq0:-:100:AT:GC",
+            "seq0:-:100:.:AT",
+            "seq0:-:100:AT:.",
+            "seq0:-:100:AT:G",
+        ] {
+            let variant = input.parse::<Variant<dna::Nucleotide>>()?;
+            assert_eq!(variant.to_string(), input);
+        }
+        Ok(())
+    }
 }

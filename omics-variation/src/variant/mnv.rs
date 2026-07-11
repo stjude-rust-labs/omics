@@ -209,4 +209,15 @@ mod tests {
             }
         ));
     }
+
+    #[test]
+    fn it_rejects_a_span_that_overflows() {
+        let coordinate = format!("seq0:+:{}", Number::MAX)
+            .parse::<Coordinate<Base>>()
+            .unwrap();
+        // Two-base MNV at MAX would need MAX+1.
+        let alteration = Alteration::try_new("AT".parse().unwrap(), "GC".parse().unwrap()).unwrap();
+        let err = Variant::<dna::Nucleotide>::try_new(coordinate, alteration).unwrap_err();
+        assert!(matches!(err, KindError::SpanOverflow));
+    }
 }
