@@ -154,6 +154,7 @@ use omics_molecule::sequence::Sequence;
 use thiserror::Error;
 
 pub mod small;
+pub mod structural;
 
 use small::Alteration;
 use small::Kind;
