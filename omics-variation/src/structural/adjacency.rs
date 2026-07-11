@@ -392,6 +392,16 @@ mod tests {
     }
 
     #[test]
+    fn it_rejects_an_identity_join_from_a_string() {
+        // Same locus, opposite orientations, and an empty insertion, so the
+        // parsed paired join encodes no change and must be rejected.
+        let err = "seq0:>:100(i)::seq0:<:100(i)::."
+            .parse::<Adjacency<dna::Nucleotide>>()
+            .unwrap_err();
+        assert!(matches!(err, ParseError::Construct(Error::IdentityJoin)));
+    }
+
+    #[test]
     fn it_rejects_a_bad_breakend() {
         let err = "bad::seq1:<:200(i)::AT"
             .parse::<Adjacency<dna::Nucleotide>>()

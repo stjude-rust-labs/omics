@@ -750,6 +750,13 @@ mod tests {
     }
 
     #[test]
+    fn it_round_trips_a_single_ended_breakend() {
+        let adjacency =
+            Adjacency::new_single(bnd(Orientation::LowerFlank, 100), "AT".parse().unwrap());
+        round_trip(Sv::try_new(vec![adjacency]).unwrap(), Kind::Breakend);
+    }
+
+    #[test]
     fn it_rejects_an_empty_string() {
         let err = "".parse::<Sv>().unwrap_err();
         assert!(matches!(err, ParseError::Empty));
