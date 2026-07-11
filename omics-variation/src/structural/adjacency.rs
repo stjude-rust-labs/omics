@@ -241,7 +241,10 @@ impl<N: Nucleotide> Adjacency<N> {
 impl<N: Nucleotide> fmt::Display for Adjacency<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some((a, b, insertion)) = self.paired() {
-            write!(f, "{a}{ADJACENCY_SEPARATOR}{b}{ADJACENCY_SEPARATOR}{insertion}")
+            write!(
+                f,
+                "{a}{ADJACENCY_SEPARATOR}{b}{ADJACENCY_SEPARATOR}{insertion}"
+            )
         } else if let Some((breakend, insertion)) = self.single() {
             write!(
                 f,

@@ -237,7 +237,9 @@ fn breakend_key(breakend: &Breakend) -> BreakendKey {
 /// The key tags paired adjacencies ahead of single ones, then orders by the
 /// canonical breakend keys and finally by the insertion sequence. It backs the
 /// normalized ordering of the adjacencies in a [`StructuralVariant`].
-fn adjacency_key<N: Nucleotide>(adjacency: &Adjacency<N>) -> (u8, BreakendKey, BreakendKey, String) {
+fn adjacency_key<N: Nucleotide>(
+    adjacency: &Adjacency<N>,
+) -> (u8, BreakendKey, BreakendKey, String) {
     if let Some((a, b, insertion)) = adjacency.paired() {
         (0, breakend_key(a), breakend_key(b), insertion.to_string())
     } else if let Some((breakend, insertion)) = adjacency.single() {
@@ -384,12 +386,12 @@ fn classify_triple<N: Nucleotide>(
         if let Some((a, b)) = paired_breakends(adjacency) {
             for breakend in [a, b] {
                 let position = breakend.position().get();
-                if !counts.iter().any(|(p, _, _)| *p == position) {
+                if !counts.iter().any(|(p, ..)| *p == position) {
                     counts.push((position, 0, 0));
                 }
                 let entry = counts
                     .iter_mut()
-                    .find(|(p, _, _)| *p == position)
+                    .find(|(p, ..)| *p == position)
                     .expect("the position was just inserted");
                 match breakend.orientation() {
                     Orientation::LowerFlank => entry.1 += 1,
@@ -399,8 +401,10 @@ fn classify_triple<N: Nucleotide>(
         }
     }
 
-    let triangle =
-        counts.len() == 3 && counts.iter().all(|(_, lower, higher)| *lower == 1 && *higher == 1);
+    let triangle = counts.len() == 3
+        && counts
+            .iter()
+            .all(|(_, lower, higher)| *lower == 1 && *higher == 1);
 
     if triangle {
         Kind::Translocation(Locality::Intrachromosomal)
@@ -464,7 +468,10 @@ mod tests {
             bnd(Orientation::HigherFlank, 100),
             "AAAA",
         );
-        assert_eq!(Sv::try_new(vec![adjacency]).unwrap().kind(), Kind::Insertion);
+        assert_eq!(
+            Sv::try_new(vec![adjacency]).unwrap().kind(),
+            Kind::Insertion
+        );
     }
 
     #[test]
@@ -605,10 +612,7 @@ mod tests {
             bnd(Orientation::HigherFlank, 300),
             "A",
         );
-        assert_eq!(
-            Sv::try_new(vec![j1, j2, j3]).unwrap().kind(),
-            Kind::Complex
-        );
+        assert_eq!(Sv::try_new(vec![j1, j2, j3]).unwrap().kind(), Kind::Complex);
     }
 
     #[test]

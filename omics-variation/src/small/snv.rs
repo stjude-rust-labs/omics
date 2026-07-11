@@ -14,11 +14,11 @@ use thiserror::Error;
 
 use crate::PositionQualifier;
 use crate::qualified_position;
-use crate::split_qualified_position;
 use crate::small::Alteration;
 use crate::small::Kind;
 use crate::small::KindError;
 use crate::small::base_interval;
+use crate::split_qualified_position;
 
 /// A parse error related to a [`Variant`].
 #[derive(Error, Debug)]

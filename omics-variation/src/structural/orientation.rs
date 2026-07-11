@@ -87,7 +87,10 @@ mod tests {
     #[test]
     fn it_parses_and_serializes() {
         assert_eq!(">".parse::<Orientation>().unwrap(), Orientation::LowerFlank);
-        assert_eq!("<".parse::<Orientation>().unwrap(), Orientation::HigherFlank);
+        assert_eq!(
+            "<".parse::<Orientation>().unwrap(),
+            Orientation::HigherFlank
+        );
         assert_eq!(Orientation::LowerFlank.to_string(), ">");
         assert_eq!(Orientation::HigherFlank.to_string(), "<");
     }
