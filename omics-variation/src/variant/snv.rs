@@ -67,7 +67,9 @@ pub struct Variant<N: Nucleotide> {
     /// The coordinate of the substituted base.
     coordinate: Coordinate<Base>,
 
-    /// The reference and alternate alleles (each exactly one base).
+    /// Reference and alternate alleles, each exactly one base.
+    ///
+    /// Construction guarantees `kind()` is [`Kind::Snv`].
     alteration: Alteration<N>,
 }
 

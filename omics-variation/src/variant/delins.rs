@@ -15,9 +15,15 @@ use crate::variant::KindError;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Variant<N: Nucleotide> {
     /// The coordinate of the first replaced base.
+    ///
+    /// [`try_new`](Self::try_new) guarantees that advancing this forward by
+    /// `reference.len() - 1` stays within the position bounds, so
+    /// [`interval`](Self::interval) cannot overflow.
     coordinate: Coordinate<Base>,
 
-    /// The alleles (both non-empty, differing lengths).
+    /// Both alleles non-empty and of differing lengths.
+    ///
+    /// [`try_new`](Self::try_new) guarantees `kind()` is [`Kind::Delins`].
     alteration: Alteration<N>,
 }
 

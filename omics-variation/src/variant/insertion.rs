@@ -16,7 +16,9 @@ pub struct Variant<N: Nucleotide> {
     /// The interbase boundary at which the alternate allele is inserted.
     coordinate: Coordinate<Interbase>,
 
-    /// The alleles (empty reference, non-empty alternate).
+    /// An empty reference allele paired with a non-empty alternate allele.
+    ///
+    /// [`try_new`](Self::try_new) guarantees `kind()` is [`Kind::Insertion`].
     alteration: Alteration<N>,
 }
 
