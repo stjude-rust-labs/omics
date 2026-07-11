@@ -6,6 +6,7 @@ use omics_molecule::compound::Nucleotide;
 use thiserror::Error;
 
 pub mod snv;
+pub mod variant;
 
 /// An error related to a [`Variant`].
 #[derive(Error, Debug)]
