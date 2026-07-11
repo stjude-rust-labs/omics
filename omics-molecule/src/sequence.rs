@@ -179,6 +179,14 @@ impl<N: Nucleotide> FromStr for Sequence<N> {
     }
 }
 
+impl<N: Nucleotide> TryFrom<&str> for Sequence<N> {
+    type Error = ParseError;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        s.parse()
+    }
+}
+
 impl<N: Nucleotide> std::fmt::Display for Sequence<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.0.is_empty() {

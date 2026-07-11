@@ -1,4 +1,133 @@
-//! Genomic variation.
+//! Small sequence variants.
+//!
+//! `omics-variation` represents genomic changes that can be written as a
+//! reference allele and an alternate allele at one locus. This covers single
+//! nucleotide variants (`SNV`s), multi-nucleotide variants (`MNV`s),
+//! insertions, deletions, and deletion-insertions (`delins`). Larger events
+//! such as copy-number variants, inversions, translocations, and breakends
+//! need additional structure and are not modeled by this crate.
+//!
+//! The central type is [`Variant`]. A [`Variant`] is generic over the
+//! nucleotide type, so the same representation works for DNA and RNA alleles
+//! from `omics-molecule`.
+//!
+//! ```
+//! use omics_molecule::polymer::dna;
+//! use omics_variation::Variant;
+//! use omics_variation::variant::Kind;
+//!
+//! let variant = "seq0:+:100:A:C".parse::<Variant<dna::Nucleotide>>()?;
+//! assert_eq!(variant.kind(), Kind::Snv);
+//! assert_eq!(variant.to_string(), "seq0:+:100:A:C");
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Variant strings
+//!
+//! The crate uses a compact, crate-local string format:
+//!
+//! ```text
+//! contig:[strand:]position:reference:alternate
+//! ```
+//!
+//! The `strand` field is optional when parsing and defaults to `+`.
+//! Serialization always emits the explicit strand. The `reference` and
+//! `alternate` fields are nucleotide sequences; `.` denotes an empty allele.
+//! This format is intentionally not [VCF], `SPDI`, or [HGVS]. Those formats
+//! carry additional metadata and normalization rules that belong in dedicated
+//! adapters.
+//!
+//! | Kind | Example | Meaning |
+//! | --- | --- | --- |
+//! | [`Kind::Snv`] | `seq0:+:100:A:C` | substitute `A` with `C` |
+//! | [`Kind::Mnv`] | `seq0:+:100:AT:GC` | substitute `AT` with `GC` |
+//! | [`Kind::Insertion`] | `seq0:+:100:.:AT` | insert `AT` at interbase boundary `100` |
+//! | [`Kind::Deletion`] | `seq0:+:100:AT:.` | delete `AT` starting at base `100` |
+//! | [`Kind::Delins`] | `seq0:+:100:AT:G` | replace `AT` with `G` |
+//!
+//! Parsing classifies a variant from its allele lengths. Identical
+//! `reference` and `alternate` alleles are rejected because they do not
+//! describe variation, and `.:.` is rejected because it changes nothing.
+//!
+//! ```
+//! use omics_molecule::polymer::dna;
+//! use omics_variation::Variant;
+//! use omics_variation::variant::Kind;
+//!
+//! let insertion = "seq0:+:100:.:AT".parse::<Variant<dna::Nucleotide>>()?;
+//! assert_eq!(insertion.kind(), Kind::Insertion);
+//!
+//! let deletion = "seq0:100:AT:.".parse::<Variant<dna::Nucleotide>>()?;
+//! assert_eq!(deletion.kind(), Kind::Deletion);
+//! assert_eq!(deletion.to_string(), "seq0:+:100:AT:.");
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Coordinates and spans
+//!
+//! `SNV`, `MNV`, deletion, and `delins` variants occupy bases, so their typed
+//! variants use `Coordinate<Base>` and expose `Interval<Base>` spans.
+//! Insertions occur between bases, so [`insertion::Variant`] uses
+//! `Coordinate<Interbase>` and exposes a zero-width `Interval<Interbase>` with
+//! [`insertion::Variant::interbase_interval`].
+//!
+//! ```
+//! use omics_molecule::polymer::dna;
+//! use omics_variation::Variant;
+//!
+//! let variant = "seq0:+:100:.:AT".parse::<Variant<dna::Nucleotide>>()?;
+//! let Variant::Insertion(insertion) = variant else {
+//!     unreachable!("the empty reference allele classifies as an insertion");
+//! };
+//!
+//! let interval = insertion.interbase_interval();
+//! assert_eq!(interval.start().position().get(), 100);
+//! assert_eq!(interval.end().position().get(), 100);
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Normalization and equality
+//!
+//! Variants preserve the alleles as written. [`PartialEq`] therefore compares
+//! the literal stored form, not biological equivalence. Use
+//! [`Variant::normalize`] when you need a parsimonious representation. The
+//! normalization implemented here trims shared prefix and suffix bases and
+//! moves the coordinate forward in the molecule's strand-aware direction. It
+//! does not left-align through repeats because that requires a reference
+//! sequence.
+//!
+//! ```
+//! use omics_molecule::polymer::dna;
+//! use omics_variation::Variant;
+//!
+//! let variant = "seq0:+:100:AT:AG".parse::<Variant<dna::Nucleotide>>()?;
+//! assert_eq!(variant.normalize()?.to_string(), "seq0:+:101:T:G");
+//!
+//! let variant = "seq0:-:100:AT:AG".parse::<Variant<dna::Nucleotide>>()?;
+//! assert_eq!(variant.normalize()?.to_string(), "seq0:-:99:T:G");
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Typed variants
+//!
+//! Use the top-level [`Variant`] enum when parsing or dispatching across all
+//! supported small variants. Use the modules under [`variant`] when a caller
+//! already knows the expected kind and wants kind-specific accessors.
+//!
+//! ```
+//! use omics_molecule::polymer::dna::Nucleotide;
+//! use omics_variation::variant::deletion;
+//!
+//! let variant = deletion::Variant::<Nucleotide>::try_new("seq0:+:100", "AT")?;
+//!
+//! assert_eq!(variant.reference().to_string(), "AT");
+//! assert_eq!(variant.interval().end().position().get(), 101);
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! [`Kind`]: variant::Kind
+//! [VCF]: https://samtools.github.io/hts-specs/VCFv4.5.pdf
+//! [HGVS]: https://hgvs-nomenclature.org/stable/
 
 use std::str::FromStr;
 
@@ -138,31 +267,31 @@ impl<N: Nucleotide> Variant<N> {
                     .ok_or(Error::NormalizeOverflow)?
                     .into_move_forward(prefix)
                     .ok_or(Error::NormalizeOverflow)?;
-                Variant::Insertion(insertion::Variant::try_new(boundary, trimmed)?)
+                Variant::Insertion(insertion::Variant::try_from((boundary, trimmed))?)
             }
             Kind::Snv => {
                 let c = start
                     .into_move_forward(prefix)
                     .ok_or(Error::NormalizeOverflow)?;
-                Variant::Snv(snv::Variant::from_alteration(c, trimmed)?)
+                Variant::Snv(snv::Variant::try_from((c, trimmed))?)
             }
             Kind::Mnv => {
                 let c = start
                     .into_move_forward(prefix)
                     .ok_or(Error::NormalizeOverflow)?;
-                Variant::Mnv(mnv::Variant::try_new(c, trimmed)?)
+                Variant::Mnv(mnv::Variant::try_from((c, trimmed))?)
             }
             Kind::Deletion => {
                 let c = start
                     .into_move_forward(prefix)
                     .ok_or(Error::NormalizeOverflow)?;
-                Variant::Deletion(deletion::Variant::try_new(c, trimmed)?)
+                Variant::Deletion(deletion::Variant::try_from((c, trimmed))?)
             }
             Kind::Delins => {
                 let c = start
                     .into_move_forward(prefix)
                     .ok_or(Error::NormalizeOverflow)?;
-                Variant::Delins(delins::Variant::try_new(c, trimmed)?)
+                Variant::Delins(delins::Variant::try_from((c, trimmed))?)
             }
         })
     }
@@ -192,23 +321,23 @@ impl<N: Nucleotide> FromStr for Variant<N> {
         Ok(match alteration.kind() {
             Kind::Insertion => {
                 let coordinate = coord.parse::<Coordinate<Interbase>>()?;
-                Variant::Insertion(insertion::Variant::try_new(coordinate, alteration)?)
+                Variant::Insertion(insertion::Variant::try_from((coordinate, alteration))?)
             }
             Kind::Snv => {
                 let coordinate = coord.parse::<Coordinate<Base>>()?;
-                Variant::Snv(snv::Variant::from_alteration(coordinate, alteration)?)
+                Variant::Snv(snv::Variant::try_from((coordinate, alteration))?)
             }
             Kind::Mnv => {
                 let coordinate = coord.parse::<Coordinate<Base>>()?;
-                Variant::Mnv(mnv::Variant::try_new(coordinate, alteration)?)
+                Variant::Mnv(mnv::Variant::try_from((coordinate, alteration))?)
             }
             Kind::Deletion => {
                 let coordinate = coord.parse::<Coordinate<Base>>()?;
-                Variant::Deletion(deletion::Variant::try_new(coordinate, alteration)?)
+                Variant::Deletion(deletion::Variant::try_from((coordinate, alteration))?)
             }
             Kind::Delins => {
                 let coordinate = coord.parse::<Coordinate<Base>>()?;
-                Variant::Delins(delins::Variant::try_new(coordinate, alteration)?)
+                Variant::Delins(delins::Variant::try_from((coordinate, alteration))?)
             }
         })
     }

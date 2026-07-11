@@ -2,78 +2,55 @@
 
 use omics_coordinate::Coordinate;
 use omics_coordinate::Interval;
+use omics_coordinate::coordinate;
 use omics_coordinate::position::Number;
 use omics_coordinate::system::Base;
 use omics_molecule::compound::Nucleotide;
+use omics_molecule::sequence;
 use omics_molecule::sequence::Sequence;
 
 use crate::variant::Alteration;
 use crate::variant::Kind;
 use crate::variant::KindError;
 
-/// A deletion: one or more reference bases removed.
+/// A deletion of one or more reference bases.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Variant<N: Nucleotide> {
     /// The coordinate of the first deleted base.
     ///
-    /// [`try_new`](Self::try_new) guarantees that advancing this forward by
+    /// Construction guarantees that advancing this forward by
     /// `reference.len() - 1` stays within the position bounds, so
     /// [`interval`](Self::interval) cannot overflow.
     coordinate: Coordinate<Base>,
 
     /// A non-empty reference allele paired with an empty alternate allele.
     ///
-    /// [`try_new`](Self::try_new) guarantees `kind()` is [`Kind::Deletion`].
+    /// Construction guarantees `kind()` is [`Kind::Deletion`].
     alteration: Alteration<N>,
 }
 
 impl<N: Nucleotide> Variant<N> {
-    /// Attempts to create a new deletion from an [`Alteration`].
-    ///
-    /// The span (`start + reference.len() - 1`) is validated here so that
-    /// [`interval`](Self::interval) never panics on a constructed value.
+    /// Attempts to create a new deletion from a coordinate and the deleted
+    /// reference bases.
     ///
     /// # Examples
     ///
     /// ```
-    /// use omics_coordinate::Coordinate;
-    /// use omics_coordinate::system::Base;
     /// use omics_molecule::polymer::dna::Nucleotide;
-    /// use omics_variation::variant::Alteration;
     /// use omics_variation::variant::deletion::Variant;
     ///
-    /// let coordinate = "seq0:+:100".parse::<Coordinate<Base>>()?;
-    /// let alteration = Alteration::<Nucleotide>::try_new("AT".parse()?, ".".parse()?)?;
-    /// let variant = Variant::try_new(coordinate, alteration)?;
+    /// let variant = Variant::<Nucleotide>::try_new("seq0:+:100", "AT")?;
     /// assert_eq!(variant.reference().to_string(), "AT");
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn try_new(
-        coordinate: impl Into<Coordinate<Base>>,
-        alteration: Alteration<N>,
+        coordinate: impl TryInto<Coordinate<Base>, Error = coordinate::Error>,
+        reference: impl TryInto<Sequence<N>, Error = sequence::ParseError>,
     ) -> Result<Self, KindError> {
-        let found = alteration.kind();
-        if found != Kind::Deletion {
-            return Err(KindError::WrongKind {
-                expected: Kind::Deletion,
-                found,
-            });
-        }
-
-        let coordinate = coordinate.into();
-
-        // Validate the span is representable now so `interval()` cannot panic.
-        let span = Number::try_from(alteration.reference().len() - 1)
-            .map_err(|_| KindError::SpanOverflow)?;
-        coordinate
-            .clone()
-            .into_move_forward(span)
-            .ok_or(KindError::SpanOverflow)?;
-
-        Ok(Self {
-            coordinate,
-            alteration,
-        })
+        let coordinate = coordinate.try_into()?;
+        let reference = reference.try_into()?;
+        let alteration = Alteration::try_new(reference, Sequence::new(Vec::new()))?;
+        Self::try_from((coordinate, alteration))
     }
 
     /// Gets the coordinate of the first deleted base.
@@ -81,14 +58,9 @@ impl<N: Nucleotide> Variant<N> {
     /// # Examples
     ///
     /// ```
-    /// # use omics_coordinate::Coordinate;
-    /// # use omics_coordinate::system::Base;
     /// # use omics_molecule::polymer::dna::Nucleotide;
-    /// # use omics_variation::variant::Alteration;
     /// # use omics_variation::variant::deletion::Variant;
-    /// let coordinate = "seq0:+:100".parse::<Coordinate<Base>>()?;
-    /// let alteration = Alteration::<Nucleotide>::try_new("AT".parse()?, ".".parse()?)?;
-    /// let variant = Variant::try_new(coordinate, alteration)?;
+    /// let variant = Variant::<Nucleotide>::try_new("seq0:+:100", "AT")?;
     /// assert_eq!(variant.coordinate().position().get(), 100);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -101,14 +73,9 @@ impl<N: Nucleotide> Variant<N> {
     /// # Examples
     ///
     /// ```
-    /// # use omics_coordinate::Coordinate;
-    /// # use omics_coordinate::system::Base;
     /// # use omics_molecule::polymer::dna::Nucleotide;
-    /// # use omics_variation::variant::Alteration;
     /// # use omics_variation::variant::deletion::Variant;
-    /// let coordinate = "seq0:+:100".parse::<Coordinate<Base>>()?;
-    /// let alteration = Alteration::<Nucleotide>::try_new("AT".parse()?, ".".parse()?)?;
-    /// let variant = Variant::try_new(coordinate, alteration)?;
+    /// let variant = Variant::<Nucleotide>::try_new("seq0:+:100", "AT")?;
     /// assert_eq!(variant.reference().to_string(), "AT");
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -121,26 +88,20 @@ impl<N: Nucleotide> Variant<N> {
     /// # Examples
     ///
     /// ```
-    /// # use omics_coordinate::Coordinate;
-    /// # use omics_coordinate::system::Base;
     /// # use omics_molecule::polymer::dna::Nucleotide;
-    /// # use omics_variation::variant::Alteration;
     /// # use omics_variation::variant::deletion::Variant;
-    /// let coordinate = "seq0:+:100".parse::<Coordinate<Base>>()?;
-    /// let alteration = Alteration::<Nucleotide>::try_new("AT".parse()?, ".".parse()?)?;
-    /// let variant = Variant::try_new(coordinate, alteration)?;
+    /// let variant = Variant::<Nucleotide>::try_new("seq0:+:100", "AT")?;
     /// assert_eq!(variant.interval().end().position().get(), 101);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn interval(&self) -> Interval<Base> {
-        let span = Number::try_from(self.alteration.reference().len() - 1)
-            .expect("validated at construction");
-        let end = self
-            .coordinate
-            .clone()
-            .into_move_forward(span)
-            .expect("validated at construction");
-        // SAFETY: start and end share a contig/strand and end >= start.
+        // SAFETY: construction validated that this span is representable.
+        let span = Number::try_from(self.alteration.reference().len() - 1).unwrap();
+        // SAFETY: construction validated that moving forward by the span
+        // stays within the position bounds.
+        let end = self.coordinate.clone().into_move_forward(span).unwrap();
+        // SAFETY: `start` and `end` share a contig and strand, and `end` is at
+        // or beyond `start` in the strand's forward direction.
         Interval::try_new(self.coordinate.clone(), end).unwrap()
     }
 
@@ -149,19 +110,61 @@ impl<N: Nucleotide> Variant<N> {
     /// # Examples
     ///
     /// ```
-    /// # use omics_coordinate::Coordinate;
-    /// # use omics_coordinate::system::Base;
     /// # use omics_molecule::polymer::dna::Nucleotide;
-    /// # use omics_variation::variant::Alteration;
     /// # use omics_variation::variant::deletion::Variant;
-    /// let coordinate = "seq0:+:100".parse::<Coordinate<Base>>()?;
-    /// let alteration = Alteration::<Nucleotide>::try_new("AT".parse()?, ".".parse()?)?;
-    /// let variant = Variant::try_new(coordinate, alteration)?;
+    /// let variant = Variant::<Nucleotide>::try_new("seq0:+:100", "AT")?;
     /// assert_eq!(variant.alteration().reference().to_string(), "AT");
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn alteration(&self) -> &Alteration<N> {
         &self.alteration
+    }
+}
+
+impl<N: Nucleotide> TryFrom<(Coordinate<Base>, Alteration<N>)> for Variant<N> {
+    type Error = KindError;
+
+    /// Builds a deletion from a base [`Coordinate`] and a classified deletion
+    /// [`Alteration`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_coordinate::Coordinate;
+    /// use omics_coordinate::system::Base;
+    /// use omics_molecule::polymer::dna::Nucleotide;
+    /// use omics_variation::variant::Alteration;
+    /// use omics_variation::variant::deletion::Variant;
+    ///
+    /// let coordinate = Coordinate::<Base>::try_from("seq0:+:100")?;
+    /// let alteration = Alteration::<Nucleotide>::try_new("AT".parse()?, ".".parse()?)?;
+    /// let variant = Variant::try_from((coordinate, alteration))?;
+    /// assert_eq!(variant.reference().to_string(), "AT");
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    fn try_from(
+        (coordinate, alteration): (Coordinate<Base>, Alteration<N>),
+    ) -> Result<Self, Self::Error> {
+        let found = alteration.kind();
+        if found != Kind::Deletion {
+            return Err(KindError::WrongKind {
+                expected: Kind::Deletion,
+                found,
+            });
+        }
+
+        // Validate the span is representable now so `interval` cannot panic.
+        let span = Number::try_from(alteration.reference().len() - 1)
+            .map_err(|_| KindError::SpanOverflow)?;
+        coordinate
+            .clone()
+            .into_move_forward(span)
+            .ok_or(KindError::SpanOverflow)?;
+
+        Ok(Self {
+            coordinate,
+            alteration,
+        })
     }
 }
 
@@ -171,28 +174,36 @@ mod tests {
 
     use super::*;
 
-    fn deletion(pos: &str, reference: &str) -> Variant<dna::Nucleotide> {
-        let coordinate = format!("seq0:+:{pos}").parse::<Coordinate<Base>>().unwrap();
-        let alteration =
-            Alteration::try_new(reference.parse().unwrap(), ".".parse().unwrap()).unwrap();
-        Variant::try_new(coordinate, alteration).unwrap()
+    #[test]
+    fn it_builds_a_deletion_from_raw_parts() {
+        let variant = Variant::<dna::Nucleotide>::try_new("seq0:+:100", "AT").unwrap();
+        assert_eq!(variant.reference().to_string(), "AT");
+        assert_eq!(variant.interval().start().position().get(), 100);
+        assert_eq!(variant.interval().end().position().get(), 101);
     }
 
     #[test]
-    fn it_builds_a_deletion_and_computes_its_interval() {
-        let variant = deletion("100", "AT");
+    fn it_builds_a_deletion_from_an_alteration() {
+        let coordinate = Coordinate::<Base>::try_from("seq0:+:100").unwrap();
+        let alteration = Alteration::<dna::Nucleotide>::try_new(
+            Sequence::try_from("AT").unwrap(),
+            Sequence::try_from(".").unwrap(),
+        )
+        .unwrap();
+        let variant = Variant::try_from((coordinate, alteration)).unwrap();
         assert_eq!(variant.reference().to_string(), "AT");
-        let interval = variant.interval();
-        assert_eq!(interval.start().position().get(), 100);
-        assert_eq!(interval.end().position().get(), 101);
     }
 
     #[test]
     fn it_rejects_a_non_deletion_alteration() {
-        let coordinate = "seq0:+:100".parse::<Coordinate<Base>>().unwrap();
+        let coordinate = Coordinate::<Base>::try_from("seq0:+:100").unwrap();
         // An SNV, not a deletion.
-        let alteration = Alteration::try_new("A".parse().unwrap(), "C".parse().unwrap()).unwrap();
-        let err = Variant::<dna::Nucleotide>::try_new(coordinate, alteration).unwrap_err();
+        let alteration = Alteration::<dna::Nucleotide>::try_new(
+            Sequence::try_from("A").unwrap(),
+            Sequence::try_from("C").unwrap(),
+        )
+        .unwrap();
+        let err = Variant::try_from((coordinate, alteration)).unwrap_err();
         assert!(matches!(
             err,
             KindError::WrongKind {
@@ -203,13 +214,19 @@ mod tests {
     }
 
     #[test]
+    fn it_rejects_an_empty_reference() {
+        let err = Variant::<dna::Nucleotide>::try_new("seq0:+:100", ".").unwrap_err();
+        assert!(matches!(
+            err,
+            KindError::Alteration(crate::variant::Error::BothEmpty)
+        ));
+    }
+
+    #[test]
     fn it_rejects_a_span_that_overflows() {
-        let coordinate = format!("seq0:+:{}", Number::MAX)
-            .parse::<Coordinate<Base>>()
-            .unwrap();
         // Two-base deletion at MAX would need MAX+1.
-        let alteration = Alteration::try_new("AT".parse().unwrap(), ".".parse().unwrap()).unwrap();
-        let err = Variant::<dna::Nucleotide>::try_new(coordinate, alteration).unwrap_err();
+        let coordinate = format!("seq0:+:{}", Number::MAX);
+        let err = Variant::<dna::Nucleotide>::try_new(coordinate.as_str(), "AT").unwrap_err();
         assert!(matches!(err, KindError::SpanOverflow));
     }
 }

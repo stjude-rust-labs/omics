@@ -2,7 +2,28 @@
 //!
 //! Every small variant is a reference allele and an alternate allele anchored
 //! at a coordinate. [`Alteration`] is the shared core carrying the two alleles
-//! and classifying them into a [`Kind`].
+//! and classifying them into a [`Kind`]. The typed modules in this namespace
+//! add the coordinate type and kind-specific invariants.
+//!
+//! [`Alteration`] stores allele sequence only. It does not store a coordinate,
+//! and it does not remember whether the alleles came from a string or from
+//! typed construction. This keeps classification deterministic: the same
+//! `reference` and `alternate` always produce the same [`Kind`].
+//!
+//! ```
+//! use omics_molecule::polymer::dna::Nucleotide;
+//! use omics_variation::variant::Alteration;
+//! use omics_variation::variant::Kind;
+//!
+//! let alteration = Alteration::<Nucleotide>::try_new("AT".parse()?, "G".parse()?)?;
+//! assert_eq!(alteration.kind(), Kind::Delins);
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! Use [`Alteration`] when code needs to reason about alleles independent of a
+//! locus. Use [`snv::Variant`], [`mnv::Variant`], [`insertion::Variant`],
+//! [`deletion::Variant`], or [`delins::Variant`] when code needs a fully
+//! anchored variant with span accessors.
 
 use omics_molecule::compound::Nucleotide;
 use omics_molecule::sequence::Sequence;
@@ -37,15 +58,15 @@ pub enum Error {
     BothEmpty,
 
     /// The reference and alternate alleles were identical.
-    #[error("reference and alternate alleles are identical: `{0}`")]
+    #[error("reference and alternate alleles are both `{0}`")]
     Identical(String),
 }
 
-/// An error raised when constructing a typed variant from an [`Alteration`].
+/// An error raised when constructing a typed variant.
 #[derive(Error, Debug)]
 pub enum KindError {
     /// The alteration classified as a different kind than the target type.
-    #[error("wrong alteration kind: expected {expected:?}, found {found:?}")]
+    #[error("wrong alteration kind; expected {expected:?}, found {found:?}")]
     WrongKind {
         /// The kind the target type requires.
         expected: Kind,
@@ -57,6 +78,18 @@ pub enum KindError {
     /// coordinate overflows the position bounds).
     #[error("variant span overflows the coordinate position bounds")]
     SpanOverflow,
+
+    /// The raw alleles could not form a valid alteration.
+    #[error(transparent)]
+    Alteration(#[from] Error),
+
+    /// The coordinate could not be parsed.
+    #[error(transparent)]
+    Coordinate(#[from] omics_coordinate::coordinate::Error),
+
+    /// An allele could not be parsed.
+    #[error(transparent)]
+    Sequence(#[from] omics_molecule::sequence::ParseError),
 }
 
 /// The reference and alternate alleles of a small variant.

@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 * Added a generic `Sequence<N>` allele type, the generic sibling of the
-  concrete `dna::Molecule` / `rna::Molecule`.
+  concrete `dna::Molecule` / `rna::Molecule`, with `FromStr` and `TryFrom<&str>`
+  parsing (a lone `.` denotes the empty allele).
 
 ## 0.2.0 - 03-19-2026
 

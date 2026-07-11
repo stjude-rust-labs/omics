@@ -121,43 +121,6 @@ where
 }
 
 impl<N: Nucleotide> Variant<N> {
-    /// Creates a single nucleotide [`Variant`] from a classified single-base
-    /// [`Alteration`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use omics_coordinate::Coordinate;
-    /// use omics_coordinate::system::Base;
-    /// use omics_molecule::polymer::dna::Nucleotide;
-    /// use omics_variation::snv::Variant;
-    /// use omics_variation::variant::Alteration;
-    ///
-    /// let coordinate = "seq0:+:1".parse::<Coordinate<Base>>()?;
-    /// let alteration = Alteration::<Nucleotide>::try_new("A".parse()?, "C".parse()?)?;
-    /// let variant = Variant::from_alteration(coordinate, alteration)?;
-    /// assert_eq!(variant.reference(), Nucleotide::A);
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn from_alteration(
-        coordinate: impl Into<Coordinate<Base>>,
-        alteration: Alteration<N>,
-    ) -> Result<Self, KindError> {
-        let found = alteration.kind();
-        if found != Kind::Snv {
-            return Err(KindError::WrongKind {
-                expected: Kind::Snv,
-                found,
-            });
-        }
-
-        Ok(Self {
-            coordinate: coordinate.into(),
-            alteration,
-        })
-    }
-
     /// Gets the [`Coordinate`] for this [`Variant`].
     ///
     /// # Examples
@@ -255,6 +218,46 @@ impl<N: Nucleotide> Variant<N> {
     /// ```
     pub fn alteration(&self) -> &Alteration<N> {
         &self.alteration
+    }
+}
+
+impl<N: Nucleotide> TryFrom<(Coordinate<Base>, Alteration<N>)> for Variant<N> {
+    type Error = KindError;
+
+    /// Builds a single nucleotide [`Variant`] from a base [`Coordinate`] and a
+    /// classified single-base [`Alteration`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_coordinate::Coordinate;
+    /// use omics_coordinate::system::Base;
+    /// use omics_molecule::polymer::dna::Nucleotide;
+    /// use omics_variation::snv::Variant;
+    /// use omics_variation::variant::Alteration;
+    ///
+    /// let coordinate = "seq0:+:1".parse::<Coordinate<Base>>()?;
+    /// let alteration = Alteration::<Nucleotide>::try_new("A".parse()?, "C".parse()?)?;
+    /// let variant = Variant::try_from((coordinate, alteration))?;
+    /// assert_eq!(variant.reference(), Nucleotide::A);
+    ///
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    fn try_from(
+        (coordinate, alteration): (Coordinate<Base>, Alteration<N>),
+    ) -> Result<Self, Self::Error> {
+        let found = alteration.kind();
+        if found != Kind::Snv {
+            return Err(KindError::WrongKind {
+                expected: Kind::Snv,
+                found,
+            });
+        }
+
+        Ok(Self {
+            coordinate,
+            alteration,
+        })
     }
 }
 

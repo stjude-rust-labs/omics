@@ -12,7 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added the `MNV`, insertion, deletion, and delins small-variant kinds
   alongside the existing SNV, backed by a shared `Alteration` core and a new
   `Kind` classification. The top-level `Variant` now parses and dispatches to
-  each kind and exposes a parsimony `normalize` method.
+  each kind and exposes a parsimony `normalize` method. Each kind exposes a
+  `try_new` taking string-like inputs and a `TryFrom<(Coordinate, Alteration)>`
+  conversion for pre-built alleles.
 
 ### Changed
 
