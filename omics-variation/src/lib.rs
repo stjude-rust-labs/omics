@@ -1,15 +1,21 @@
-//! Small sequence variants.
+//! Sequence and structural variants.
 //!
 //! `omics-variation` represents genomic changes that can be written as a
 //! reference allele and an alternate allele at one locus. This covers single
 //! nucleotide variants (`SNV`s), multi-nucleotide variants (`MNV`s),
 //! insertions, deletions, and deletion-insertions (`delins`). Larger events
-//! such as copy-number variants, inversions, translocations, and breakends
-//! need additional structure and are not modeled by this crate.
+//! such as inversions, translocations, and breakends need additional structure
+//! and are now modeled by the [`structural`] module.
 //!
 //! The central type is [`Variant`]. A [`Variant`] is generic over the
 //! nucleotide type, so the same representation works for DNA and RNA alleles
 //! from `omics-molecule`.
+//!
+//! Beyond small variants, the [`structural`] module models breakends, novel
+//! adjacencies, and structural-variant events such as large deletions, large
+//! insertions, inversions, tandem duplications, and translocations. A
+//! structural variant derives its [`structural::Kind`] from breakend geometry
+//! rather than storing it.
 //!
 //! ```
 //! use omics_molecule::polymer::dna;
@@ -19,6 +25,22 @@
 //! let variant = "seq0:+:100(b):A:C".parse::<Variant<dna::Nucleotide>>()?;
 //! assert_eq!(variant.kind(), Kind::Snv);
 //! assert_eq!(variant.to_string(), "seq0:+:100(b):A:C");
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! ```
+//! use omics_molecule::polymer::dna;
+//! use omics_variation::StructuralKind;
+//! use omics_variation::StructuralVariant;
+//! use omics_variation::structural::adjacency::Adjacency;
+//! use omics_variation::structural::breakend::Breakend;
+//! use omics_variation::structural::orientation::Orientation;
+//!
+//! let a = Breakend::try_new("seq0", Orientation::LowerFlank, 100)?;
+//! let b = Breakend::try_new("seq0", Orientation::HigherFlank, 200)?;
+//! let adjacency = Adjacency::<dna::Nucleotide>::try_new_paired(a, b, ".".parse()?)?;
+//! let variant = StructuralVariant::try_new(vec![adjacency])?;
+//! assert_eq!(variant.kind(), StructuralKind::Deletion);
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -156,6 +178,8 @@ use thiserror::Error;
 pub mod small;
 pub mod structural;
 
+/// The small-variant module, retained at its historical path.
+pub use small as variant;
 use small::Alteration;
 use small::Kind;
 pub use small::deletion;
@@ -163,9 +187,9 @@ pub use small::delins;
 pub use small::insertion;
 pub use small::mnv;
 pub use small::snv;
-
-/// The small-variant module, retained at its historical path.
-pub use small as variant;
+pub use structural::Kind as StructuralKind;
+pub use structural::Locality;
+pub use structural::StructuralVariant;
 
 /// An error related to a top-level [`Variant`].
 #[derive(Error, Debug)]
