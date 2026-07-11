@@ -156,6 +156,24 @@ impl<N: Nucleotide> Sequence<N> {
     }
 }
 
+impl<N: Nucleotide + crate::compound::Complement> Sequence<N> {
+    /// Gets the reverse complement of this [`Sequence`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_molecule::polymer::dna::Nucleotide;
+    /// use omics_molecule::sequence::Sequence;
+    ///
+    /// let sequence = "ATGC".parse::<Sequence<Nucleotide>>()?;
+    /// assert_eq!(sequence.reverse_complement().to_string(), "GCAT");
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn reverse_complement(&self) -> Sequence<N> {
+        Sequence::new(self.0.iter().rev().map(|base| base.complement()).collect())
+    }
+}
+
 impl<N: Nucleotide> FromStr for Sequence<N> {
     type Err = ParseError;
 
@@ -242,6 +260,20 @@ mod tests {
         assert_eq!(a.shared_prefix_len(&b), 2); // "AA"
         assert_eq!(a.shared_suffix_len(&b), 1); // "G"
         Ok(())
+    }
+
+    #[test]
+    fn it_reverse_complements_a_dna_sequence() {
+        use crate::polymer::dna::Nucleotide;
+        let seq = Sequence::<Nucleotide>::from_str("ATGC").unwrap();
+        assert_eq!(seq.reverse_complement().to_string(), "GCAT");
+    }
+
+    #[test]
+    fn it_reverse_complements_an_empty_sequence() {
+        use crate::polymer::dna::Nucleotide;
+        let seq = Sequence::<Nucleotide>::from_str(".").unwrap();
+        assert!(seq.reverse_complement().is_empty());
     }
 
     #[test]
