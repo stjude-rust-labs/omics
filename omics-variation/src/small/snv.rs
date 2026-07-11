@@ -15,10 +15,10 @@ use thiserror::Error;
 use crate::PositionQualifier;
 use crate::qualified_position;
 use crate::split_qualified_position;
-use crate::variant::Alteration;
-use crate::variant::Kind;
-use crate::variant::KindError;
-use crate::variant::base_interval;
+use crate::small::Alteration;
+use crate::small::Kind;
+use crate::small::KindError;
+use crate::small::base_interval;
 
 /// A parse error related to a [`Variant`].
 #[derive(Error, Debug)]
@@ -69,7 +69,7 @@ where
 
     /// The alleles did not form a valid alteration.
     #[error(transparent)]
-    Alteration(crate::variant::Error),
+    Alteration(crate::small::Error),
 }
 
 /// A single nucleotide variant.
@@ -124,7 +124,7 @@ where
             Sequence::new(vec![alternate_nucleotide]),
         )
         .map_err(|err| match err {
-            crate::variant::Error::Identical(_) => Error::Identical(reference_nucleotide),
+            crate::small::Error::Identical(_) => Error::Identical(reference_nucleotide),
             other => Error::Alteration(other),
         })?;
 

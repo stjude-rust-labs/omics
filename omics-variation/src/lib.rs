@@ -153,15 +153,18 @@ use omics_molecule::compound::Nucleotide;
 use omics_molecule::sequence::Sequence;
 use thiserror::Error;
 
-pub mod variant;
+pub mod small;
 
-use variant::Alteration;
-use variant::Kind;
-pub use variant::deletion;
-pub use variant::delins;
-pub use variant::insertion;
-pub use variant::mnv;
-pub use variant::snv;
+use small::Alteration;
+use small::Kind;
+pub use small::deletion;
+pub use small::delins;
+pub use small::insertion;
+pub use small::mnv;
+pub use small::snv;
+
+/// The small-variant module, retained at its historical path.
+pub use small as variant;
 
 /// An error related to a top-level [`Variant`].
 #[derive(Error, Debug)]
