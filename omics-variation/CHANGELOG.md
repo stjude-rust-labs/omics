@@ -14,6 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Kind` classification. The top-level `Variant` now parses and dispatches to
   each kind and exposes a parsimony `normalize` method.
 
+### Changed
+
+* **Breaking:** renamed the `Variant::SingleNucleotideVariation` enum variant to
+  `Variant::Snv` for consistency with the new kind variants (`Mnv`,
+  `Insertion`, `Deletion`, `Delins`).
+* **Breaking:** reworked the top-level `Error`: removed `Error::ParseError` in
+  favor of `InvalidFormat`, `Coordinate`, `ReferenceSequence`,
+  `AlternateSequence`, `Alteration`, `Kind`, and `NormalizeOverflow` variants.
+* **Breaking:** replaced `snv::Error::Relation` with `snv::Error::Alteration`
+  now that SNVs are built on the shared `Alteration` core.
+
 ### Crate Updates
 
 - `omics-coordinate`: bumped to v0.4.0
