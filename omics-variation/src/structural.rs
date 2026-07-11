@@ -4,13 +4,20 @@ pub mod adjacency;
 pub mod breakend;
 pub mod orientation;
 
+use std::fmt;
+use std::str::FromStr;
+
 use omics_coordinate::position::Number;
+use omics_molecule::compound::Complement;
 use omics_molecule::compound::Nucleotide;
 use thiserror::Error;
 
 use crate::structural::adjacency::Adjacency;
 use crate::structural::breakend::Breakend;
 use crate::structural::orientation::Orientation;
+
+/// The separator between the adjacency tokens of a [`StructuralVariant`].
+const EVENT_SEPARATOR: &str = ";";
 
 /// Whether a translocation stays on one contig or crosses contigs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,6 +62,22 @@ pub enum Error {
     Empty,
 }
 
+/// A parse error related to a [`StructuralVariant`].
+#[derive(Error, Debug)]
+pub enum ParseError {
+    /// The structural-variant string was empty.
+    #[error("a structural variant string must not be empty")]
+    Empty,
+
+    /// An adjacency token failed to parse.
+    #[error(transparent)]
+    Adjacency(#[from] adjacency::ParseError),
+
+    /// The structural variant could not be constructed.
+    #[error(transparent)]
+    Construct(#[from] Error),
+}
+
 /// A structural variant, built from one or more novel adjacencies.
 ///
 /// The adjacencies are held in a normalized form, sorted by a deterministic
@@ -63,6 +86,20 @@ pub enum Error {
 ///
 /// `Hash` is intentionally not derived because `Adjacency` does not implement
 /// it.
+///
+/// A structural variant serializes as its adjacency tokens joined with `;`.
+///
+/// # Examples
+///
+/// ```
+/// use omics_molecule::polymer::dna;
+/// use omics_variation::structural::StructuralVariant;
+///
+/// let rendered = "seq0:>:100(i)::seq0:<:200(i)::.";
+/// let variant = rendered.parse::<StructuralVariant<dna::Nucleotide>>()?;
+/// assert_eq!(variant.to_string(), rendered);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StructuralVariant<N: Nucleotide> {
     /// The adjacencies making up the event, held in normalized order.
@@ -152,6 +189,34 @@ impl<N: Nucleotide> StructuralVariant<N> {
             [first, second, third] => classify_triple(first, second, third),
             _ => Kind::Complex,
         }
+    }
+}
+
+impl<N: Nucleotide> fmt::Display for StructuralVariant<N> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let tokens = self
+            .adjacencies
+            .iter()
+            .map(|adjacency| adjacency.to_string())
+            .collect::<Vec<_>>();
+        write!(f, "{}", tokens.join(EVENT_SEPARATOR))
+    }
+}
+
+impl<N: Nucleotide + Complement> FromStr for StructuralVariant<N> {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.is_empty() {
+            return Err(ParseError::Empty);
+        }
+
+        let adjacencies = s
+            .split(EVENT_SEPARATOR)
+            .map(|token| token.parse::<Adjacency<N>>())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(StructuralVariant::try_new(adjacencies)?)
     }
 }
 
@@ -591,6 +656,109 @@ mod tests {
         assert_eq!(canonical, permuted);
         assert_eq!(canonical.kind(), permuted.kind());
         assert_eq!(permuted.kind(), Kind::Inversion);
+    }
+
+    fn round_trip(variant: Sv, expected: Kind) {
+        assert_eq!(variant.kind(), expected);
+        let rendered = variant.to_string();
+        let parsed = rendered.parse::<Sv>().unwrap();
+        assert_eq!(parsed, variant);
+        assert_eq!(parsed.kind(), variant.kind());
+        assert_eq!(parsed.to_string(), rendered);
+    }
+
+    #[test]
+    fn it_round_trips_a_large_deletion() {
+        let adjacency = paired(
+            bnd(Orientation::LowerFlank, 100),
+            bnd(Orientation::HigherFlank, 200),
+            ".",
+        );
+        round_trip(Sv::try_new(vec![adjacency]).unwrap(), Kind::Deletion);
+    }
+
+    #[test]
+    fn it_round_trips_a_large_insertion() {
+        let adjacency = paired(
+            bnd(Orientation::LowerFlank, 100),
+            bnd(Orientation::HigherFlank, 100),
+            "AAAA",
+        );
+        round_trip(Sv::try_new(vec![adjacency]).unwrap(), Kind::Insertion);
+    }
+
+    #[test]
+    fn it_round_trips_an_interchromosomal_translocation() {
+        let a = Breakend::try_new("seq0", Orientation::LowerFlank, 100).unwrap();
+        let b = Breakend::try_new("seq1", Orientation::HigherFlank, 200).unwrap();
+        let adjacency = Adjacency::try_new_paired(a, b, ".".parse().unwrap()).unwrap();
+        round_trip(
+            Sv::try_new(vec![adjacency]).unwrap(),
+            Kind::Translocation(Locality::Interchromosomal),
+        );
+    }
+
+    #[test]
+    fn it_round_trips_an_intrachromosomal_translocation() {
+        let origin = paired(
+            bnd(Orientation::LowerFlank, 100),
+            bnd(Orientation::HigherFlank, 200),
+            ".",
+        );
+        let target_left = paired(
+            bnd(Orientation::LowerFlank, 400),
+            bnd(Orientation::HigherFlank, 100),
+            ".",
+        );
+        let target_right = paired(
+            bnd(Orientation::LowerFlank, 200),
+            bnd(Orientation::HigherFlank, 400),
+            ".",
+        );
+        round_trip(
+            Sv::try_new(vec![origin, target_left, target_right]).unwrap(),
+            Kind::Translocation(Locality::Intrachromosomal),
+        );
+    }
+
+    #[test]
+    fn it_round_trips_an_inversion() {
+        let lower = paired(
+            bnd(Orientation::LowerFlank, 100),
+            bnd(Orientation::LowerFlank, 200),
+            ".",
+        );
+        let higher = paired(
+            bnd(Orientation::HigherFlank, 100),
+            bnd(Orientation::HigherFlank, 200),
+            ".",
+        );
+        round_trip(Sv::try_new(vec![lower, higher]).unwrap(), Kind::Inversion);
+    }
+
+    #[test]
+    fn it_round_trips_an_internal_tandem_duplication() {
+        let adjacency = paired(
+            bnd(Orientation::HigherFlank, 100),
+            bnd(Orientation::LowerFlank, 200),
+            ".",
+        );
+        round_trip(
+            Sv::try_new(vec![adjacency]).unwrap(),
+            Kind::TandemDuplication,
+        );
+    }
+
+    #[test]
+    fn it_rejects_an_empty_string() {
+        let err = "".parse::<Sv>().unwrap_err();
+        assert!(matches!(err, ParseError::Empty));
+    }
+
+    #[test]
+    fn it_rejects_a_bad_adjacency_token() {
+        let err = "seq0:>:100(i)::AT".parse::<Sv>().unwrap_err();
+        assert!(matches!(err, ParseError::Adjacency(_)));
     }
 
     #[test]
