@@ -9,6 +9,7 @@ use std::hint::black_box;
 use criterion::Criterion;
 use criterion::criterion_group;
 use criterion::criterion_main;
+use omics_coordinate::position::Number;
 use omics_molecule::polymer::dna;
 use omics_variation::StructuralVariant;
 use omics_variation::structural::adjacency::Adjacency;
@@ -19,7 +20,7 @@ use omics_variation::structural::orientation::Orientation;
 type Sv = StructuralVariant<dna::Nucleotide>;
 
 /// Builds a breakend on the named contig.
-fn bnd(contig: &str, orientation: Orientation, position: u32) -> Breakend {
+fn bnd(contig: &str, orientation: Orientation, position: Number) -> Breakend {
     Breakend::try_new(contig, orientation, position).unwrap()
 }
 

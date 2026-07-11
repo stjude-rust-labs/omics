@@ -163,8 +163,8 @@ fn deletion_is_swap_invariant() {
     assert_swap_invariant(
         bnd("seq0", Orientation::LowerFlank, 100),
         bnd("seq0", Orientation::HigherFlank, 5000),
-        ".",
-        ".",
+        "AAAC",
+        "GTTT",
         Kind::Deletion,
     );
 }
@@ -198,8 +198,8 @@ fn interchromosomal_translocation_is_swap_invariant() {
     assert_swap_invariant(
         bnd("seq0", Orientation::LowerFlank, 100),
         bnd("seq1", Orientation::HigherFlank, 900),
-        ".",
-        ".",
+        "AAAC",
+        "GTTT",
         Kind::Translocation(Locality::Interchromosomal),
     );
 }
