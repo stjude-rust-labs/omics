@@ -297,10 +297,16 @@ fn classify_triple<N: Nucleotide>(
         return Kind::Complex;
     }
 
-    // Every junction must be a co-linear (opposite-orientation) paired join.
+    // Every junction must be a co-linear (opposite-orientation) paired join
+    // that is not a self-loop. A self-loop (both breakends at the same
+    // boundary) is a degenerate join that cannot participate in a connected
+    // triangle, so any such junction demotes the triple to complex even when
+    // the per-boundary flank tally would otherwise be satisfied.
     for adjacency in adjacencies {
         match paired_breakends(adjacency) {
-            Some((a, b)) if a.orientation().is_opposite(b.orientation()) => {}
+            Some((a, b))
+                if a.orientation().is_opposite(b.orientation())
+                    && a.position().get() != b.position().get() => {}
             _ => return Kind::Complex,
         }
     }
@@ -508,6 +514,60 @@ mod tests {
         );
         assert_eq!(
             Sv::try_new(vec![one, two, three]).unwrap().kind(),
+            Kind::Complex
+        );
+    }
+
+    #[test]
+    fn it_rejects_three_self_loop_junctions_as_complex() {
+        // Three independent self-loop insertions. Each junction's two breakends
+        // sit at the same position, so the graph is three disconnected
+        // self-loops rather than a connected triangle. Although the per-boundary
+        // flank tally is satisfied, this must classify as Complex, not an
+        // intrachromosomal translocation.
+        let j1 = paired(
+            bnd(Orientation::LowerFlank, 100),
+            bnd(Orientation::HigherFlank, 100),
+            "A",
+        );
+        let j2 = paired(
+            bnd(Orientation::LowerFlank, 200),
+            bnd(Orientation::HigherFlank, 200),
+            "A",
+        );
+        let j3 = paired(
+            bnd(Orientation::LowerFlank, 300),
+            bnd(Orientation::HigherFlank, 300),
+            "A",
+        );
+        assert_eq!(
+            Sv::try_new(vec![j1, j2, j3]).unwrap().kind(),
+            Kind::Complex
+        );
+    }
+
+    #[test]
+    fn it_rejects_an_inverted_reinsertion_as_complex() {
+        // A three-junction set where one junction is a fold-back (both breakends
+        // share the same orientation). The co-linear check rejects any triple
+        // containing a fold-back, so this classifies as Complex.
+        let fold_back = paired(
+            bnd(Orientation::LowerFlank, 100),
+            bnd(Orientation::LowerFlank, 200),
+            ".",
+        );
+        let two = paired(
+            bnd(Orientation::LowerFlank, 400),
+            bnd(Orientation::HigherFlank, 100),
+            ".",
+        );
+        let three = paired(
+            bnd(Orientation::LowerFlank, 200),
+            bnd(Orientation::HigherFlank, 400),
+            ".",
+        );
+        assert_eq!(
+            Sv::try_new(vec![fold_back, two, three]).unwrap().kind(),
             Kind::Complex
         );
     }
