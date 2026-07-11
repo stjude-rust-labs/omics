@@ -140,8 +140,6 @@ impl Breakend {
     /// The key orders breakends first by contig, then by interbase position,
     /// and finally by orientation rank. It backs the canonical form of a
     /// paired adjacency.
-    // Consumed by `Adjacency`'s canonical construction, added in the next task.
-    #[allow(dead_code)]
     pub(crate) fn canonical_key(&self) -> (&str, Number, u8) {
         (
             self.contig.as_str(),
