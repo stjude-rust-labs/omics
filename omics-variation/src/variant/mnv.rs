@@ -106,9 +106,10 @@ impl<N: Nucleotide> Variant<N> {
         self.alteration.alternate()
     }
 
-    /// Gets the interval spanned by the reference allele.
+    /// Gets the interval spanned by the variant.
     ///
-    /// Use this for reference-facing overlap and annotation queries.
+    /// An `MNV` has the same interval for the reference and alternate alleles
+    /// because it substitutes the same number of bases.
     ///
     /// # Examples
     ///
@@ -119,33 +120,9 @@ impl<N: Nucleotide> Variant<N> {
     /// assert_eq!(variant.interval().end().position().get(), 101);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn reference_interval(&self) -> Interval<Base> {
+    pub fn interval(&self) -> Interval<Base> {
         // SAFETY: construction validated that this span is representable.
         base_interval(&self.coordinate, self.alteration.reference().len()).unwrap()
-    }
-
-    /// Gets the interval spanned by the alternate allele.
-    ///
-    /// The alternate interval has the same span as the reference interval
-    /// because an `MNV` substitutes an equal number of bases.
-    /// Use this for local alternate-allele span queries.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use omics_molecule::polymer::dna::Nucleotide;
-    /// # use omics_variation::variant::mnv::Variant;
-    /// let variant = Variant::<Nucleotide>::try_new("seq0:+:100", "AT", "GC")?;
-    /// assert_eq!(variant.alternate_interval().end().position().get(), 101);
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn alternate_interval(&self) -> Interval<Base> {
-        self.reference_interval()
-    }
-
-    /// Gets the interval spanned by the reference allele.
-    pub fn interval(&self) -> Interval<Base> {
-        self.reference_interval()
     }
 
     /// Gets the underlying [`Alteration`] carrying both alleles.

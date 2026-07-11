@@ -35,7 +35,7 @@ where
     CoordinateError(#[from] coordinate::Error),
 
     /// The coordinate system qualifier was missing or invalid.
-    #[error("position `{position}` must end with `(b)`")]
+    #[error("position `{position}` must end with `(b)` for a base coordinate")]
     CoordinateSystemQualifier {
         /// The unqualified or incorrectly qualified position token.
         position: String,
@@ -197,9 +197,10 @@ impl<N: Nucleotide> Variant<N> {
         self.alteration.alternate().inner()[0]
     }
 
-    /// Gets the interval spanned by the reference allele.
+    /// Gets the interval spanned by the variant.
     ///
-    /// Use this for reference-facing overlap and annotation queries.
+    /// An `SNV` has the same interval for the reference and alternate alleles
+    /// because it substitutes one existing base with one alternate base.
     ///
     /// # Examples
     ///
@@ -214,37 +215,9 @@ impl<N: Nucleotide> Variant<N> {
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn reference_interval(&self) -> Interval<Base> {
+    pub fn interval(&self) -> Interval<Base> {
         // SAFETY: an SNV reference allele always has exactly one base.
         base_interval(&self.coordinate, self.alteration.reference().len()).unwrap()
-    }
-
-    /// Gets the interval spanned by the alternate allele.
-    ///
-    /// The alternate interval is the same base as the reference interval
-    /// because an `SNV` substitutes one existing base with one alternate base.
-    /// Use this for local alternate-allele span queries.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use omics_molecule::polymer::dna;
-    /// use omics_variation::snv::Variant;
-    ///
-    /// let variant = "seq0:+:1(b):A:C".parse::<Variant<dna::Nucleotide>>()?;
-    /// let interval = variant.alternate_interval();
-    /// assert_eq!(interval.start().position().get(), 1);
-    /// assert_eq!(interval.end().position().get(), 1);
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn alternate_interval(&self) -> Interval<Base> {
-        self.reference_interval()
-    }
-
-    /// Gets the interval spanned by the reference allele.
-    pub fn interval(&self) -> Interval<Base> {
-        self.reference_interval()
     }
 
     /// Gets the underlying [`Alteration`] carrying both alleles.
@@ -541,7 +514,10 @@ mod tests {
             .parse::<Variant<dna::Nucleotide>>()
             .unwrap_err();
 
-        assert_eq!(err.to_string(), "position `1` must end with `(b)`");
+        assert_eq!(
+            err.to_string(),
+            "position `1` must end with `(b)` for a base coordinate"
+        );
     }
 
     #[test]
@@ -550,6 +526,9 @@ mod tests {
             .parse::<Variant<dna::Nucleotide>>()
             .unwrap_err();
 
-        assert_eq!(err.to_string(), "position `1(i)` must end with `(b)`");
+        assert_eq!(
+            err.to_string(),
+            "position `1(i)` must end with `(b)` for a base coordinate"
+        );
     }
 }

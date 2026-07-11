@@ -56,9 +56,10 @@
 //! Use [`Variant::reference_interval`] when comparing a variant to a reference
 //! genome or asking which reference bases are consumed. Use
 //! [`Variant::alternate_interval`] when asking about the local span of the
-//! sequence introduced by the alternate allele. The alternate interval is not a
-//! full query-genome coordinate; downstream variants can shift global query
-//! coordinates.
+//! sequence introduced by the alternate allele. `SNV` and `MNV` variants use a
+//! single interval because their reference and alternate alleles occupy the
+//! same bases. The alternate interval is not a full query-genome coordinate;
+//! downstream variants can shift global query coordinates.
 //!
 //! ```
 //! use omics_molecule::polymer::dna;
@@ -174,14 +175,17 @@ pub enum Error {
     Coordinate(#[from] omics_coordinate::coordinate::Error),
 
     /// The coordinate system qualifier was missing or invalid.
-    #[error("position `{position}` must end with `(b)` or `(i)`")]
+    #[error(
+        "position `{position}` must end with `(b)` for a base coordinate or `(i)` for an \
+         interbase coordinate"
+    )]
     CoordinateSystemQualifier {
         /// The unqualified or incorrectly qualified position token.
         position: String,
     },
 
     /// The coordinate system qualifier does not match the variant kind.
-    #[error("wrong coordinate system for {kind}; expected `{expected}`, found `{found}`")]
+    #[error("wrong coordinate system for {kind}; expected {expected}; found {found}")]
     CoordinateSystem {
         /// The variant kind.
         kind: &'static str,
@@ -259,8 +263,8 @@ impl PositionQualifier {
     /// Gets a human-readable description for error messages.
     pub(crate) fn description(self) -> &'static str {
         match self {
-            Self::Base => "base `(b)`",
-            Self::Interbase => "interbase `(i)`",
+            Self::Base => "`(b)`",
+            Self::Interbase => "`(i)`",
         }
     }
 }
@@ -363,8 +367,8 @@ impl<N: Nucleotide> Variant<N> {
     /// ```
     pub fn reference_interval(&self) -> VariantInterval {
         match self {
-            Variant::Snv(variant) => VariantInterval::Base(variant.reference_interval()),
-            Variant::Mnv(variant) => VariantInterval::Base(variant.reference_interval()),
+            Variant::Snv(variant) => VariantInterval::Base(variant.interval()),
+            Variant::Mnv(variant) => VariantInterval::Base(variant.interval()),
             Variant::Insertion(variant) => VariantInterval::Interbase(variant.reference_interval()),
             Variant::Deletion(variant) => VariantInterval::Base(variant.reference_interval()),
             Variant::Delins(variant) => VariantInterval::Base(variant.reference_interval()),
@@ -398,8 +402,8 @@ impl<N: Nucleotide> Variant<N> {
     /// ```
     pub fn alternate_interval(&self) -> Option<VariantInterval> {
         match self {
-            Variant::Snv(variant) => Some(VariantInterval::Base(variant.alternate_interval())),
-            Variant::Mnv(variant) => Some(VariantInterval::Base(variant.alternate_interval())),
+            Variant::Snv(variant) => Some(VariantInterval::Base(variant.interval())),
+            Variant::Mnv(variant) => Some(VariantInterval::Base(variant.interval())),
             Variant::Insertion(variant) => variant.alternate_interval().map(VariantInterval::Base),
             Variant::Deletion(variant) => {
                 Some(VariantInterval::Interbase(variant.alternate_interval()))
@@ -679,8 +683,13 @@ mod tests {
             .unwrap_err();
         assert!(matches!(
             err,
-            Error::CoordinateSystemQualifier { position } if position == "100"
+            Error::CoordinateSystemQualifier { ref position } if position == "100"
         ));
+        assert_eq!(
+            err.to_string(),
+            "position `100` must end with `(b)` for a base coordinate or `(i)` for an interbase \
+             coordinate"
+        );
     }
 
     #[test]
@@ -697,6 +706,14 @@ mod tests {
                 Error::CoordinateSystem { .. }
             ));
         }
+
+        let err = "seq0:+:100(i):A:C"
+            .parse::<Variant<dna::Nucleotide>>()
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "wrong coordinate system for snv; expected `(b)`; found `(i)`"
+        );
     }
 
     #[test]

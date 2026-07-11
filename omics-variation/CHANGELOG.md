@@ -14,18 +14,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Kind` classification. The top-level `Variant` now parses and dispatches to
   each kind and exposes a parsimony `normalize` method. Each kind exposes a
   `try_new` taking string-like inputs and a `TryFrom<(Coordinate, Alteration)>`
-  conversion for pre-built alleles.
+  conversion for pre-built alleles
+  ([#15](https://github.com/stjude-rust-labs/omics/pull/15)).
+* Added `reference_interval` and `alternate_interval` APIs for variant kinds
+  whose reference and alternate alleles occupy different coordinate systems or
+  spans. `SNV` and `MNV` variants use a single `interval` method because the
+  reference and alternate spans are identical
+  ([#15](https://github.com/stjude-rust-labs/omics/pull/15)).
+* Added Criterion benchmarks for qualified variant parsing, rejected
+  coordinate-system qualifiers, display, normalization, and interval queries
+  ([#15](https://github.com/stjude-rust-labs/omics/pull/15)).
 
 ### Changed
 
 * **Breaking:** renamed the `Variant::SingleNucleotideVariation` enum variant to
   `Variant::Snv` for consistency with the new kind variants (`Mnv`,
-  `Insertion`, `Deletion`, `Delins`).
+  `Insertion`, `Deletion`, `Delins`)
+  ([#15](https://github.com/stjude-rust-labs/omics/pull/15)).
 * **Breaking:** reworked the top-level `Error`: removed `Error::ParseError` in
   favor of `InvalidFormat`, `Coordinate`, `ReferenceSequence`,
-  `AlternateSequence`, `Alteration`, `Kind`, and `NormalizeOverflow` variants.
+  `AlternateSequence`, `Alteration`, `Kind`, and `NormalizeOverflow` variants
+  ([#15](https://github.com/stjude-rust-labs/omics/pull/15)).
 * **Breaking:** replaced `snv::Error::Relation` with `snv::Error::Alteration`
-  now that SNVs are built on the shared `Alteration` core.
+  now that SNVs are built on the shared `Alteration` core
+  ([#15](https://github.com/stjude-rust-labs/omics/pull/15)).
+* **Breaking:** required serialized variant positions to include `(b)` for base
+  coordinates or `(i)` for interbase coordinates. `SNV`, `MNV`, deletion, and
+  delins records accept only `(b)`, while insertion records accept only `(i)`
+  ([#15](https://github.com/stjude-rust-labs/omics/pull/15)).
 
 ### Crate Updates
 

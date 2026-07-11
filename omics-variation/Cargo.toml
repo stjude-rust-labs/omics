@@ -18,6 +18,13 @@ thiserror.workspace = true
 
 [dev-dependencies]
 anyhow.workspace = true
+criterion.workspace = true
 
 [lints]
 workspace = true
+
+# Benchmarks
+
+[[bench]]
+name = "variants"
+harness = false

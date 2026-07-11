@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 * Added a `TryFrom<&str>` conversion for `Coordinate`, mirroring the existing
-  `FromStr` so coordinates compose with `TryInto`-based constructors.
+  `FromStr` so coordinates compose with `TryInto`-based constructors
+  ([#15](https://github.com/stjude-rust-labs/omics/pull/15)).
 
 ## 0.4.0 - 03-19-2026
 
