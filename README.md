@@ -57,9 +57,9 @@ following features are included and are top-level goals of the project.
 - **Biologically relevant molecules (`omics::molecule`).** Representations of molecules
   relevant in omics including smaller compounds (e.g., nucleotides) and larger
   polymers (e.g., DNA, RNA).
-- **Variation (`omics::variation`).** Facilities for expressing common types of
-  variation including single nucleotide variations (SNVs), insertions/deletions
-  (INDELs), structural variations (SVs), and copy number variations (CNVs).
+- **Variation (`omics::variation`).** Facilities for expressing small sequence
+  variants, including single nucleotide variants (SNVs), multi-nucleotide
+  variants (MNVs), insertions, deletions, and deletion-insertions (delins).
 
 ## 🖥️ Development
 
