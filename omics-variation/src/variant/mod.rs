@@ -8,6 +8,7 @@ use omics_molecule::compound::Nucleotide;
 use omics_molecule::sequence::Sequence;
 use thiserror::Error;
 
+pub mod deletion;
 pub mod snv;
 
 /// The classification of a small variant, derived from its alleles.
