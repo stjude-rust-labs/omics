@@ -48,3 +48,12 @@ where
     /// a different molecular context (generally from RNA to DNA).
     fn reverse_transcribe(&self) -> T;
 }
+
+/// A trait that provides the Watson-Crick complement of a [`Nucleotide`].
+pub trait Complement
+where
+    Self: Nucleotide,
+{
+    /// Gets the complement of this [`Nucleotide`].
+    fn complement(&self) -> Self;
+}

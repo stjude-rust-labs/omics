@@ -137,6 +137,17 @@ impl std::str::FromStr for Nucleotide {
     }
 }
 
+impl crate::compound::Complement for Nucleotide {
+    fn complement(&self) -> Self {
+        match self {
+            Nucleotide::A => Nucleotide::T,
+            Nucleotide::C => Nucleotide::G,
+            Nucleotide::G => Nucleotide::C,
+            Nucleotide::T => Nucleotide::A,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -163,6 +174,15 @@ mod tests {
         assert_eq!(Nucleotide::C.to_string(), "C");
         assert_eq!(Nucleotide::G.to_string(), "G");
         assert_eq!(Nucleotide::T.to_string(), "T");
+    }
+
+    #[test]
+    fn it_complements_each_dna_base() {
+        use crate::compound::Complement;
+        assert_eq!(Nucleotide::A.complement(), Nucleotide::T);
+        assert_eq!(Nucleotide::T.complement(), Nucleotide::A);
+        assert_eq!(Nucleotide::C.complement(), Nucleotide::G);
+        assert_eq!(Nucleotide::G.complement(), Nucleotide::C);
     }
 
     #[test]
