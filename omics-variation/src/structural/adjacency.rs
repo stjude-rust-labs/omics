@@ -463,6 +463,25 @@ mod tests {
     }
 
     #[test]
+    fn it_accepts_a_same_locus_insertion() {
+        // Same locus and opposite orientations, but with inserted bases, is a
+        // valid large insertion rather than an identity join. The empty
+        // insertion is the only thing that distinguishes the two.
+        let adjacency = Adjacency::try_new_paired(
+            bnd("seq0", Orientation::LowerFlank, 100),
+            bnd("seq0", Orientation::HigherFlank, 100),
+            seq("ACGT"),
+        )
+        .unwrap();
+        let Adjacency::Paired(paired) = adjacency else {
+            panic!("expected a paired adjacency");
+        };
+        assert_eq!(paired.a().position().get(), 100);
+        assert_eq!(paired.b().position().get(), 100);
+        assert_eq!(paired.insertion().to_string(), "ACGT");
+    }
+
+    #[test]
     fn it_rejects_a_self_junction() {
         // Fully identical breakends, meaning the same contig, position, and
         // orientation, join a breakend to itself and are rejected, both with an
