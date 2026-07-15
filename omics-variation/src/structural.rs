@@ -1,4 +1,43 @@
 //! The structural-variant tier.
+//!
+//! Structural variants are modeled as novel adjacencies between breakends,
+//! following the breakend representation used by the VCF breakend spec and by
+//! GA4GH VRS. A [`Breakend`] is one endpoint of a junction,
+//! an [`Adjacency`] is a single junction joining two
+//! breakends with an optional non-templated insertion, and a
+//! [`StructuralVariant`] is an event built from one or more adjacencies. The
+//! event [`Kind`] is derived from the geometry of those adjacencies rather than
+//! stored, mirroring how the small-variant tier derives its kind from allele
+//! content.
+//!
+//! # Coordinate-anchored orientation
+//!
+//! A breakend carries a contig, an interbase position, and an
+//! [`Orientation`]. It deliberately does not carry a
+//! strand. Every position is a coordinate on the reference, so
+//! [`LowerFlank`](orientation::Orientation::LowerFlank) and
+//! [`HigherFlank`](orientation::Orientation::HigherFlank) name the retained
+//! side purely by reference coordinate, and "lower" can only ever mean a
+//! smaller reference position.
+//!
+//! This deliberately splits two facts that other breakend representations
+//! bundle into a single per-endpoint value. The first fact is which side of the
+//! cut is retained, which lives on the breakend as its
+//! [`Orientation`]. The second fact is the reading
+//! direction of the retained piece in the derivative molecule, or equivalently
+//! whether the join reverse-complements one side. That second fact is stored on
+//! no breakend. It emerges from the pair. Two breakends with opposite
+//! orientations join co-linearly with no flip, while two breakends with
+//! matching orientations form a fold-back that reverse-complements one side,
+//! which is how an inversion arises. The [`Adjacency`]
+//! carries the residual bookkeeping by storing the non-templated insertion in
+//! the reading frame of its canonical first breakend and reverse-complementing
+//! it when the supplied breakends are swapped into canonical order.
+//!
+//! Naming the variants after reference coordinates rather than after a strand
+//! keeps the meaning unambiguous. A single fold-back breakend cannot say on its
+//! own which way its retained piece reads, so a lone fold-back classifies as
+//! [`Kind::Complex`] and only a matched pair resolves an inversion.
 
 pub mod adjacency;
 pub mod breakend;

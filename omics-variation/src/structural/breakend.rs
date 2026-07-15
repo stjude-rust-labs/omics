@@ -45,7 +45,10 @@ pub enum ParseError {
 ///
 /// A breakend mirrors a coordinate's fields, except that the strand slot is
 /// replaced by an [`Orientation`]. A breakend has no meaningful biological
-/// strand, so it does not carry one.
+/// strand, so it does not carry one, and its [`Orientation`] names the retained
+/// flank by reference coordinate rather than by strand. See the [module
+/// documentation](crate::structural) for why read direction lives on the
+/// adjacency pair rather than on a breakend.
 ///
 /// `Hash` is intentionally not derived because `Position<Interbase>` does not
 /// implement it.

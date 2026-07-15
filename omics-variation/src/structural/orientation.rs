@@ -13,6 +13,14 @@ pub enum ParseError {
 }
 
 /// Which flank of a breakend's boundary is retained.
+///
+/// The flank is named by reference coordinate, not by strand. A breakend has no
+/// strand, so [`LowerFlank`](Orientation::LowerFlank) and
+/// [`HigherFlank`](Orientation::HigherFlank) always refer to the lower and
+/// higher reference-coordinate side of the boundary. Whether the retained piece
+/// is read forward or reverse-complemented in the derivative molecule is not
+/// recorded here; that emerges from how two breakends pair, as described in the
+/// [module documentation](crate::structural).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Orientation {
     /// The retained reference is the lower-coordinate flank.

@@ -93,7 +93,7 @@ enum Inner<N: Nucleotide> {
 /// A single novel junction between one or two oriented breakends.
 ///
 /// An adjacency is opaque. A paired adjacency is always held in canonical form,
-/// with its breakends ordered by [`Breakend::canonical_key`] and its insertion
+/// with its breakends ordered by their canonical key and its insertion
 /// carried in the reading frame of the canonical lower breakend, so that
 /// equality and later classification do not depend on the input order.
 ///
@@ -124,7 +124,7 @@ pub struct Adjacency<N: Nucleotide> {
 impl<N: Nucleotide + Complement> Adjacency<N> {
     /// Attempts to create a paired [`Adjacency`] in canonical form.
     ///
-    /// The two breakends are ordered by [`Breakend::canonical_key`]. When
+    /// The two breakends are ordered by their canonical key. When
     /// ordering swaps the supplied pair, the insertion is reverse-complemented
     /// into the reading frame of the canonical lower breakend. The identity
     /// join, meaning two breakends at the same locus with opposite orientations
