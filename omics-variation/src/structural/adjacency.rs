@@ -83,15 +83,17 @@ pub struct PairedAdjacency<N: Nucleotide> {
 impl<N: Nucleotide + Complement> PairedAdjacency<N> {
     /// Attempts to create a [`PairedAdjacency`] in canonical form.
     ///
-    /// The two breakends are ordered by their canonical key. The `insertion` is
-    /// supplied as it reads across the junction from the first breakend `x`
-    /// toward the second breakend `y`. Canonical form instead reads from the
-    /// lower breakend to the higher one, so when ordering swaps the supplied
-    /// pair the insertion is reverse-complemented into that frame. The identity
-    /// join, meaning two breakends at the same locus with opposite orientations
-    /// and an empty insertion, is rejected because it encodes no change. Two
-    /// fully identical breakends are rejected because they join a breakend to
-    /// itself.
+    /// The two breakends are ordered by their canonical key, which sorts by
+    /// contig, then interbase position, then orientation. The `insertion` is
+    /// supplied as it reads across the junction from the first argument `x`
+    /// toward the second argument `y`. If `x` already sorts at or before `y`,
+    /// both are kept as given. If `x` sorts after `y`, the pair is swapped into
+    /// canonical order and the insertion is reverse-complemented so that it
+    /// still reads from the canonical lower breakend toward the higher one. The
+    /// identity join, meaning two breakends at the same locus with opposite
+    /// orientations and an empty insertion, is rejected because it encodes no
+    /// change. Two fully identical breakends are rejected because they join a
+    /// breakend to itself.
     ///
     /// # Examples
     ///
