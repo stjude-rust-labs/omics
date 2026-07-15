@@ -301,23 +301,28 @@ fn breakend_key(breakend: &Breakend) -> BreakendKey {
 fn adjacency_key<N: Nucleotide>(
     adjacency: &Adjacency<N>,
 ) -> (u8, BreakendKey, BreakendKey, String) {
-    if let Some((a, b, insertion)) = adjacency.paired() {
-        (0, breakend_key(a), breakend_key(b), insertion.to_string())
-    } else if let Some((breakend, insertion)) = adjacency.single() {
-        (
+    match adjacency {
+        Adjacency::Paired(paired) => (
+            0,
+            breakend_key(paired.a()),
+            breakend_key(paired.b()),
+            paired.insertion().to_string(),
+        ),
+        Adjacency::Single(single) => (
             1,
-            breakend_key(breakend),
+            breakend_key(single.breakend()),
             (String::new(), 0, 0),
-            insertion.to_string(),
-        )
-    } else {
-        unreachable!("an adjacency is always paired or single")
+            single.insertion().to_string(),
+        ),
     }
 }
 
 /// Gets the two breakends of a paired adjacency, or `None` for a single one.
 fn paired_breakends<N: Nucleotide>(adjacency: &Adjacency<N>) -> Option<(&Breakend, &Breakend)> {
-    adjacency.paired().map(|(a, b, _)| (a, b))
+    match adjacency {
+        Adjacency::Paired(paired) => Some((paired.a(), paired.b())),
+        Adjacency::Single(_) => None,
+    }
 }
 
 /// Reports whether every breakend across the adjacencies is on one contig.
@@ -360,10 +365,11 @@ fn position_pair<N: Nucleotide>(adjacency: &Adjacency<N>) -> Option<(Number, Num
 
 /// Classifies a structural variant made of exactly one adjacency.
 fn classify_single<N: Nucleotide>(adjacency: &Adjacency<N>) -> Kind {
-    let Some((a, b, _)) = adjacency.paired() else {
+    let Adjacency::Paired(paired) = adjacency else {
         // A single-ended breakend.
         return Kind::Breakend;
     };
+    let (a, b) = (paired.a(), paired.b());
 
     if a.contig() != b.contig() {
         return Kind::Translocation(Locality::Interchromosomal);

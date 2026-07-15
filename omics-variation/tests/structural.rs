@@ -222,8 +222,12 @@ fn reverse_complement_lands_in_the_canonical_frame() {
     let backward =
         Adjacency::<dna::Nucleotide>::try_new_paired(hi, lo, "AAAC".parse().unwrap()).unwrap();
 
-    let (_, _, forward_insertion) = forward.paired().expect("a paired adjacency");
-    let (_, _, backward_insertion) = backward.paired().expect("a paired adjacency");
-    assert_eq!(forward_insertion.to_string(), "AAAC");
-    assert_eq!(backward_insertion.to_string(), "GTTT");
+    let Adjacency::Paired(forward) = forward else {
+        panic!("expected a paired adjacency");
+    };
+    let Adjacency::Paired(backward) = backward else {
+        panic!("expected a paired adjacency");
+    };
+    assert_eq!(forward.insertion().to_string(), "AAAC");
+    assert_eq!(backward.insertion().to_string(), "GTTT");
 }

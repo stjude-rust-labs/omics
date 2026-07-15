@@ -24,7 +24,7 @@ const ADJACENCY_SEPARATOR: &str = "::";
 /// so the middle field alone disambiguates single-ended from paired.
 const OPEN_SIDE: &str = ".";
 
-/// An error related to constructing an [`Adjacency`].
+/// An error related to constructing a [`PairedAdjacency`].
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum Error {
     /// The two breakends sit at the same locus with opposite orientations and
@@ -58,93 +58,56 @@ pub enum ParseError {
     Construct(#[from] Error),
 }
 
-/// The private inner representation of an [`Adjacency`].
+/// A junction joining two oriented breakends, held in canonical form.
 ///
-/// Keeping this enum private makes [`Adjacency`] opaque, so callers cannot
-/// build a non-canonical or identity adjacency that would break classification.
-/// Adjacencies are built only through [`Adjacency::try_new_paired`] and
-/// [`Adjacency::new_single`], and are read back through
-/// [`Adjacency::paired`] and [`Adjacency::single`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum Inner<N: Nucleotide> {
-    /// Two loci joined, with optional non-templated bases between them.
-    Paired {
-        /// The canonical lower-locus breakend.
-        a: Breakend,
-
-        /// The canonical higher-locus breakend.
-        b: Breakend,
-
-        /// The non-templated insertion, in the reading frame of `a`.
-        insertion: Sequence<N>,
-    },
-
-    /// One locus joined to novel or unassembled sequence, open on the other
-    /// side.
-    Single {
-        /// The single known breakend.
-        breakend: Breakend,
-
-        /// The non-templated insertion at the open side.
-        insertion: Sequence<N>,
-    },
-}
-
-/// A single novel junction between one or two oriented breakends.
-///
-/// An adjacency is opaque. A paired adjacency is always held in canonical form,
-/// with its breakends ordered by their canonical key and its insertion
-/// carried in the reading frame of the canonical lower breakend, so that
-/// equality and later classification do not depend on the input order.
+/// The two breakends are ordered by their canonical key, and the non-templated
+/// insertion is carried in the reading frame of the canonical lower breakend,
+/// so that equality and later classification do not depend on the input order.
+/// A value of this type can only be built through [`PairedAdjacency::try_new`],
+/// so it always upholds those invariants.
 ///
 /// `Hash` is intentionally not derived because `Sequence` does not implement
 /// it.
-///
-/// An adjacency serializes as three `::`-separated fields. A paired adjacency
-/// renders both breakends and its insertion, while a single-ended one renders
-/// its one breakend, a literal `.` marking the open side, and its insertion.
-///
-/// # Examples
-///
-/// ```
-/// use omics_molecule::polymer::dna;
-/// use omics_variation::structural::adjacency::Adjacency;
-///
-/// let rendered = "seq0:>:100(i)::seq1:<:200(i)::AT";
-/// let adjacency = rendered.parse::<Adjacency<dna::Nucleotide>>()?;
-/// assert_eq!(adjacency.to_string(), rendered);
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Adjacency<N: Nucleotide> {
-    /// The private, canonical inner representation.
-    inner: Inner<N>,
+pub struct PairedAdjacency<N: Nucleotide> {
+    /// The canonical lower-locus breakend.
+    a: Breakend,
+
+    /// The canonical higher-locus breakend.
+    b: Breakend,
+
+    /// The non-templated insertion, in the reading frame of `a`.
+    insertion: Sequence<N>,
 }
 
-impl<N: Nucleotide + Complement> Adjacency<N> {
-    /// Attempts to create a paired [`Adjacency`] in canonical form.
+impl<N: Nucleotide + Complement> PairedAdjacency<N> {
+    /// Attempts to create a [`PairedAdjacency`] in canonical form.
     ///
-    /// The two breakends are ordered by their canonical key. When
-    /// ordering swaps the supplied pair, the insertion is reverse-complemented
-    /// into the reading frame of the canonical lower breakend. The identity
+    /// The two breakends are ordered by their canonical key. The `insertion` is
+    /// supplied as it reads across the junction from the first breakend `x`
+    /// toward the second breakend `y`. Canonical form instead reads from the
+    /// lower breakend to the higher one, so when ordering swaps the supplied
+    /// pair the insertion is reverse-complemented into that frame. The identity
     /// join, meaning two breakends at the same locus with opposite orientations
-    /// and an empty insertion, is rejected because it encodes no change.
+    /// and an empty insertion, is rejected because it encodes no change. Two
+    /// fully identical breakends are rejected because they join a breakend to
+    /// itself.
     ///
     /// # Examples
     ///
     /// ```
     /// use omics_molecule::polymer::dna;
-    /// use omics_variation::structural::adjacency::Adjacency;
+    /// use omics_variation::structural::adjacency::PairedAdjacency;
     /// use omics_variation::structural::breakend::Breakend;
     /// use omics_variation::structural::orientation::Orientation;
     ///
     /// let a = Breakend::try_new("seq0", Orientation::LowerFlank, 100)?;
     /// let b = Breakend::try_new("seq0", Orientation::HigherFlank, 200)?;
-    /// let adjacency = Adjacency::<dna::Nucleotide>::try_new_paired(a, b, ".".parse()?)?;
-    /// assert!(adjacency.paired().is_some());
+    /// let paired = PairedAdjacency::<dna::Nucleotide>::try_new(a, b, ".".parse()?)?;
+    /// assert_eq!(paired.a().position().get(), 100);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn try_new_paired(x: Breakend, y: Breakend, insertion: Sequence<N>) -> Result<Self, Error> {
+    pub fn try_new(x: Breakend, y: Breakend, insertion: Sequence<N>) -> Result<Self, Error> {
         let (a, b, insertion) = if x.canonical_key() <= y.canonical_key() {
             (x, y, insertion)
         } else {
@@ -165,39 +128,204 @@ impl<N: Nucleotide + Complement> Adjacency<N> {
             return Err(Error::IdentityJoin);
         }
 
-        Ok(Self {
-            inner: Inner::Paired { a, b, insertion },
-        })
+        Ok(Self { a, b, insertion })
     }
 }
 
-impl<N: Nucleotide> Adjacency<N> {
-    /// Creates a single-ended [`Adjacency`].
+impl<N: Nucleotide> PairedAdjacency<N> {
+    /// Gets the canonical lower-locus breakend.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use omics_molecule::polymer::dna;
+    /// # use omics_variation::structural::adjacency::PairedAdjacency;
+    /// # use omics_variation::structural::breakend::Breakend;
+    /// # use omics_variation::structural::orientation::Orientation;
+    /// let a = Breakend::try_new("seq0", Orientation::LowerFlank, 100)?;
+    /// let b = Breakend::try_new("seq0", Orientation::HigherFlank, 200)?;
+    /// let paired = PairedAdjacency::<dna::Nucleotide>::try_new(a, b, ".".parse()?)?;
+    /// assert_eq!(paired.a().position().get(), 100);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn a(&self) -> &Breakend {
+        &self.a
+    }
+
+    /// Gets the canonical higher-locus breakend.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use omics_molecule::polymer::dna;
+    /// # use omics_variation::structural::adjacency::PairedAdjacency;
+    /// # use omics_variation::structural::breakend::Breakend;
+    /// # use omics_variation::structural::orientation::Orientation;
+    /// let a = Breakend::try_new("seq0", Orientation::LowerFlank, 100)?;
+    /// let b = Breakend::try_new("seq0", Orientation::HigherFlank, 200)?;
+    /// let paired = PairedAdjacency::<dna::Nucleotide>::try_new(a, b, ".".parse()?)?;
+    /// assert_eq!(paired.b().position().get(), 200);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn b(&self) -> &Breakend {
+        &self.b
+    }
+
+    /// Gets the non-templated insertion, in the reading frame of `a`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use omics_molecule::polymer::dna;
+    /// # use omics_variation::structural::adjacency::PairedAdjacency;
+    /// # use omics_variation::structural::breakend::Breakend;
+    /// # use omics_variation::structural::orientation::Orientation;
+    /// let a = Breakend::try_new("seq0", Orientation::LowerFlank, 100)?;
+    /// let b = Breakend::try_new("seq1", Orientation::HigherFlank, 200)?;
+    /// let paired = PairedAdjacency::<dna::Nucleotide>::try_new(a, b, "AT".parse()?)?;
+    /// assert_eq!(paired.insertion().to_string(), "AT");
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn insertion(&self) -> &Sequence<N> {
+        &self.insertion
+    }
+}
+
+impl<N: Nucleotide> fmt::Display for PairedAdjacency<N> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}{ADJACENCY_SEPARATOR}{}{ADJACENCY_SEPARATOR}{}",
+            self.a, self.b, self.insertion
+        )
+    }
+}
+
+/// A junction joining one breakend to novel or unassembled sequence.
+///
+/// One side is a known breakend and the other is open, so the adjacency carries
+/// a single locus and the non-templated insertion at its open side.
+///
+/// `Hash` is intentionally not derived because `Sequence` does not implement
+/// it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SingleAdjacency<N: Nucleotide> {
+    /// The single known breakend.
+    breakend: Breakend,
+
+    /// The non-templated insertion at the open side.
+    insertion: Sequence<N>,
+}
+
+impl<N: Nucleotide> SingleAdjacency<N> {
+    /// Creates a [`SingleAdjacency`].
     ///
     /// # Examples
     ///
     /// ```
     /// use omics_molecule::polymer::dna;
-    /// use omics_variation::structural::adjacency::Adjacency;
+    /// use omics_variation::structural::adjacency::SingleAdjacency;
     /// use omics_variation::structural::breakend::Breakend;
     /// use omics_variation::structural::orientation::Orientation;
     ///
     /// let breakend = Breakend::try_new("seq0", Orientation::LowerFlank, 100)?;
-    /// let adjacency = Adjacency::<dna::Nucleotide>::new_single(breakend, "AT".parse()?);
-    /// assert!(adjacency.single().is_some());
+    /// let single = SingleAdjacency::<dna::Nucleotide>::new(breakend, "AT".parse()?);
+    /// assert_eq!(single.insertion().to_string(), "AT");
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn new_single(breakend: Breakend, insertion: Sequence<N>) -> Self {
+    pub fn new(breakend: Breakend, insertion: Sequence<N>) -> Self {
         Self {
-            inner: Inner::Single {
-                breakend,
-                insertion,
-            },
+            breakend,
+            insertion,
         }
     }
 
-    /// Gets the two canonical breakends and insertion of a paired adjacency, or
-    /// `None` for a single-ended one.
+    /// Gets the single known breakend.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use omics_molecule::polymer::dna;
+    /// # use omics_variation::structural::adjacency::SingleAdjacency;
+    /// # use omics_variation::structural::breakend::Breakend;
+    /// # use omics_variation::structural::orientation::Orientation;
+    /// let breakend = Breakend::try_new("seq0", Orientation::LowerFlank, 100)?;
+    /// let single = SingleAdjacency::<dna::Nucleotide>::new(breakend, "AT".parse()?);
+    /// assert_eq!(single.breakend().position().get(), 100);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn breakend(&self) -> &Breakend {
+        &self.breakend
+    }
+
+    /// Gets the non-templated insertion at the open side.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use omics_molecule::polymer::dna;
+    /// # use omics_variation::structural::adjacency::SingleAdjacency;
+    /// # use omics_variation::structural::breakend::Breakend;
+    /// # use omics_variation::structural::orientation::Orientation;
+    /// let breakend = Breakend::try_new("seq0", Orientation::LowerFlank, 100)?;
+    /// let single = SingleAdjacency::<dna::Nucleotide>::new(breakend, "AT".parse()?);
+    /// assert_eq!(single.insertion().to_string(), "AT");
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn insertion(&self) -> &Sequence<N> {
+        &self.insertion
+    }
+}
+
+impl<N: Nucleotide> fmt::Display for SingleAdjacency<N> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}{ADJACENCY_SEPARATOR}{OPEN_SIDE}{ADJACENCY_SEPARATOR}{}",
+            self.breakend, self.insertion
+        )
+    }
+}
+
+/// A single novel junction between one or two oriented breakends.
+///
+/// A [`Paired`](Adjacency::Paired) junction joins two known loci, while a
+/// [`Single`](Adjacency::Single) junction joins one known locus to novel or
+/// unassembled sequence. Each variant wraps a strong type that owns its
+/// invariants, so a paired junction is always canonical.
+///
+/// `Hash` is intentionally not derived because `Sequence` does not implement
+/// it.
+///
+/// An adjacency serializes as three `::`-separated fields. A paired adjacency
+/// renders both breakends and its insertion, while a single-ended one renders
+/// its one breakend, a literal `.` marking the open side, and its insertion.
+///
+/// # Examples
+///
+/// ```
+/// use omics_molecule::polymer::dna;
+/// use omics_variation::structural::adjacency::Adjacency;
+///
+/// let rendered = "seq0:>:100(i)::seq1:<:200(i)::AT";
+/// let adjacency = rendered.parse::<Adjacency<dna::Nucleotide>>()?;
+/// assert_eq!(adjacency.to_string(), rendered);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Adjacency<N: Nucleotide> {
+    /// Two loci joined, with optional non-templated bases between them.
+    Paired(PairedAdjacency<N>),
+
+    /// One locus joined to novel or unassembled sequence, open on the other
+    /// side.
+    Single(SingleAdjacency<N>),
+}
+
+impl<N: Nucleotide + Complement> Adjacency<N> {
+    /// Attempts to create a paired [`Adjacency`] in canonical form.
+    ///
+    /// This is a convenience wrapper over [`PairedAdjacency::try_new`].
     ///
     /// # Examples
     ///
@@ -210,20 +338,20 @@ impl<N: Nucleotide> Adjacency<N> {
     /// let a = Breakend::try_new("seq0", Orientation::LowerFlank, 100)?;
     /// let b = Breakend::try_new("seq0", Orientation::HigherFlank, 200)?;
     /// let adjacency = Adjacency::<dna::Nucleotide>::try_new_paired(a, b, ".".parse()?)?;
-    /// let (lower, higher, _) = adjacency.paired().expect("a paired adjacency");
-    /// assert_eq!(lower.position().get(), 100);
-    /// assert_eq!(higher.position().get(), 200);
+    /// assert!(matches!(adjacency, Adjacency::Paired(_)));
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn paired(&self) -> Option<(&Breakend, &Breakend, &Sequence<N>)> {
-        match &self.inner {
-            Inner::Paired { a, b, insertion } => Some((a, b, insertion)),
-            Inner::Single { .. } => None,
-        }
+    pub fn try_new_paired(x: Breakend, y: Breakend, insertion: Sequence<N>) -> Result<Self, Error> {
+        Ok(Adjacency::Paired(PairedAdjacency::try_new(
+            x, y, insertion,
+        )?))
     }
+}
 
-    /// Gets the breakend and insertion of a single-ended adjacency, or `None`
-    /// for a paired one.
+impl<N: Nucleotide> Adjacency<N> {
+    /// Creates a single-ended [`Adjacency`].
+    ///
+    /// This is a convenience wrapper over [`SingleAdjacency::new`].
     ///
     /// # Examples
     ///
@@ -235,36 +363,19 @@ impl<N: Nucleotide> Adjacency<N> {
     ///
     /// let breakend = Breakend::try_new("seq0", Orientation::LowerFlank, 100)?;
     /// let adjacency = Adjacency::<dna::Nucleotide>::new_single(breakend, "AT".parse()?);
-    /// let (breakend, insertion) = adjacency.single().expect("a single adjacency");
-    /// assert_eq!(breakend.position().get(), 100);
-    /// assert_eq!(insertion.to_string(), "AT");
+    /// assert!(matches!(adjacency, Adjacency::Single(_)));
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn single(&self) -> Option<(&Breakend, &Sequence<N>)> {
-        match &self.inner {
-            Inner::Single {
-                breakend,
-                insertion,
-            } => Some((breakend, insertion)),
-            Inner::Paired { .. } => None,
-        }
+    pub fn new_single(breakend: Breakend, insertion: Sequence<N>) -> Self {
+        Adjacency::Single(SingleAdjacency::new(breakend, insertion))
     }
 }
 
 impl<N: Nucleotide> fmt::Display for Adjacency<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some((a, b, insertion)) = self.paired() {
-            write!(
-                f,
-                "{a}{ADJACENCY_SEPARATOR}{b}{ADJACENCY_SEPARATOR}{insertion}"
-            )
-        } else if let Some((breakend, insertion)) = self.single() {
-            write!(
-                f,
-                "{breakend}{ADJACENCY_SEPARATOR}{OPEN_SIDE}{ADJACENCY_SEPARATOR}{insertion}"
-            )
-        } else {
-            unreachable!("an adjacency is always paired or single")
+        match self {
+            Adjacency::Paired(paired) => write!(f, "{paired}"),
+            Adjacency::Single(single) => write!(f, "{single}"),
         }
     }
 }
@@ -325,17 +436,20 @@ mod tests {
         // Supplied high-to-low, so the insertion is reverse-complemented into
         // the canonical low-to-high frame. `AAAC` reverse-complements to `GTTT`.
         let adjacency = Adjacency::try_new_paired(hi, lo, seq("AAAC")).unwrap();
-        let (_, _, insertion) = adjacency.paired().expect("a paired adjacency");
-        assert_eq!(insertion.to_string(), "GTTT");
+        let Adjacency::Paired(paired) = adjacency else {
+            panic!("expected a paired adjacency");
+        };
+        assert_eq!(paired.insertion().to_string(), "GTTT");
     }
 
     #[test]
-    fn it_exposes_a_single_adjacency_through_the_accessor() {
+    fn it_builds_a_single_adjacency() {
         let breakend = bnd("seq0", Orientation::LowerFlank, 100);
         let adjacency = Adjacency::new_single(breakend, seq("AT"));
-        assert!(adjacency.paired().is_none());
-        let (_, insertion) = adjacency.single().expect("a single adjacency");
-        assert_eq!(insertion.to_string(), "AT");
+        let Adjacency::Single(single) = adjacency else {
+            panic!("expected a single adjacency");
+        };
+        assert_eq!(single.insertion().to_string(), "AT");
     }
 
     #[test]
