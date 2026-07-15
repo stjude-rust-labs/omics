@@ -38,6 +38,28 @@
 //! keeps the meaning unambiguous. A single fold-back breakend cannot say on its
 //! own which way its retained piece reads, so a lone fold-back classifies as
 //! [`Kind::Complex`] and only a matched pair resolves an inversion.
+//!
+//! # Double-stranded reference
+//!
+//! A breakend breaks double-stranded DNA, and a junction fuses one
+//! double-stranded end to another, so both strands join at every adjacency.
+//! Only the reference forward strand is written down. Its antiparallel partner
+//! is left implicit and fuses along with it by Watson-Crick complementarity.
+//!
+//! This is why an orientation pair is enough to place a junction. Once each
+//! side states which flank it retains and whether the join is co-linear or a
+//! fold-back, the way both strands connect is fixed, so the partner-strand
+//! connection is forced rather than separately recorded. A fold-back is exactly
+//! the case where the forward strand of one side continues onto the partner
+//! strand of the other, which is why that side is read reverse-complemented.
+//!
+//! The model therefore assumes a clean fusion of double-stranded ends,
+//! optionally with a non-templated insertion between them. Single-stranded
+//! junctions, and events whose two strands join different partners, are out of
+//! scope. Both strands fusing at one junction is also a separate matter from
+//! whether a whole event is balanced. A reciprocal event that yields more than
+//! one derivative molecule is several adjacencies grouped in a
+//! [`StructuralVariant`].
 
 pub mod adjacency;
 pub mod breakend;
