@@ -60,6 +60,91 @@
 //! whether a whole event is balanced. A reciprocal event that yields more than
 //! one derivative molecule is several adjacencies grouped in a
 //! [`StructuralVariant`].
+//!
+//! # Reading the kinds
+//!
+//! The figures below show how each [`Kind`] looks in the data model. In them
+//! `>` marks a lower-flank breakend and `<` marks a higher-flank one, the same
+//! glyphs the serialized form uses. Positions are interbase boundaries, `::`
+//! separates the fields of one adjacency, and `;` separates the adjacencies of
+//! one event. A `.` is an empty insertion or, in the middle field, the open
+//! side of a single-ended breakend.
+//!
+//! A deletion is one co-linear junction whose lower breakend keeps its lower
+//! flank, so the two outer pieces join and the middle is dropped.
+//!
+//! ```text
+//! ref   ==A==|100 .......... 5000|==B==
+//! adj   seq0:>:100(i)::seq0:<:5000(i)::.
+//! =>    ==A====B==                 Deletion  (101..5000 removed)
+//! ```
+//!
+//! A large insertion is one co-linear junction at a single boundary carrying
+//! the novel bases.
+//!
+//! ```text
+//! ref   ==A==|100|==B==
+//! adj   seq0:>:100(i)::seq0:<:100(i)::ACGT
+//! =>    ==A==[ACGT]==B==            Insertion
+//! ```
+//!
+//! A tandem duplication is one co-linear junction whose lower breakend keeps
+//! its higher flank, so the join runs backward and the segment repeats.
+//!
+//! ```text
+//! ref   ==| 100 ==seg== 160 |==
+//! adj   seq0:<:100(i)::seq0:>:160(i)::GAT
+//! =>    ==|100 ==seg== 160||100 ==seg== 160|==   TandemDuplication
+//! ```
+//!
+//! An inversion is two fold-back junctions over the same two boundaries, one
+//! joining the lower flanks and one joining the higher flanks.
+//!
+//! ```text
+//! ref   ==| 100 ==seg== 300 |==
+//! adj   seq0:>:100(i)::seq0:>:300(i)::. ; seq0:<:100(i)::seq0:<:300(i)::.
+//! =>    ==| revcomp(seg) |==            Inversion
+//! ```
+//!
+//! An interchromosomal translocation is one junction across two contigs. With
+//! opposite orientations the fused piece keeps its direction.
+//!
+//! ```text
+//! ref   seq0 ==A==|100        seq1 900|==B==
+//! adj   seq0:>:100(i)::seq1:<:900(i)::.
+//! =>    ==A==|==B==            Translocation { Interchromosomal, CoLinear }
+//! ```
+//!
+//! With matching orientations the fused piece is reverse-complemented, a
+//! fold-back.
+//!
+//! ```text
+//! adj   seq0:>:100(i)::seq1:>:200(i)::.
+//! =>    ==A==| revcomp(seq1 piece)      Translocation { Interchromosomal, FoldBack }
+//! ```
+//!
+//! An intrachromosomal translocation is the balanced forward relocation of a
+//! segment, three co-linear junctions over three boundaries where each boundary
+//! appears once as a lower flank and once as a higher flank.
+//!
+//! ```text
+//! adj   seq0:>:100(i)::seq0:<:200(i)::.     origin flanks rejoin
+//!       seq0:<:100(i)::seq0:>:400(i)::.     segment start meets the target
+//!       seq0:>:200(i)::seq0:<:400(i)::.     segment end meets the target
+//! =>    Translocation { Intrachromosomal, CoLinear }
+//! ```
+//!
+//! A single-ended breakend joins one locus to novel or unassembled sequence,
+//! with the other side open.
+//!
+//! ```text
+//! ref   ==A==|100  ->  novel sequence
+//! adj   seq0:>:100(i)::.::AT
+//! =>    Breakend
+//! ```
+//!
+//! Any well-formed event whose shape matches none of these, such as a lone
+//! fold-back or a reciprocal interchromosomal pair, is [`Kind::Complex`].
 
 pub mod adjacency;
 pub mod breakend;
