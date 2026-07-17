@@ -90,6 +90,18 @@ pub enum Locality {
     Intrachromosomal,
 }
 
+/// How the two sides of a translocation join with respect to reading direction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Join {
+    /// The two sides read in the same direction, joined without a flip. Its
+    /// breakends have opposite orientations.
+    CoLinear,
+
+    /// One side is reverse-complemented, so the join folds back. Its breakends
+    /// have matching orientations, meaning the fused piece is inverted.
+    FoldBack,
+}
+
 /// The derived class of a structural variant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
@@ -105,8 +117,14 @@ pub enum Kind {
     /// An inversion.
     Inversion,
 
-    /// A translocation, with its locality.
-    Translocation(Locality),
+    /// A translocation, with its locality and how its sides join.
+    Translocation {
+        /// Whether the translocation crosses contigs or stays on one.
+        locality: Locality,
+
+        /// Whether the sides join co-linearly or fold back.
+        join: Join,
+    },
 
     /// A single-ended breakend joined to novel sequence.
     Breakend,
@@ -372,7 +390,15 @@ fn classify_single<N: Nucleotide>(adjacency: &Adjacency<N>) -> Kind {
     let (a, b) = (paired.a(), paired.b());
 
     if a.contig() != b.contig() {
-        return Kind::Translocation(Locality::Interchromosomal);
+        let join = if a.orientation().is_opposite(b.orientation()) {
+            Join::CoLinear
+        } else {
+            Join::FoldBack
+        };
+        return Kind::Translocation {
+            locality: Locality::Interchromosomal,
+            join,
+        };
     }
 
     if !a.orientation().is_opposite(b.orientation()) {
@@ -480,7 +506,12 @@ fn classify_triple<N: Nucleotide>(
             .all(|(_, lower, higher)| *lower == 1 && *higher == 1);
 
     if triangle {
-        Kind::Translocation(Locality::Intrachromosomal)
+        // The recognized relocation is three co-linear junctions, so the sides
+        // join co-linearly.
+        Kind::Translocation {
+            locality: Locality::Intrachromosomal,
+            join: Join::CoLinear,
+        }
     } else {
         Kind::Complex
     }
@@ -554,7 +585,26 @@ mod tests {
         let adjacency = Adjacency::try_new_paired(a, b, ".".parse().unwrap()).unwrap();
         assert_eq!(
             Sv::try_new(vec![adjacency]).unwrap().kind(),
-            Kind::Translocation(Locality::Interchromosomal)
+            Kind::Translocation {
+                locality: Locality::Interchromosomal,
+                join: Join::CoLinear
+            }
+        );
+    }
+
+    #[test]
+    fn it_classifies_an_inverted_interchromosomal_translocation() {
+        // Matching orientations across contigs fuse the other contig's piece
+        // reverse-complemented, so the join folds back.
+        let a = Breakend::try_new("seq0", Orientation::LowerFlank, 100).unwrap();
+        let b = Breakend::try_new("seq1", Orientation::LowerFlank, 200).unwrap();
+        let adjacency = Adjacency::try_new_paired(a, b, ".".parse().unwrap()).unwrap();
+        assert_eq!(
+            Sv::try_new(vec![adjacency]).unwrap().kind(),
+            Kind::Translocation {
+                locality: Locality::Interchromosomal,
+                join: Join::FoldBack
+            }
         );
     }
 
@@ -639,7 +689,10 @@ mod tests {
             Sv::try_new(vec![origin, target_left, target_right])
                 .unwrap()
                 .kind(),
-            Kind::Translocation(Locality::Intrachromosomal)
+            Kind::Translocation {
+                locality: Locality::Intrachromosomal,
+                join: Join::CoLinear
+            }
         );
     }
 
@@ -792,7 +845,10 @@ mod tests {
         let adjacency = Adjacency::try_new_paired(a, b, ".".parse().unwrap()).unwrap();
         round_trip(
             Sv::try_new(vec![adjacency]).unwrap(),
-            Kind::Translocation(Locality::Interchromosomal),
+            Kind::Translocation {
+                locality: Locality::Interchromosomal,
+                join: Join::CoLinear,
+            },
         );
     }
 
@@ -815,7 +871,10 @@ mod tests {
         );
         round_trip(
             Sv::try_new(vec![origin, target_left, target_right]).unwrap(),
-            Kind::Translocation(Locality::Intrachromosomal),
+            Kind::Translocation {
+                locality: Locality::Intrachromosomal,
+                join: Join::CoLinear,
+            },
         );
     }
 

@@ -37,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Moved the small-variant tier into a `small` module. The previous paths remain
   available through re-exports, including `omics_variation::variant`
   ([#16](https://github.com/stjude-rust-labs/omics/pull/16)).
+* Gave the structural `Kind::Translocation` a `Join` payload alongside its
+  `Locality`, so a co-linear fusion is distinguished from a fold-back
+  (inverted) one, including across contigs
+  ([#16](https://github.com/stjude-rust-labs/omics/pull/16)).
 * Raised the minimum supported Rust version to `1.81`
   ([#16](https://github.com/stjude-rust-labs/omics/pull/16)).
 * **Breaking:** renamed the `Variant::SingleNucleotideVariation` enum variant to

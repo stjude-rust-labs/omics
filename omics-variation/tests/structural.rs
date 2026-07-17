@@ -9,6 +9,7 @@
 use omics_coordinate::position::Number;
 use omics_molecule::polymer::dna;
 use omics_variation::StructuralVariant;
+use omics_variation::structural::Join;
 use omics_variation::structural::Kind;
 use omics_variation::structural::Locality;
 use omics_variation::structural::adjacency::Adjacency;
@@ -95,7 +96,10 @@ fn interchromosomal_translocation() {
     );
     assert_eq!(
         Sv::try_new(vec![adjacency]).unwrap().kind(),
-        Kind::Translocation(Locality::Interchromosomal)
+        Kind::Translocation {
+            locality: Locality::Interchromosomal,
+            join: Join::CoLinear
+        }
     );
 }
 
@@ -123,7 +127,10 @@ fn intrachromosomal_translocation() {
         Sv::try_new(vec![origin, target_left, target_right])
             .unwrap()
             .kind(),
-        Kind::Translocation(Locality::Intrachromosomal)
+        Kind::Translocation {
+            locality: Locality::Intrachromosomal,
+            join: Join::CoLinear
+        }
     );
 }
 
@@ -200,7 +207,10 @@ fn interchromosomal_translocation_is_swap_invariant() {
         bnd("seq1", Orientation::HigherFlank, 900),
         "AAAC",
         "GTTT",
-        Kind::Translocation(Locality::Interchromosomal),
+        Kind::Translocation {
+            locality: Locality::Interchromosomal,
+            join: Join::CoLinear,
+        },
     );
 }
 

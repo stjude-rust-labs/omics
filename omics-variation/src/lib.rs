@@ -187,6 +187,7 @@ pub use small::delins;
 pub use small::insertion;
 pub use small::mnv;
 pub use small::snv;
+pub use structural::Join;
 pub use structural::Kind as StructuralKind;
 pub use structural::Locality;
 pub use structural::StructuralVariant;
