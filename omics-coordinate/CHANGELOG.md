@@ -14,6 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#15](https://github.com/stjude-rust-labs/omics/pull/15)).
 * Derived `Hash` for `Position`, `Base`, and `Interbase`
   ([#16](https://github.com/stjude-rust-labs/omics/pull/16)).
+* Added `CoordinateRef` for allocation-free access to interval endpoints.
+
+### Changed
+
+* Compacted `Interval` storage so each interval stores its contig and strand
+  once.
+* Changed `Interval<Interbase>::into_equivalent_base()` to return `Option`.
+  Zero-width interbase intervals return `None`.
+
+### Fixed
+
+* Return `ClampError::Disjoint` instead of panicking when clamping disjoint
+  intervals.
+* Preserve colons in contig names when parsing coordinates and intervals.
+* Accept validated `Contig` and `Strand` values in `Coordinate::try_new()`.
 
 ## 0.4.0 - 03-19-2026
 

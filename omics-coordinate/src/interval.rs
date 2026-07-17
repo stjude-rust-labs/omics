@@ -11,6 +11,7 @@ use crate::Strand;
 use crate::System;
 use crate::coordinate;
 use crate::coordinate::Coordinate;
+use crate::coordinate::CoordinateRef;
 use crate::position;
 use crate::position::Number;
 use crate::strand;
@@ -50,6 +51,31 @@ pub enum ClampError {
 
         /// The strand of the interval doing the clamping.
         operand: Strand,
+    },
+
+    /// A disjoint interval error.
+    ///
+    /// This error occurs when one attempts to clamp an interval with another
+    /// interval that does not overlap it.
+    #[error(
+        "disjoint intervals: `{original_start}-{original_end}` and \
+         `{operand_start}-{operand_end}` on strand `{strand}`"
+    )]
+    Disjoint {
+        /// The start position of the interval being clamped.
+        original_start: Number,
+
+        /// The end position of the interval being clamped.
+        original_end: Number,
+
+        /// The start position of the interval doing the clamping.
+        operand_start: Number,
+
+        /// The end position of the interval doing the clamping.
+        operand_end: Number,
+
+        /// The strand shared by both intervals.
+        strand: Strand,
     },
 }
 
@@ -180,11 +206,17 @@ pub mod r#trait {
 /// An interval.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Interval<S: System> {
-    /// The start coordinate.
-    start: Coordinate<S>,
+    /// The contig.
+    contig: Contig,
 
-    /// The end coordinate.
-    end: Coordinate<S>,
+    /// The strand.
+    strand: Strand,
+
+    /// The start position.
+    start: Position<S>,
+
+    /// The end position.
+    end: Position<S>,
 }
 
 impl<S: System> Interval<S>
@@ -250,45 +282,53 @@ where
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn try_new(start: Coordinate<S>, end: Coordinate<S>) -> Result<super::Interval<S>> {
-        if start.contig() != end.contig() {
+        let (start_contig, start_strand, start_position) = start.into_parts();
+        let (end_contig, end_strand, end_position) = end.into_parts();
+
+        if start_contig != end_contig {
             return Err(Error::Nonsensical(NonsensicalError::MismatchedContigs {
-                start: start.contig().clone(),
-                end: end.contig().clone(),
+                start: start_contig,
+                end: end_contig,
             }));
         }
 
-        if start.strand() != end.strand() {
+        if start_strand != end_strand {
             return Err(Error::Nonsensical(NonsensicalError::MismatchedStrands {
-                start: start.strand(),
-                end: end.strand(),
+                start: start_strand,
+                end: end_strand,
             }));
         }
 
-        match start.strand() {
+        match start_strand {
             Strand::Positive => {
-                if start.position() > end.position() {
+                if start_position > end_position {
                     return Err(Error::Nonsensical(NonsensicalError::NegativelySized {
-                        start: start.position().get(),
-                        end: end.position().get(),
-                        strand: start.strand(),
+                        start: start_position.get(),
+                        end: end_position.get(),
+                        strand: start_strand,
                     }));
                 }
             }
             Strand::Negative => {
-                if end.position() > start.position() {
+                if end_position > start_position {
                     return Err(Error::Nonsensical(NonsensicalError::NegativelySized {
-                        start: start.position().get(),
-                        end: end.position().get(),
-                        strand: start.strand(),
+                        start: start_position.get(),
+                        end: end_position.get(),
+                        strand: start_strand,
                     }));
                 }
             }
         }
 
-        Ok(Interval { start, end })
+        Ok(Interval {
+            contig: start_contig,
+            strand: start_strand,
+            start: start_position,
+            end: end_position,
+        })
     }
 
-    /// Gets a reference to the start coordinate.
+    /// Gets a borrowed start coordinate.
     ///
     /// # Examples
     ///
@@ -306,7 +346,7 @@ where
     /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
     /// let interval = Interval::try_new(start.clone(), end)?;
     ///
-    /// assert_eq!(interval.start(), &start);
+    /// assert_eq!(interval.start(), start);
     ///
     /// //======//
     /// // Base //
@@ -316,12 +356,12 @@ where
     /// let end = Coordinate::<Base>::try_new("seq0", "+", 20)?;
     /// let interval = Interval::try_new(start.clone(), end)?;
     ///
-    /// assert_eq!(interval.start(), &start);
+    /// assert_eq!(interval.start(), start);
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn start(&self) -> &Coordinate<S> {
-        &self.start
+    pub fn start(&self) -> CoordinateRef<'_, S> {
+        CoordinateRef::new(&self.contig, self.strand, &self.start)
     }
 
     /// Consumes `self` and returns the start coordinate.
@@ -357,10 +397,10 @@ where
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn into_start(self) -> Coordinate<S> {
-        self.start
+        Coordinate::new(self.contig, self.strand, self.start)
     }
 
-    /// Gets a reference to the end coordinate.
+    /// Gets a borrowed end coordinate.
     ///
     /// # Examples
     ///
@@ -378,7 +418,7 @@ where
     /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
     /// let interval = Interval::try_new(start, end.clone())?;
     ///
-    /// assert_eq!(interval.end(), &end);
+    /// assert_eq!(interval.end(), end);
     ///
     /// //======//
     /// // Base //
@@ -388,12 +428,12 @@ where
     /// let end = Coordinate::<Base>::try_new("seq0", "+", 20)?;
     /// let interval = Interval::try_new(start, end.clone())?;
     ///
-    /// assert_eq!(interval.end(), &end);
+    /// assert_eq!(interval.end(), end);
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn end(&self) -> &Coordinate<S> {
-        &self.end
+    pub fn end(&self) -> CoordinateRef<'_, S> {
+        CoordinateRef::new(&self.contig, self.strand, &self.end)
     }
 
     /// Consumes `self` and returns the end coordinate.
@@ -429,7 +469,7 @@ where
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn into_end(self) -> Coordinate<S> {
-        self.end
+        Coordinate::new(self.contig, self.strand, self.end)
     }
 
     /// Consumes `self` and returns the start and end coordinates.
@@ -469,7 +509,10 @@ where
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn into_coordinates(self) -> (Coordinate<S>, Coordinate<S>) {
-        (self.start, self.end)
+        (
+            Coordinate::new(self.contig.clone(), self.strand, self.start),
+            Coordinate::new(self.contig, self.strand, self.end),
+        )
     }
 
     /// Returns a reference to the contig.
@@ -505,7 +548,7 @@ where
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn contig(&self) -> &Contig {
-        self.start().contig()
+        &self.contig
     }
 
     /// Returns the strand.
@@ -542,7 +585,7 @@ where
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn strand(&self) -> Strand {
-        self.start().strand()
+        self.strand
     }
 
     /// Returns whether or not a coordinate is contained within this interval.
@@ -613,7 +656,12 @@ where
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn contains_coordinate(&self, coordinate: &crate::Coordinate<S>) -> bool {
+    pub fn contains_coordinate<'a>(&self, coordinate: impl Into<CoordinateRef<'a, S>>) -> bool
+    where
+        S: 'a,
+    {
+        let coordinate = coordinate.into();
+
         if self.contig() != coordinate.contig() {
             return false;
         }
@@ -860,14 +908,18 @@ where
     /// ```
     #[must_use = "this method returns a new interval"]
     pub fn clamp(self, interval: Interval<S>) -> Result<Interval<S>> {
-        let (start, end) = self.into_coordinates();
-        let (operand_start, operand_end) = interval.into_coordinates();
-
-        let (start_contig, start_strand, start) = start.into_parts();
-        let (end_contig, end_strand, end) = end.into_parts();
-
-        let (operand_contig, operand_strand, operand_start) = operand_start.into_parts();
-        let (_, _, operand_end) = operand_end.into_parts();
+        let Self {
+            contig: start_contig,
+            strand: start_strand,
+            start,
+            end,
+        } = self;
+        let Self {
+            contig: operand_contig,
+            strand: operand_strand,
+            start: operand_start,
+            end: operand_end,
+        } = interval;
 
         if start_contig != operand_contig {
             return Err(Error::Clamp(ClampError::MismatchedContigs {
@@ -883,19 +935,37 @@ where
             }));
         }
 
+        let original_start = start.get();
+        let original_end = end.get();
+        let operand_start_value = operand_start.get();
+        let operand_end_value = operand_end.get();
+
         let (new_start, new_end) = match start_strand {
             Strand::Positive => (max(start, operand_start), min(end, operand_end)),
             Strand::Negative => (min(start, operand_start), max(end, operand_end)),
         };
 
-        let start = Coordinate::<S>::new(start_contig, start_strand, new_start);
-        let end = Coordinate::<S>::new(end_contig, end_strand, new_end);
+        let disjoint = match start_strand {
+            Strand::Positive => new_start > new_end,
+            Strand::Negative => new_start < new_end,
+        };
 
-        // SAFETY: both the start _and_ the end positions were originally on
-        // intervals that were valid. Since we are not breaking any rules that
-        // would make the intervals invalid in this method, this should always
-        // unwrap.
-        Ok(Self::try_new(start, end).unwrap())
+        if disjoint {
+            return Err(Error::Clamp(ClampError::Disjoint {
+                original_start,
+                original_end,
+                operand_start: operand_start_value,
+                operand_end: operand_end_value,
+                strand: start_strand,
+            }));
+        }
+
+        Ok(Self {
+            contig: start_contig,
+            strand: start_strand,
+            start: new_start,
+            end: new_end,
+        })
     }
 
     /// Gets the offset of a coordinate from the start of the interval.
@@ -1031,7 +1101,7 @@ where
     /// Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn coordinate_at_offset(&self, offset: Number) -> Option<Coordinate<S>> {
-        let coordinate = self.start().clone().into_move_forward(offset)?;
+        let coordinate = self.start().into_owned().into_move_forward(offset)?;
 
         match self.contains_coordinate(&coordinate) {
             true => Some(coordinate),
@@ -1084,13 +1154,12 @@ where
     /// ```
     #[must_use = "this method returns a new interval"]
     pub fn reverse_complement(self) -> super::Interval<S> {
-        let (start, end) = self.into_coordinates();
-        // SAFETY: because (a) intervals are inclusive of both of their start
-        // and end coordinates, (b) all positions can be represented on the
-        // opposite strand, and (c) swapping the start and end while also
-        // swapping strand will always create the correct directionality, this will
-        // always unwrap.
-        Interval::try_new(end.swap_strand(), start.swap_strand()).unwrap()
+        Self {
+            contig: self.contig,
+            strand: self.strand.complement(),
+            start: self.end,
+            end: self.start,
+        }
     }
 }
 
@@ -1123,54 +1192,29 @@ where
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        let parts = s.split(':').collect::<Vec<_>>();
+        let (prefix, positions) = s.rsplit_once(':').ok_or_else(|| ParseError::Format {
+            value: s.to_owned(),
+        })?;
+        let (contig, strand) = prefix.rsplit_once(':').ok_or_else(|| ParseError::Format {
+            value: s.to_owned(),
+        })?;
 
-        if parts.len() != 3 {
-            return Err(Error::Parse(ParseError::Format {
-                value: s.to_string(),
-            }));
-        }
-
-        let mut parts = parts.iter();
-
-        // SAFETY: we checked that there are three parts above. Given that we
-        // haven't pulled anything from the iterator, we can always safely
-        // unwrap this.
-        let contig = parts.next().unwrap().parse::<Contig>().map_err(|_| {
+        let contig = contig.parse::<Contig>().map_err(|_| {
             Error::Parse(ParseError::Format {
                 value: s.to_string(),
             })
         })?;
 
-        // SAFETY: we checked that there are three parts above. Given that we
-        // have only pulled one item from the iterator, we can always safely
-        // unwrap this.
-        let strand = parts
-            .next()
-            .unwrap()
-            .parse::<Strand>()
-            .map_err(Error::Strand)?;
+        let strand = strand.parse::<Strand>().map_err(Error::Strand)?;
+        let (start, end) = positions
+            .split_once('-')
+            .filter(|(_, end)| !end.contains('-'))
+            .ok_or_else(|| ParseError::Format {
+                value: s.to_owned(),
+            })?;
 
-        // SAFETY: we checked that there are three parts above. Given that we
-        // have only pulled two items from the iterator, we can always safely
-        // unwrap this.
-        let positions = parts.next().unwrap().split('-').collect::<Vec<_>>();
-
-        if positions.len() != 2 {
-            return Err(Error::Parse(ParseError::Format {
-                value: s.to_string(),
-            }));
-        }
-
-        // SAFETY: we just ensured that two parts exist, so the direct
-        // indexing of the slice for both index zero and one will never
-        // fail.
-        let start = positions[0]
-            .parse::<Position<S>>()
-            .map_err(Error::Position)?;
-        let end = positions[1]
-            .parse::<Position<S>>()
-            .map_err(Error::Position)?;
+        let start = start.parse::<Position<S>>().map_err(Error::Position)?;
+        let end = end.parse::<Position<S>>().map_err(Error::Position)?;
 
         Interval::try_new(
             Coordinate::new(contig.clone(), strand, start),
@@ -1307,6 +1351,60 @@ mod tests {
     }
 
     #[test]
+    fn interval_storage_is_smaller_than_two_coordinates() {
+        assert!(
+            std::mem::size_of::<Interval<Interbase>>()
+                < 2 * std::mem::size_of::<Coordinate<Interbase>>()
+        );
+    }
+
+    #[test]
+    fn endpoint_views_borrow_interval_data() -> Result<()> {
+        let start = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
+        let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
+        let interval = Interval::try_new(start.clone(), end.clone())?;
+
+        let start_ref: CoordinateRef<'_, Interbase> = interval.start();
+        let end_ref: CoordinateRef<'_, Interbase> = interval.end();
+        let start_position = interval.start().position();
+
+        assert!(std::ptr::eq(start_ref.contig(), interval.contig()));
+        assert!(std::ptr::eq(end_ref.contig(), interval.contig()));
+        assert_eq!(start_ref, start);
+        assert_eq!(end_ref, end);
+        assert_eq!(start, start_ref);
+        assert_eq!(end, end_ref);
+        assert_eq!(start_ref.into_owned(), start);
+        assert_eq!(end_ref.into_owned(), end);
+        assert_eq!(start_ref.cmp(&end_ref), start.cmp(&end));
+        assert_eq!(start_position.get(), 10);
+        assert_eq!(start_ref.to_string(), "seq0:+:10");
+        assert_eq!(end_ref.to_string(), "seq0:+:20");
+
+        Ok(())
+    }
+
+    #[test]
+    fn coordinate_containment_accepts_forwarded_references() -> Result<()> {
+        let start = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
+        let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
+        let interval = Interval::try_new(start, end)?;
+        let mut coordinate = Coordinate::<Interbase>::try_new("seq0", "+", 15)?;
+
+        assert!(interval.contains_coordinate(&mut coordinate));
+        let coordinates = [coordinate.clone()];
+        assert_eq!(
+            coordinates
+                .iter()
+                .filter(|coordinate| interval.contains_coordinate(coordinate))
+                .count(),
+            1
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn positive_strand_clamp() {
         let interval = "seq0:+:1000-2000".parse::<Interval<Interbase>>().unwrap();
 
@@ -1421,6 +1519,56 @@ mod tests {
     }
 
     #[test]
+    fn clamp_touching_intervals() {
+        let positive = "seq0:+:10-20".parse::<Interval<Interbase>>().unwrap();
+        assert_eq!(
+            positive
+                .clamp("seq0:+:20-30".parse::<Interval<Interbase>>().unwrap())
+                .unwrap(),
+            "seq0:+:20-20".parse::<Interval<Interbase>>().unwrap()
+        );
+
+        let negative = "seq0:-:30-20".parse::<Interval<Interbase>>().unwrap();
+        assert_eq!(
+            negative
+                .clamp("seq0:-:20-10".parse::<Interval<Interbase>>().unwrap())
+                .unwrap(),
+            "seq0:-:20-20".parse::<Interval<Interbase>>().unwrap()
+        );
+    }
+
+    #[test]
+    fn clamp_disjoint_intervals_returns_error() {
+        let positive = "seq0:+:10-20".parse::<Interval<Interbase>>().unwrap();
+        assert_eq!(
+            positive
+                .clamp("seq0:+:21-30".parse::<Interval<Interbase>>().unwrap())
+                .unwrap_err(),
+            Error::Clamp(ClampError::Disjoint {
+                original_start: 10,
+                original_end: 20,
+                operand_start: 21,
+                operand_end: 30,
+                strand: Strand::Positive,
+            })
+        );
+
+        let negative = "seq0:-:30-21".parse::<Interval<Interbase>>().unwrap();
+        assert_eq!(
+            negative
+                .clamp("seq0:-:20-10".parse::<Interval<Interbase>>().unwrap())
+                .unwrap_err(),
+            Error::Clamp(ClampError::Disjoint {
+                original_start: 30,
+                original_end: 21,
+                operand_start: 20,
+                operand_end: 10,
+                strand: Strand::Negative,
+            })
+        );
+    }
+
+    #[test]
     fn positive_strand_offset() {
         let interval = "seq0:+:1000-2000".parse::<Interval<Interbase>>().unwrap();
 
@@ -1531,6 +1679,18 @@ mod tests {
         assert_eq!(interval.strand(), Strand::Negative);
         assert_eq!(interval.start().position().get(), Number::MAX);
         assert_eq!(interval.end().position().get(), 0);
+    }
+
+    #[test]
+    fn contig_with_colons_round_trips() -> Result<()> {
+        let start = Coordinate::<Interbase>::try_new("assembly:chr:1", "+", 10)?;
+        let end = Coordinate::<Interbase>::try_new("assembly:chr:1", "+", 20)?;
+        let interval = Interval::try_new(start, end)?;
+        let parsed = interval.to_string().parse::<Interval<Interbase>>()?;
+
+        assert_eq!(parsed, interval);
+
+        Ok(())
     }
 
     #[test]
