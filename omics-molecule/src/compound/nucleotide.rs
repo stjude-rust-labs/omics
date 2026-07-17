@@ -8,7 +8,7 @@ use crate::compound::Kind;
 
 /// A marker trait that denotes a type of nucleotide.
 pub trait Nucleotide:
-    std::fmt::Debug + std::fmt::Display + Copy + Eq + PartialEq + std::str::FromStr
+    std::fmt::Debug + std::fmt::Display + Copy + Eq + PartialEq + std::hash::Hash + std::str::FromStr
 {
     /// Gets the [`Kind`] type for a given [`Nucleotide`].
     fn kind(&self) -> Kind;
@@ -47,4 +47,22 @@ where
     /// Reverse transcribes a [`Nucleotide`] to the respective [`Nucleotide`] in
     /// a different molecular context (generally from RNA to DNA).
     fn reverse_transcribe(&self) -> T;
+}
+
+/// A trait that provides the Watson-Crick complement of a [`Nucleotide`].
+pub trait Complement
+where
+    Self: Nucleotide,
+{
+    /// Gets the complement of this [`Nucleotide`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use omics_molecule::compound::Complement;
+    /// use omics_molecule::polymer::dna::Nucleotide;
+    ///
+    /// assert_eq!(Nucleotide::A.complement(), Nucleotide::T);
+    /// ```
+    fn complement(&self) -> Self;
 }

@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   concrete `dna::Molecule` / `rna::Molecule`, with `FromStr` and `TryFrom<&str>`
   parsing (a lone `.` denotes the empty allele)
   ([#15](https://github.com/stjude-rust-labs/omics/pull/15)).
+* Added a `Complement` trait giving the Watson-Crick complement of the DNA and
+  RNA nucleotides, and a `Sequence::reverse_complement` method built on it
+  ([#16](https://github.com/stjude-rust-labs/omics/pull/16)).
+
+### Changed
+
+* Raised the minimum supported Rust version to `1.81`
+  ([#16](https://github.com/stjude-rust-labs/omics/pull/16)).
+* **Breaking:** added `Hash` to the `Nucleotide` supertrait bounds, and derived
+  `Hash` for the DNA and RNA nucleotides and for `Sequence`
+  ([#16](https://github.com/stjude-rust-labs/omics/pull/16)).
 
 ## 0.2.0 - 03-19-2026
 

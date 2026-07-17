@@ -4,4 +4,5 @@ mod kind;
 pub mod nucleotide;
 
 pub use kind::Kind;
+pub use nucleotide::Complement;
 pub use nucleotide::Nucleotide;

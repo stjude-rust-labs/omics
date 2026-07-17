@@ -16,7 +16,7 @@ authors = ["The Omics project developers"]
 description = "Foundations for the Rust omics ecosystem"
 homepage = "https://github.com/stjude-rust-labs/omics"
 repository = "https://github.com/stjude-rust-labs/omics"
-rust-version = "1.80.0"
+rust-version = "1.81.0"
 
 [workspace.dependencies]
 anyhow = "1.0.89"

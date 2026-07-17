@@ -1,4 +1,4 @@
-//! Small variants and their shared representation.
+//! The small-variant tier.
 //!
 //! Every small variant is a reference allele and an alternate allele anchored
 //! at a coordinate. [`Alteration`] is the shared core carrying the two alleles

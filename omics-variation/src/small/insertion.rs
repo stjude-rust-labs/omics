@@ -9,11 +9,11 @@ use omics_molecule::compound::Nucleotide;
 use omics_molecule::sequence;
 use omics_molecule::sequence::Sequence;
 
-use crate::variant::Alteration;
-use crate::variant::Kind;
-use crate::variant::KindError;
-use crate::variant::base_interval;
-use crate::variant::interbase_interval;
+use crate::small::Alteration;
+use crate::small::Kind;
+use crate::small::KindError;
+use crate::small::base_interval;
+use crate::small::interbase_interval;
 
 /// An insertion of one or more bases at an interbase boundary.
 ///

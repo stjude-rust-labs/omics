@@ -24,9 +24,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added Criterion benchmarks for qualified variant parsing, rejected
   coordinate-system qualifiers, display, normalization, and interval queries
   ([#15](https://github.com/stjude-rust-labs/omics/pull/15)).
+* Added a structural-variant tier under the `structural` module, modeling
+  oriented `Breakend`s, single novel `Adjacency` junctions carrying an optional
+  non-templated insertion, and a `StructuralVariant` event whose `Kind`
+  (deletion, insertion, tandem duplication, inversion, translocation, breakend,
+  or complex) is derived from breakend geometry rather than stored. The tier
+  parses and serializes a compact crate-local string format and ships Criterion
+  benchmarks ([#16](https://github.com/stjude-rust-labs/omics/pull/16)).
 
 ### Changed
 
+* Moved the small-variant tier into a `small` module. The previous paths remain
+  available through re-exports, including `omics_variation::variant`
+  ([#16](https://github.com/stjude-rust-labs/omics/pull/16)).
+* Gave the structural `Kind::Translocation` a `Join` payload alongside its
+  `Locality`, so a co-linear fusion is distinguished from a fold-back
+  (inverted) one, including across contigs
+  ([#16](https://github.com/stjude-rust-labs/omics/pull/16)).
+* Raised the minimum supported Rust version to `1.81`
+  ([#16](https://github.com/stjude-rust-labs/omics/pull/16)).
 * **Breaking:** renamed the `Variant::SingleNucleotideVariation` enum variant to
   `Variant::Snv` for consistency with the new kind variants (`Mnv`,
   `Insertion`, `Deletion`, `Delins`)

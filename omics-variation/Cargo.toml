@@ -28,3 +28,7 @@ workspace = true
 [[bench]]
 name = "variants"
 harness = false
+
+[[bench]]
+name = "structural"
+harness = false
