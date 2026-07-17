@@ -65,10 +65,7 @@ pub enum ParseError {
 /// so that equality and later classification do not depend on the input order.
 /// A value of this type can only be built through [`PairedAdjacency::try_new`],
 /// so it always upholds those invariants.
-///
-/// `Hash` is intentionally not derived because `Sequence` does not implement
-/// it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PairedAdjacency<N: Nucleotide> {
     /// The canonical lower-locus breakend.
     a: Breakend,
@@ -207,10 +204,7 @@ impl<N: Nucleotide> fmt::Display for PairedAdjacency<N> {
 ///
 /// One side is a known breakend and the other is open, so the adjacency carries
 /// a single locus and the non-templated insertion at its open side.
-///
-/// `Hash` is intentionally not derived because `Sequence` does not implement
-/// it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SingleAdjacency<N: Nucleotide> {
     /// The single known breakend.
     breakend: Breakend,
@@ -296,9 +290,6 @@ impl<N: Nucleotide> fmt::Display for SingleAdjacency<N> {
 /// unassembled sequence. Each variant wraps a strong type that owns its
 /// invariants, so a paired junction is always canonical.
 ///
-/// `Hash` is intentionally not derived because `Sequence` does not implement
-/// it.
-///
 /// An adjacency serializes as three `::`-separated fields. A paired adjacency
 /// renders both breakends and its insertion, while a single-ended one renders
 /// its one breakend, a literal `.` marking the open side, and its insertion.
@@ -314,7 +305,7 @@ impl<N: Nucleotide> fmt::Display for SingleAdjacency<N> {
 /// assert_eq!(adjacency.to_string(), rendered);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Adjacency<N: Nucleotide> {
     /// Two loci joined, with optional non-templated bases between them.
     Paired(PairedAdjacency<N>),

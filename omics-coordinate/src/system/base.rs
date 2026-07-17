@@ -21,7 +21,7 @@ const _: () = {
 ///
 /// This coordinate system is also known as the "1-based, fully-closed"
 /// coordinate system.
-#[derive(Copy, Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Base;
 
 impl Base {

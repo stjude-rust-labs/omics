@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Raised the minimum supported Rust version to `1.81`
   ([#16](https://github.com/stjude-rust-labs/omics/pull/16)).
+* **Breaking:** added `Hash` to the `Nucleotide` supertrait bounds, and derived
+  `Hash` for the DNA and RNA nucleotides and for `Sequence`
+  ([#16](https://github.com/stjude-rust-labs/omics/pull/16)).
 
 ## 0.2.0 - 03-19-2026
 

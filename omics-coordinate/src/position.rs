@@ -134,7 +134,7 @@ pub mod r#trait {
 ///
 /// For a more in-depth discussion on what positions are and the notations used
 /// within this crate, please see [this section of the docs](crate#positions).
-#[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Position<S: System> {
     /// The coordinate system.
     system: S,

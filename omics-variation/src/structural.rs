@@ -254,9 +254,6 @@ pub enum ParseError {
 /// canonical key and deduplicated, so that equality and classification do not
 /// depend on the input order and are insensitive to duplicates.
 ///
-/// `Hash` is intentionally not derived because `Adjacency` does not implement
-/// it.
-///
 /// A structural variant serializes as its adjacency tokens joined with `;`.
 ///
 /// # Examples
@@ -270,7 +267,7 @@ pub enum ParseError {
 /// assert_eq!(variant.to_string(), rendered);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StructuralVariant<N: Nucleotide> {
     /// The adjacencies making up the event, held in normalized order.
     adjacencies: Vec<Adjacency<N>>,

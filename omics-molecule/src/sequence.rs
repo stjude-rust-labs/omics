@@ -28,7 +28,7 @@ pub enum ParseError {
 /// An ordered run of [`Nucleotide`]s representing a variant allele.
 ///
 /// An empty [`Sequence`] is valid and denotes a missing allele.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Sequence<N: Nucleotide>(Vec<N>);
 
 impl<N: Nucleotide> Sequence<N> {

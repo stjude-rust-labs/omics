@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added a `TryFrom<&str>` conversion for `Coordinate`, mirroring the existing
   `FromStr` so coordinates compose with `TryInto`-based constructors
   ([#15](https://github.com/stjude-rust-labs/omics/pull/15)).
+* Derived `Hash` for `Position`, `Base`, and `Interbase`
+  ([#16](https://github.com/stjude-rust-labs/omics/pull/16)).
 
 ## 0.4.0 - 03-19-2026
 

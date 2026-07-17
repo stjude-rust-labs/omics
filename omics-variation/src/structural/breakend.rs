@@ -49,10 +49,7 @@ pub enum ParseError {
 /// flank by reference coordinate rather than by strand. See the [module
 /// documentation](crate::structural) for why read direction lives on the
 /// adjacency pair rather than on a breakend.
-///
-/// `Hash` is intentionally not derived because `Position<Interbase>` does not
-/// implement it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Breakend {
     /// The contig the breakend sits on.
     contig: Contig,
