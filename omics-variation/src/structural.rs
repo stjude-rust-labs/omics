@@ -1,4 +1,4 @@
-//! The structural-variant tier.
+//! Structural variants.
 //!
 //! Structural variants are modeled as novel adjacencies between breakends,
 //! following the breakend representation used by the VCF breakend spec and by
@@ -7,8 +7,7 @@
 //! breakends with an optional non-templated insertion, and a
 //! [`StructuralVariant`] is an event built from one or more adjacencies. The
 //! event [`Kind`] is derived from the geometry of those adjacencies rather than
-//! stored, mirroring how the small-variant tier derives its kind from allele
-//! content.
+//! stored.
 //!
 //! # Coordinate-anchored orientation
 //!
@@ -107,20 +106,27 @@
 //! ```
 //!
 //! An interchromosomal translocation is one junction across two contigs. With
-//! opposite orientations the fused piece keeps its direction.
+//! opposite orientations the piece brought over from the other contig keeps its
+//! direction. Below, `[R S]` is the segment translocated from `seq1` into the
+//! `seq0`-derived molecule.
 //!
 //! ```text
-//! ref   seq0 ==A==|100        seq1 900|==B==
-//! adj   seq0:>:100(i)::seq1:<:900(i)::.
-//! =>    ==A==|==B==            Translocation { Interchromosomal, CoLinear }
+//! seq0   ==P==Q==|100 . . .            keep P Q up to boundary 100
+//! seq1        . . . 900|==R==S==       keep R S from boundary 900
+//! adj    seq0:>:100(i)::seq1:<:900(i)::.
+//! =>     ==P==Q==[R==S]==              [R S] is spliced in from seq1
+//!        Translocation { Interchromosomal, CoLinear }
 //! ```
 //!
-//! With matching orientations the fused piece is reverse-complemented, a
-//! fold-back.
+//! With matching orientations the segment brought over is reverse-complemented,
+//! a fold-back. Below, `[S' R']` is that same `seq1` segment, now inverted.
 //!
 //! ```text
-//! adj   seq0:>:100(i)::seq1:>:200(i)::.
-//! =>    ==A==| revcomp(seq1 piece)      Translocation { Interchromosomal, FoldBack }
+//! seq0   ==P==Q==|100 . . .            keep P Q up to boundary 100
+//! seq1        . . . |200 R==S==        matching orientation flips this piece
+//! adj    seq0:>:100(i)::seq1:>:200(i)::.
+//! =>     ==P==Q==[S'==R']==            [S' R'] is [R S] from seq1, reverse-complemented
+//!        Translocation { Interchromosomal, FoldBack }
 //! ```
 //!
 //! An intrachromosomal translocation is the balanced forward relocation of a
