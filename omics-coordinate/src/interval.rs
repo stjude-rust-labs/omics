@@ -3,6 +3,7 @@
 use std::cmp::max;
 use std::cmp::min;
 
+use omics_core::VARIANT_SEPARATOR;
 use thiserror::Error;
 
 use crate::Contig;
@@ -19,6 +20,9 @@ use crate::system::Base;
 
 pub mod base;
 pub mod interbase;
+
+/// The separator between an interval's start and end positions.
+const INTERVAL_SEPARATOR: &str = "-";
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // Errors
@@ -1187,12 +1191,17 @@ where
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        let (prefix, positions) = s.rsplit_once(':').ok_or_else(|| ParseError::Format {
-            value: s.to_owned(),
-        })?;
-        let (contig, strand) = prefix.rsplit_once(':').ok_or_else(|| ParseError::Format {
-            value: s.to_owned(),
-        })?;
+        let (prefix, positions) =
+            s.rsplit_once(VARIANT_SEPARATOR)
+                .ok_or_else(|| ParseError::Format {
+                    value: s.to_owned(),
+                })?;
+        let (contig, strand) =
+            prefix
+                .rsplit_once(VARIANT_SEPARATOR)
+                .ok_or_else(|| ParseError::Format {
+                    value: s.to_owned(),
+                })?;
 
         let contig = contig.parse::<Contig>().map_err(|_| {
             Error::Parse(ParseError::Format {
@@ -1202,8 +1211,8 @@ where
 
         let strand = strand.parse::<Strand>().map_err(Error::Strand)?;
         let (start, end) = positions
-            .split_once('-')
-            .filter(|(_, end)| !end.contains('-'))
+            .split_once(INTERVAL_SEPARATOR)
+            .filter(|(_, end)| !end.contains(INTERVAL_SEPARATOR))
             .ok_or_else(|| ParseError::Format {
                 value: s.to_owned(),
             })?;
