@@ -63,19 +63,13 @@ impl Coordinate {
 }
 
 impl crate::coordinate::r#trait::Coordinate<Base> for Coordinate {
-    fn try_new<C, T>(contig: C, strand: T, position: position::Number) -> super::Result<Self>
-    where
-        C: TryInto<crate::Contig>,
-        C::Error: Into<contig::Error>,
-        T: TryInto<crate::Strand>,
-        T::Error: Into<strand::Error>,
-    {
-        let contig = contig
-            .try_into()
-            .map_err(|error| Error::Contig(error.into()))?;
-        let strand = strand
-            .try_into()
-            .map_err(|error| Error::Strand(error.into()))?;
+    fn try_new(
+        contig: impl TryInto<crate::Contig, Error = contig::Error>,
+        strand: impl TryInto<crate::Strand, Error = strand::Error>,
+        position: position::Number,
+    ) -> super::Result<Self> {
+        let contig = contig.try_into().map_err(Error::Contig)?;
+        let strand = strand.try_into().map_err(Error::Strand)?;
         let position = Position::try_new(position).map_err(Error::Position)?;
 
         Ok(Self {

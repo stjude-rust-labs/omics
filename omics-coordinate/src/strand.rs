@@ -1,7 +1,5 @@
 //! Strands of a molecule.
 
-use std::convert::Infallible;
-
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -43,12 +41,6 @@ pub enum Error {
     /// A parse error.
     #[error("parse error: {0}")]
     Parse(#[from] ParseError),
-}
-
-impl From<Infallible> for Error {
-    fn from(value: Infallible) -> Self {
-        match value {}
-    }
 }
 
 /// A [`Result`](std::result::Result) with an [`Error`](enum@Error).

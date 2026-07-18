@@ -1,6 +1,5 @@
 //! Contiguous molecules.
 
-use std::convert::Infallible;
 use std::sync::Arc;
 
 use thiserror::Error;
@@ -15,12 +14,6 @@ pub enum Error {
     /// An empty contig name was provided.
     #[error("contig name cannot be empty")]
     Empty,
-}
-
-impl From<Infallible> for Error {
-    fn from(value: Infallible) -> Self {
-        match value {}
-    }
 }
 
 /// A [`Result`](std::result::Result) with an [`Error`](enum@Error).

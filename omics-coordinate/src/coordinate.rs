@@ -79,12 +79,11 @@ pub mod r#trait {
         Self: Sized,
     {
         /// Attempts to create a new coordinate.
-        fn try_new<C, T>(contig: C, strand: T, position: Number) -> Result<Self>
-        where
-            C: TryInto<Contig>,
-            C::Error: Into<contig::Error>,
-            T: TryInto<Strand>,
-            T::Error: Into<strand::Error>;
+        fn try_new(
+            contig: impl TryInto<Contig, Error = contig::Error>,
+            strand: impl TryInto<Strand, Error = strand::Error>,
+            position: Number,
+        ) -> Result<Self>;
     }
 }
 
@@ -240,13 +239,13 @@ where
     }
 
     /// Attempts to create a new coordinate.
-    pub fn try_new<C, T>(contig: C, strand: T, position: Number) -> Result<Self>
+    pub fn try_new(
+        contig: impl TryInto<Contig, Error = contig::Error>,
+        strand: impl TryInto<Strand, Error = strand::Error>,
+        position: Number,
+    ) -> Result<Self>
     where
         Self: r#trait::Coordinate<S>,
-        C: TryInto<Contig>,
-        C::Error: Into<contig::Error>,
-        T: TryInto<Strand>,
-        T::Error: Into<strand::Error>,
     {
         <Self as r#trait::Coordinate<S>>::try_new(contig, strand, position)
     }
@@ -716,18 +715,6 @@ mod tests {
         let parsed = coordinate.to_string().parse::<Coordinate<Interbase>>()?;
 
         assert_eq!(parsed, coordinate);
-
-        Ok(())
-    }
-
-    #[test]
-    fn try_new_accepts_validated_parts() -> Result<()> {
-        let contig = Contig::try_new("seq0")?;
-        let coordinate = Coordinate::<Interbase>::try_new(contig.clone(), Strand::Positive, 10)?;
-
-        assert_eq!(coordinate.contig(), &contig);
-        assert_eq!(coordinate.strand(), Strand::Positive);
-        assert_eq!(coordinate.position().get(), 10);
 
         Ok(())
     }

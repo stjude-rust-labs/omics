@@ -28,7 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Return `ClampError::Disjoint` instead of panicking when clamping disjoint
   intervals.
 * Preserve colons in contig names when parsing coordinates and intervals.
-* Accept validated `Contig` and `Strand` values in `Coordinate::try_new()`.
 
 ## 0.4.0 - 03-19-2026
 
