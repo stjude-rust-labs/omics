@@ -126,6 +126,8 @@ impl Interval {
 
     /// Consumes `self` and returns the equivalent in-base interval.
     ///
+    /// Returns [`None`] when this interval contains no entities.
+    ///
     /// # Examples
     ///
     /// ```
@@ -136,21 +138,17 @@ impl Interval {
     /// let interval = "seq0:+:0-1000".parse::<Interval<Interbase>>()?;
     /// let equivalent = interval.into_equivalent_base();
     ///
-    /// assert_eq!("seq0:+:1-1000".parse::<Interval<Base>>()?, equivalent);
+    /// assert_eq!(Some("seq0:+:1-1000".parse::<Interval<Base>>()?), equivalent);
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn into_equivalent_base(self) -> crate::interval::Interval<Base> {
+    pub fn into_equivalent_base(self) -> Option<crate::interval::Interval<Base>> {
         let (start, end) = self.into_coordinates();
 
-        // SAFETY: given the rules of how interbase and base coordinate systems
-        // work, this should always unwrap.
-        let start = start.nudge_forward().unwrap();
-        let end = end.nudge_backward().unwrap();
+        let start = start.nudge_forward()?;
+        let end = end.nudge_backward()?;
 
-        // SAFETY: since this was previously a valid interbase interval, as long
-        // as the two nudges above succeed, this should always unwrap.
-        crate::interval::Interval::<Base>::try_new(start, end).unwrap()
+        crate::interval::Interval::<Base>::try_new(start, end).ok()
     }
 }
 
@@ -219,14 +217,49 @@ mod tests {
     }
 
     #[test]
+    fn zero_width_positive_interval_has_no_equivalent_base_interval() {
+        for position in [0, 10, Number::MAX] {
+            assert!(
+                create_interval("seq0", "+", position, position)
+                    .into_equivalent_base()
+                    .is_none()
+            );
+        }
+    }
+
+    #[test]
+    fn zero_width_negative_interval_has_no_equivalent_base_interval() {
+        for position in [0, 10, Number::MAX] {
+            assert!(
+                create_interval("seq0", "-", position, position)
+                    .into_equivalent_base()
+                    .is_none()
+            );
+        }
+    }
+
+    #[test]
+    fn nonempty_intervals_have_equivalent_base_intervals() -> crate::interval::Result<()> {
+        let positive = create_interval("seq0", "+", 0, Number::MAX);
+        let expected = format!("seq0:+:1-{}", Number::MAX).parse::<crate::Interval<Base>>()?;
+        assert_eq!(positive.into_equivalent_base(), Some(expected));
+
+        let negative = create_interval("seq0", "-", Number::MAX, 0);
+        let expected = format!("seq0:-:{}-1", Number::MAX).parse::<crate::Interval<Base>>()?;
+        assert_eq!(negative.into_equivalent_base(), Some(expected));
+
+        Ok(())
+    }
+
+    #[test]
     fn contains() {
         let interval = create_interval("seq0", "+", 10, 20);
 
         // An interval contains the coordinate representing its start position.
-        assert!(interval.contains_coordinate(interval.start()));
+        assert!(interval.contains_coordinate(&interval.start().into_owned()));
 
         // An interval contains the coordinate representing its end position.
-        assert!(interval.contains_coordinate(interval.end()));
+        assert!(interval.contains_coordinate(&interval.end().into_owned()));
 
         // An interval contains a coordinate in the middle of its range.
         assert!(interval.contains_coordinate(&create_coordinate("seq0", "+", 15)));
@@ -250,10 +283,10 @@ mod tests {
         let interval = create_interval("seq0", "-", 20, 10);
 
         // An interval contains the coordinate representing its start position.
-        assert!(interval.contains_coordinate(interval.start()));
+        assert!(interval.contains_coordinate(&interval.start().into_owned()));
 
         // An interval contains the coordinate representing its end position.
-        assert!(interval.contains_coordinate(interval.end()));
+        assert!(interval.contains_coordinate(&interval.end().into_owned()));
 
         // An interval contains a coordinate in the middle of its range.
         assert!(interval.contains_coordinate(&create_coordinate("seq0", "-", 15)));

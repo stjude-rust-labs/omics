@@ -91,6 +91,61 @@ pub mod r#trait {
 // Coordinate
 ////////////////////////////////////////////////////////////////////////////////////////
 
+/// A borrowed coordinate.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CoordinateRef<'a, S: System> {
+    /// The contig.
+    contig: &'a Contig,
+
+    /// The strand.
+    strand: Strand,
+
+    /// The position.
+    position: &'a Position<S>,
+}
+
+impl<'a, S: System> CoordinateRef<'a, S> {
+    /// Creates a borrowed coordinate.
+    pub(crate) fn new(contig: &'a Contig, strand: Strand, position: &'a Position<S>) -> Self {
+        Self {
+            contig,
+            strand,
+            position,
+        }
+    }
+
+    /// Gets the contig.
+    pub fn contig(&self) -> &'a Contig {
+        self.contig
+    }
+
+    /// Gets the strand.
+    pub fn strand(&self) -> Strand {
+        self.strand
+    }
+
+    /// Gets the position.
+    pub fn position(&self) -> &'a Position<S> {
+        self.position
+    }
+
+    /// Returns an owned coordinate.
+    pub fn into_owned(self) -> Coordinate<S> {
+        Coordinate {
+            system: Default::default(),
+            contig: self.contig.clone(),
+            strand: self.strand,
+            position: self.position.clone(),
+        }
+    }
+}
+
+impl<S: System> std::fmt::Display for CoordinateRef<'_, S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}:{}", self.contig, self.strand, self.position)
+    }
+}
+
 /// A coordinate.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Coordinate<S: System> {
@@ -586,43 +641,43 @@ where
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        let parts = s.split(VARIANT_SEPARATOR).collect::<Vec<_>>();
+        let (prefix, position) =
+            s.rsplit_once(VARIANT_SEPARATOR)
+                .ok_or_else(|| ParseError::Format {
+                    value: s.to_owned(),
+                })?;
+        let (contig, strand) =
+            prefix
+                .rsplit_once(VARIANT_SEPARATOR)
+                .ok_or_else(|| ParseError::Format {
+                    value: s.to_owned(),
+                })?;
 
-        if parts.len() != 3 {
-            return Err(Error::Parse(ParseError::Format {
-                value: s.to_owned(),
-            }));
-        }
-
-        let mut parts = parts.iter();
-
-        // SAFETY: we checked that there are three parts above. Given that we
-        // haven't pulled anything from the iterator, we can always safely
-        // unwrap this.
-        let contig = parts.next().unwrap().parse::<Contig>().map_err(|_| {
+        let contig = contig.parse::<Contig>().map_err(|_| {
             Error::Parse(ParseError::Format {
                 value: s.to_string(),
             })
         })?;
 
-        // SAFETY: we checked that there are three parts above. Given that we
-        // have only pulled one item from the iterator, we can always safely
-        // unwrap this.
-        let strand = parts
-            .next()
-            .unwrap()
-            .parse::<Strand>()
-            .map_err(Error::Strand)?;
-
-        // SAFETY: we checked that there are three parts above. Given that we
-        // have only pulled two items from the iterator, we can always safely
-        // unwrap this.
-        let position = parts
-            .next()
-            .unwrap()
-            .parse::<Position<S>>()
-            .map_err(Error::Position)?;
+        let strand = strand.parse::<Strand>().map_err(Error::Strand)?;
+        let position = position.parse::<Position<S>>().map_err(Error::Position)?;
 
         Ok(Self::new(contig, strand, position))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::system::Interbase;
+
+    #[test]
+    fn contig_with_colons_round_trips() -> Result<()> {
+        let coordinate = Coordinate::<Interbase>::try_new("assembly:chr:1", "+", 10)?;
+        let parsed = coordinate.to_string().parse::<Coordinate<Interbase>>()?;
+
+        assert_eq!(parsed, coordinate);
+
+        Ok(())
     }
 }

@@ -53,7 +53,6 @@ pub mod interbase {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 pub mod base {
-    use std::cell::LazyCell;
     use std::hint::black_box;
 
     use criterion::Criterion;
@@ -71,21 +70,28 @@ pub mod base {
     ////////////////////////////////////////////////////////////////////////////////////
 
     /// Benchmarks for the [`Position::checked_add()`] method.
-    fn checked_add() -> Number {
-        let position = LazyCell::new(|| Position::<Base>::try_new(20).unwrap());
+    fn checked_add(position: &Position<Base>) -> Number {
+        // SAFETY: adding ten to twenty cannot overflow the position number.
         position.checked_add(black_box(10)).unwrap().get()
     }
 
     /// Benchmarks for the [`Position::checked_sub()`] method.
-    fn checked_sub() -> Number {
-        let position = LazyCell::new(|| Position::<Base>::try_new(20).unwrap());
+    fn checked_sub(position: &Position<Base>) -> Number {
+        // SAFETY: subtracting ten from twenty remains a valid base position.
         position.checked_sub(black_box(10)).unwrap().get()
     }
 
     pub fn benches(c: &mut Criterion) {
+        // SAFETY: the benchmark position is nonzero.
+        let position = Position::<Base>::try_new(20).unwrap();
+
         c.bench_function("positions::base::try_new", |b| b.iter(try_new));
-        c.bench_function("positions::base::checked_add", |b| b.iter(checked_add));
-        c.bench_function("positions::base::checked_sub", |b| b.iter(checked_sub));
+        c.bench_function("positions::base::checked_add", |b| {
+            b.iter(|| checked_add(&position))
+        });
+        c.bench_function("positions::base::checked_sub", |b| {
+            b.iter(|| checked_sub(&position))
+        });
     }
 }
 

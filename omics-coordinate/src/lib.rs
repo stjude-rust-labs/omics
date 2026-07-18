@@ -463,6 +463,7 @@ pub mod system;
 
 pub use contig::Contig;
 pub use coordinate::Coordinate;
+pub use coordinate::CoordinateRef;
 pub use coordinate::base;
 pub use coordinate::interbase;
 pub use interval::Interval;
