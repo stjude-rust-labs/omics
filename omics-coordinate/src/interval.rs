@@ -346,7 +346,7 @@ where
     /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
     /// let interval = Interval::try_new(start.clone(), end)?;
     ///
-    /// assert_eq!(interval.start(), start);
+    /// assert_eq!(interval.start().into_owned(), start);
     ///
     /// //======//
     /// // Base //
@@ -356,7 +356,7 @@ where
     /// let end = Coordinate::<Base>::try_new("seq0", "+", 20)?;
     /// let interval = Interval::try_new(start.clone(), end)?;
     ///
-    /// assert_eq!(interval.start(), start);
+    /// assert_eq!(interval.start().into_owned(), start);
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -418,7 +418,7 @@ where
     /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
     /// let interval = Interval::try_new(start, end.clone())?;
     ///
-    /// assert_eq!(interval.end(), end);
+    /// assert_eq!(interval.end().into_owned(), end);
     ///
     /// //======//
     /// // Base //
@@ -428,7 +428,7 @@ where
     /// let end = Coordinate::<Base>::try_new("seq0", "+", 20)?;
     /// let interval = Interval::try_new(start, end.clone())?;
     ///
-    /// assert_eq!(interval.end(), end);
+    /// assert_eq!(interval.end().into_owned(), end);
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -656,12 +656,7 @@ where
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn contains_coordinate<'a>(&self, coordinate: impl Into<CoordinateRef<'a, S>>) -> bool
-    where
-        S: 'a,
-    {
-        let coordinate = coordinate.into();
-
+    pub fn contains_coordinate(&self, coordinate: &crate::Coordinate<S>) -> bool {
         if self.contig() != coordinate.contig() {
             return false;
         }
@@ -1370,36 +1365,14 @@ mod tests {
 
         assert!(std::ptr::eq(start_ref.contig(), interval.contig()));
         assert!(std::ptr::eq(end_ref.contig(), interval.contig()));
-        assert_eq!(start_ref, start);
-        assert_eq!(end_ref, end);
-        assert_eq!(start, start_ref);
-        assert_eq!(end, end_ref);
+        assert_eq!(start_ref, interval.start());
+        assert_eq!(end_ref, interval.end());
         assert_eq!(start_ref.into_owned(), start);
         assert_eq!(end_ref.into_owned(), end);
         assert_eq!(start_ref.cmp(&end_ref), start.cmp(&end));
         assert_eq!(start_position.get(), 10);
         assert_eq!(start_ref.to_string(), "seq0:+:10");
         assert_eq!(end_ref.to_string(), "seq0:+:20");
-
-        Ok(())
-    }
-
-    #[test]
-    fn coordinate_containment_accepts_forwarded_references() -> Result<()> {
-        let start = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
-        let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
-        let interval = Interval::try_new(start, end)?;
-        let mut coordinate = Coordinate::<Interbase>::try_new("seq0", "+", 15)?;
-
-        assert!(interval.contains_coordinate(&mut coordinate));
-        let coordinates = [coordinate.clone()];
-        assert_eq!(
-            coordinates
-                .iter()
-                .filter(|coordinate| interval.contains_coordinate(coordinate))
-                .count(),
-            1
-        );
 
         Ok(())
     }

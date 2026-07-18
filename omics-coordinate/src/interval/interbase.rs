@@ -256,10 +256,10 @@ mod tests {
         let interval = create_interval("seq0", "+", 10, 20);
 
         // An interval contains the coordinate representing its start position.
-        assert!(interval.contains_coordinate(interval.start()));
+        assert!(interval.contains_coordinate(&interval.start().into_owned()));
 
         // An interval contains the coordinate representing its end position.
-        assert!(interval.contains_coordinate(interval.end()));
+        assert!(interval.contains_coordinate(&interval.end().into_owned()));
 
         // An interval contains a coordinate in the middle of its range.
         assert!(interval.contains_coordinate(&create_coordinate("seq0", "+", 15)));
@@ -283,10 +283,10 @@ mod tests {
         let interval = create_interval("seq0", "-", 20, 10);
 
         // An interval contains the coordinate representing its start position.
-        assert!(interval.contains_coordinate(interval.start()));
+        assert!(interval.contains_coordinate(&interval.start().into_owned()));
 
         // An interval contains the coordinate representing its end position.
-        assert!(interval.contains_coordinate(interval.end()));
+        assert!(interval.contains_coordinate(&interval.end().into_owned()));
 
         // An interval contains a coordinate in the middle of its range.
         assert!(interval.contains_coordinate(&create_coordinate("seq0", "-", 15)));

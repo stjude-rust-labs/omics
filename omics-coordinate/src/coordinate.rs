@@ -131,50 +131,12 @@ impl<'a, S: System> CoordinateRef<'a, S> {
 
     /// Returns an owned coordinate.
     pub fn into_owned(self) -> Coordinate<S> {
-        self.into()
-    }
-}
-
-impl<S: System> From<CoordinateRef<'_, S>> for Coordinate<S> {
-    fn from(value: CoordinateRef<'_, S>) -> Self {
-        Self {
+        Coordinate {
             system: Default::default(),
-            contig: value.contig.clone(),
-            strand: value.strand,
-            position: value.position.clone(),
+            contig: self.contig.clone(),
+            strand: self.strand,
+            position: self.position.clone(),
         }
-    }
-}
-
-impl<'a, S: System> From<&'a Coordinate<S>> for CoordinateRef<'a, S> {
-    fn from(value: &'a Coordinate<S>) -> Self {
-        Self::new(&value.contig, value.strand, &value.position)
-    }
-}
-
-impl<'a, 'b, S: System> From<&'a &'b Coordinate<S>> for CoordinateRef<'b, S> {
-    fn from(value: &'a &'b Coordinate<S>) -> Self {
-        (*value).into()
-    }
-}
-
-impl<'a, S: System> From<&'a mut Coordinate<S>> for CoordinateRef<'a, S> {
-    fn from(value: &'a mut Coordinate<S>) -> Self {
-        Self::new(&value.contig, value.strand, &value.position)
-    }
-}
-
-impl<S: System> PartialEq<Coordinate<S>> for CoordinateRef<'_, S> {
-    fn eq(&self, other: &Coordinate<S>) -> bool {
-        self.contig == &other.contig
-            && self.strand == other.strand
-            && self.position == &other.position
-    }
-}
-
-impl<S: System> PartialEq<CoordinateRef<'_, S>> for Coordinate<S> {
-    fn eq(&self, other: &CoordinateRef<'_, S>) -> bool {
-        other == self
     }
 }
 
