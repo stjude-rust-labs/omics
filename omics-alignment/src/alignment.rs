@@ -23,7 +23,6 @@ use omics_coordinate::interval::interbase::Interval;
 use omics_coordinate::position::Number;
 use thiserror::Error;
 
-use crate::AlignedBlock;
 use crate::cigar::Axis;
 use crate::cigar::Cigar;
 use crate::cigar::Operation;
@@ -58,8 +57,7 @@ pub enum Error {
 /// coordinate, and a [`Cigar`] describing the operations that transform the
 /// query into alignment with the reference. Construction eagerly validates
 /// that every operation's movement stays within representable coordinate
-/// bounds, so [`Alignment::steps`] and [`Alignment::aligned_blocks`] are
-/// infallible.
+/// bounds, so [`Alignment::steps`] is infallible.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Alignment {
     /// The starting reference coordinate.
@@ -225,78 +223,6 @@ impl Alignment {
         // strand.
         Interval::try_new(start, pointer.clone()).unwrap()
     }
-
-    /// Returns an iterator over neutral aligned blocks, coalescing runs of
-    /// consecutive aligned [`Step`]s (`M`, `=`, or `X`) into a single
-    /// [`AlignedBlock`].
-    ///
-    /// Non-aligned steps, such as insertions, deletions, reference skips,
-    /// clips, and padding, are skipped and each breaks a run; they never
-    /// appear within a merged block, and no block spans across one.
-    pub fn aligned_blocks(&self) -> impl Iterator<Item = AlignedBlock> + '_ {
-        let mut steps = self.steps().peekable();
-
-        std::iter::from_fn(move || {
-            // Skip non-aligned steps until the first aligned step, or the
-            // iterator is exhausted.
-            let first = loop {
-                match steps.peek() {
-                    Some(step) if step.is_aligned() => {
-                        // SAFETY: `peek` above just proved this is `Some`.
-                        break steps.next().unwrap();
-                    }
-                    Some(_) => {
-                        steps.next();
-                    }
-                    None => return None,
-                }
-            };
-
-            // Every aligned step has both a reference and a query interval,
-            // since aligned operations (`M`, `=`, `X`) consume both axes by
-            // the consumption table in `OperationKind`.
-            //
-            // SAFETY: `first.is_aligned()` is true, so both intervals exist.
-            let reference_interval = first.reference().unwrap().clone();
-            // SAFETY: see above.
-            let query_interval = first.query().unwrap().clone();
-
-            let reference_start = reference_interval.start().into_owned();
-            let query_start = query_interval.start().into_owned();
-            let mut reference_end = reference_interval.end().into_owned();
-            let mut query_end = query_interval.end().into_owned();
-
-            // Extend through consecutive aligned steps, stopping before the
-            // first non-aligned step (or the end of the alignment).
-            while let Some(step) = steps.peek() {
-                if !step.is_aligned() {
-                    break;
-                }
-
-                // SAFETY: `peek` above just proved this is `Some`.
-                let step = steps.next().unwrap();
-                // SAFETY: `step.is_aligned()` is true, so both intervals
-                // exist, by the same consumption-table argument as above.
-                reference_end = step.reference().unwrap().end().into_owned();
-                // SAFETY: see above.
-                query_end = step.query().unwrap().end().into_owned();
-            }
-
-            // Aligned operations advance both axes by the same positive
-            // length (the consumption table marks `M`, `=`, and `X` as
-            // consuming both reference and query, and `Cigar` guarantees
-            // every operation length is positive), so the merged reference
-            // and query intervals below necessarily span equal entity
-            // counts.
-            //
-            // SAFETY: see the proof immediately above.
-            let reference = Interval::try_new(reference_start, reference_end).unwrap();
-            // SAFETY: see above.
-            let query = Interval::try_new(query_start, query_end).unwrap();
-            // SAFETY: see above; the entity counts are proven equal.
-            Some(AlignedBlock::try_new(reference, query).unwrap())
-        })
-    }
 }
 
 #[cfg(test)]
@@ -423,47 +349,53 @@ mod tests {
     }
 
     #[test]
-    fn aligned_blocks() -> Result<(), Box<dyn std::error::Error>> {
+    fn aligned_steps_preserve_operation_boundaries() -> Result<(), Box<dyn std::error::Error>> {
         let reference_start = "ref:+:0".parse::<Coordinate>()?;
         let query_start = "query:+:0".parse::<Coordinate>()?;
         let cigar = "2M1=3X1I4M1D5M1P6M".parse::<Cigar>()?;
 
         let alignment = Alignment::try_new(reference_start, query_start, cigar)?;
-        let blocks = alignment.aligned_blocks().collect::<Vec<_>>();
-
         assert_eq!(
-            blocks
-                .iter()
-                .map(|block| block.length())
+            alignment
+                .steps()
+                .filter(Step::is_aligned)
+                .map(|step| step.operation().length())
                 .collect::<Vec<_>>(),
-            vec![6, 4, 5, 6]
+            vec![2, 1, 3, 4, 5, 6]
         );
-
-        // The first block spans the first three aligned operations (2M, 1=,
-        // 3X), each of which advances both axes by the same amount.
-        assert_eq!(blocks[0].reference().to_string(), "ref:+:0-6");
-        assert_eq!(blocks[0].query().to_string(), "query:+:0-6");
 
         Ok(())
     }
 
     #[test]
-    fn chainfile_compatibility() -> Result<(), Box<dyn std::error::Error>> {
+    fn aligned_steps_match_chainfile_geometry() -> Result<(), Box<dyn std::error::Error>> {
         let reference_start = "ref:+:0".parse::<Coordinate>()?;
         let query_start = "query:-:5".parse::<Coordinate>()?;
         let cigar = "3M1I1M".parse::<Cigar>()?;
 
         let alignment = Alignment::try_new(reference_start, query_start, cigar)?;
-        let blocks = alignment
-            .aligned_blocks()
-            .map(|block| (block.reference().to_string(), block.query().to_string()))
+        let steps = alignment
+            .steps()
+            .filter(Step::is_aligned)
+            .map(|step| {
+                (
+                    step.reference().map(ToString::to_string),
+                    step.query().map(ToString::to_string),
+                )
+            })
             .collect::<Vec<_>>();
 
         assert_eq!(
-            blocks,
+            steps,
             vec![
-                ("ref:+:0-3".to_string(), "query:-:5-2".to_string()),
-                ("ref:+:3-4".to_string(), "query:-:1-0".to_string()),
+                (
+                    Some("ref:+:0-3".to_string()),
+                    Some("query:-:5-2".to_string())
+                ),
+                (
+                    Some("ref:+:3-4".to_string()),
+                    Some("query:-:1-0".to_string())
+                ),
             ]
         );
 

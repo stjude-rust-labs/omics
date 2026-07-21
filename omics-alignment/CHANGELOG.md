@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added `Alignment`, which eagerly validates that a starting reference coordinate,
   a starting query coordinate, and a `Cigar` form a traversal that stays within
   representable bounds; `Alignment::steps` yields one `Step` per CIGAR operation
-  losslessly, and `Alignment::aligned_blocks` coalesces consecutive aligned steps
-  (`M`, `=`, `X`) into `AlignedBlock` values.
+  losslessly, and `Step::is_aligned` supports filtering to aligned operations
+  (`M`, `=`, `X`) without discarding operation boundaries.
 * Added `AlignedBlock`, a neutral primitive pairing equal-length reference and query
   interbase intervals with no coordinate translation or liftover.

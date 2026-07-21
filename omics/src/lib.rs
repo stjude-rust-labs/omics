@@ -24,7 +24,10 @@
 //! let cigar = "3M1I1M".parse::<Cigar>().unwrap();
 //! let alignment = Alignment::try_new(reference_start, query_start, cigar).unwrap();
 //! assert_eq!(alignment.steps().count(), 3);
-//! assert_eq!(alignment.aligned_blocks().count(), 2);
+//! assert_eq!(
+//!     alignment.steps().filter(|step| step.is_aligned()).count(),
+//!     2
+//! );
 //! # }
 //! ```
 

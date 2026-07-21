@@ -55,9 +55,9 @@ following features are included and are top-level goals of the project.
   _interbase_ coordinate system) and 1-based, fully-closed coordinate system (also known
   as the _in-base_ or just _base_ coordinate system).
 - **Sequence alignments (`omics::alignment`).** Validated pairwise alignments with
-  lossless per-operation traversal via `Alignment::steps` and coalesced aligned regions
-  via `Alignment::aligned_blocks`. No dependency on SAM records, BAM, PAF, or chainfile
-  libraries.
+  lossless per-operation traversal via `Alignment::steps`; callers can select aligned
+  operations with `Step::is_aligned`. No dependency on SAM records, BAM, PAF, or
+  chainfile libraries.
 - **Biologically relevant molecules (`omics::molecule`).** Representations of molecules
   relevant in omics including smaller compounds (e.g., nucleotides) and larger
   polymers (e.g., DNA, RNA).

@@ -2,8 +2,8 @@
 //! ecosystem.
 //!
 //! This crate provides validated pairwise alignments, lossless per-operation
-//! traversal, and neutral aligned blocks. It has no dependency on SAM
-//! records, BAM, PAF, or chainfile libraries.
+//! traversal, and a neutral aligned-block primitive. It has no dependency on
+//! SAM records, BAM, PAF, or chainfile libraries.
 //!
 //! # Quick start
 //!
@@ -18,7 +18,10 @@
 //!
 //! let alignment = Alignment::try_new(reference_start, query_start, cigar)?;
 //! assert_eq!(alignment.steps().count(), 3);
-//! assert_eq!(alignment.aligned_blocks().count(), 2);
+//! assert_eq!(
+//!     alignment.steps().filter(|step| step.is_aligned()).count(),
+//!     2
+//! );
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -53,18 +56,15 @@
 //! of representable bounds (position underflow on the negative strand, or
 //! overflow on the positive strand), construction returns
 //! [`alignment::Error::OutOfBounds`]. Once an [`Alignment`] exists,
-//! [`Alignment::steps`] and [`Alignment::aligned_blocks`] are infallible.
+//! [`Alignment::steps`] is infallible.
 //!
-//! # `steps()` versus `aligned_blocks()`
+//! # Filtering aligned steps
 //!
 //! [`Alignment::steps`] yields one [`Step`] per CIGAR operation in order,
 //! preserving every kind including hard clips and padding (which carry no
-//! interval). [`Alignment::aligned_blocks`] skips all non-aligned operations
-//! and merges consecutive aligned operations (`M`, `=`, `X`) into single
-//! [`AlignedBlock`] values; a single insertion or deletion between two aligned
-//! runs produces two separate blocks. Prefer [`Alignment::steps`] when you
-//! need per-operation precision; prefer [`Alignment::aligned_blocks`] when you
-//! need contiguous matched regions.
+//! interval). Callers can select the aligned operations (`M`, `=`, `X`) with
+//! `alignment.steps().filter(|step| step.is_aligned())`. Filtering preserves
+//! each CIGAR operation boundary rather than imposing a coalescing policy.
 //!
 //! # Alignments
 //!
@@ -72,14 +72,13 @@
 //! that a starting reference coordinate, a starting query coordinate, and a
 //! [`cigar::Cigar`] together describe a traversal that never moves out of
 //! representable coordinate bounds. Once constructed, [`Alignment::steps`]
-//! losslessly yields one [`Step`] per operation, and
-//! [`Alignment::aligned_blocks`] coalesces consecutive aligned steps into
-//! neutral [`AlignedBlock`]s.
+//! losslessly yields one [`Step`] per operation.
 //!
 //! # Aligned blocks
 //!
 //! The [`block`] module provides [`block::AlignedBlock`], a neutral primitive
-//! pairing equal-length reference and query interbase intervals.
+//! pairing equal-length reference and query interbase intervals. Consumers
+//! decide when and how to construct or coalesce these blocks.
 //!
 //! # CIGAR model
 //!
