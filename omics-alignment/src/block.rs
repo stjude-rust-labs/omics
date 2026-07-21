@@ -44,12 +44,12 @@ impl AlignedBlock {
     /// Returns [`Error::EntityCountsDontMatch`] when the two intervals span
     /// different numbers of entities.
     pub fn try_new(reference: InterbaseInterval, query: InterbaseInterval) -> Result<Self, Error> {
-        let ref_count = reference.count_entities();
-        let qry_count = query.count_entities();
-        if ref_count != qry_count {
+        let reference_count = reference.count_entities();
+        let query_count = query.count_entities();
+        if reference_count != query_count {
             return Err(Error::EntityCountsDontMatch {
-                reference: ref_count,
-                query: qry_count,
+                reference: reference_count,
+                query: query_count,
             });
         }
         Ok(Self { reference, query })
