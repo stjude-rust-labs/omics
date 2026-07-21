@@ -1235,6 +1235,7 @@ mod tests {
     use crate::position::ParseError as PositionParseError;
     use crate::strand::Error as StrandError;
     use crate::strand::ParseError as StrandParseError;
+    use crate::system::Base;
     use crate::system::Interbase;
 
     #[test]
@@ -1605,7 +1606,7 @@ mod tests {
     }
 
     #[test]
-    fn len() {
+    fn count_entities() {
         assert_eq!(
             "seq0:+:0-1000"
                 .parse::<Interval<Interbase>>()
@@ -1621,29 +1622,38 @@ mod tests {
                 .count_entities(),
             1000
         );
-        let interval = "seq0:-:2000-1000".parse::<Interval<Interbase>>().unwrap();
 
-        // Mismatched contigs means the interval does not contain the coordinate.
-        let coordinate = "seq1:-:1000".parse::<Coordinate<Interbase>>().unwrap();
-        assert!(interval.coordinate_offset(&coordinate).is_none());
+        assert_eq!(
+            "seq0:+:10-10"
+                .parse::<Interval<Interbase>>()
+                .unwrap()
+                .count_entities(),
+            0
+        );
 
-        // Mismatched strands means the interval does not contain the coordinate.
-        let coordinate = "seq0:+:1000".parse::<Coordinate<Interbase>>().unwrap();
-        assert!(interval.coordinate_offset(&coordinate).is_none());
+        assert_eq!(
+            "seq0:+:10-20"
+                .parse::<Interval<Base>>()
+                .unwrap()
+                .count_entities(),
+            11
+        );
 
-        // Contained within.
-        let coordinate = "seq0:-:2000".parse::<Coordinate<Interbase>>().unwrap();
-        assert_eq!(interval.coordinate_offset(&coordinate).unwrap(), 0);
+        assert_eq!(
+            "seq0:-:20-10"
+                .parse::<Interval<Base>>()
+                .unwrap()
+                .count_entities(),
+            11
+        );
 
-        let coordinate = "seq0:-:1000".parse::<Coordinate<Interbase>>().unwrap();
-        assert_eq!(interval.coordinate_offset(&coordinate).unwrap(), 1000);
-
-        // Just outside of range.
-        let coordinate = "seq0:-:999".parse::<Coordinate<Interbase>>().unwrap();
-        assert!(interval.coordinate_offset(&coordinate).is_none());
-
-        let coordinate = "seq0:-:2001".parse::<Coordinate<Interbase>>().unwrap();
-        assert!(interval.coordinate_offset(&coordinate).is_none());
+        assert_eq!(
+            "seq0:+:5-5"
+                .parse::<Interval<Base>>()
+                .unwrap()
+                .count_entities(),
+            1
+        );
     }
 
     #[test]
