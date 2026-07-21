@@ -1,9 +1,9 @@
 //! Foundational representations of sequence alignments in the Rust omics
 //! ecosystem.
 //!
-//! This crate provides validated pairwise alignments, lossless per-operation
-//! traversal, and a neutral aligned-block primitive. It has no dependency on
-//! SAM records, BAM, PAF, or chainfile libraries.
+//! This crate provides validated pairwise alignments and lossless
+//! per-operation traversal. It has no dependency on SAM records, BAM, PAF, or
+//! chainfile libraries.
 //!
 //! # Quick start
 //!
@@ -52,26 +52,16 @@
 //! representable coordinate bounds. Once constructed, [`Alignment::steps`]
 //! losslessly yields one [`Step`] per operation.
 //!
-//! # Aligned blocks
-//!
-//! The [`block`] module provides [`block::AlignedBlock`], a neutral primitive
-//! pairing equal-length reference and query interbase intervals. Consumers
-//! decide when and how to construct or coalesce these blocks.
-//!
 //! # CIGAR model
 //!
 //! The [`cigar`] module provides the checked CIGAR model, including
 //! [`cigar::OperationKind`], [`cigar::Operation`], and [`cigar::Cigar`].
 
 pub use alignment::Alignment;
-pub use block::AlignedBlock;
 pub use step::Step;
 
 /// Validated pairwise alignments with lossless per-operation traversal.
 pub mod alignment;
-
-/// Neutral aligned blocks pairing equal-length reference and query intervals.
-pub mod block;
 
 /// The CIGAR model for representing pairwise sequence alignments.
 pub mod cigar;

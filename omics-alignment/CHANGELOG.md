@@ -19,6 +19,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   losslessly, and `Step::is_aligned` supports filtering to aligned operations
   (`M`, `=`, `X`) without discarding operation boundaries
   ([#18](https://github.com/stjude-rust-labs/omics/pull/18)).
-* Added `AlignedBlock`, a neutral primitive pairing equal-length reference and query
-  interbase intervals with no coordinate translation or liftover
-  ([#18](https://github.com/stjude-rust-labs/omics/pull/18)).
