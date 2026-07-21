@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "omics",
+    "omics-alignment",
     "omics-coordinate",
     "omics-core",
     "omics-molecule",
