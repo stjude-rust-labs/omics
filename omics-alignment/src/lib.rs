@@ -36,28 +36,6 @@
 //!
 //! See [`cigar::OperationKind`] for the full per-variant documentation.
 //!
-//! # Stranded starts
-//!
-//! Both the reference and query starting coordinates carry a strand. The
-//! reference is typically positive-stranded, but the query may be on the
-//! positive strand (a forward read) or the negative strand (a
-//! reverse-complement read). [`Alignment::try_new`] treats both strands
-//! symmetrically; every operation that consumes an axis moves the
-//! corresponding coordinate "forward" for that axis, which means incrementing
-//! the position on the positive strand and decrementing it on the negative
-//! strand. A negative-strand query traverses from a higher position toward a
-//! lower one, as in the quick-start example above where `query:-:5` ends at
-//! `query:-:0` after consuming five query bases.
-//!
-//! # Eager validation
-//!
-//! [`Alignment::try_new`] replays every operation against the starting
-//! coordinates before returning. If any operation would move a coordinate out
-//! of representable bounds (position underflow on the negative strand, or
-//! overflow on the positive strand), construction returns
-//! [`alignment::Error::OutOfBounds`]. Once an [`Alignment`] exists,
-//! [`Alignment::steps`] is infallible.
-//!
 //! # Filtering aligned steps
 //!
 //! [`Alignment::steps`] yields one [`Step`] per CIGAR operation in order,
