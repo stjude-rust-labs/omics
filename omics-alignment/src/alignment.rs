@@ -199,6 +199,7 @@ impl Alignment {
     ///
     /// This is only ever called for an axis that the current operation
     /// consumes, so `length` is positive by construction of [`Operation`].
+    ///
     /// [`Coordinate::move_forward`](omics_coordinate::Coordinate::move_forward)
     /// never changes a coordinate's contig or strand; it advances the
     /// position on the positive strand and retreats it on the negative
@@ -206,12 +207,13 @@ impl Alignment {
     /// coordinate observed after the move are ordered exactly as
     /// [`Interval::try_new`] requires of a start and an end on that strand
     /// (start at or before end on the positive strand, end at or before
-    /// start on the negative strand). Finally, [`Alignment::try_new`] has
-    /// already replayed this identical sequence of operations from these
-    /// identical starting coordinates and proven that every consumed move
-    /// stays within representable bounds, so the move performed here cannot
-    /// overflow or underflow and the interval constructed from it cannot be
-    /// rejected.
+    /// start on the negative strand).
+    ///
+    /// [`Alignment::try_new`] has already replayed this identical sequence of
+    /// operations from these identical starting coordinates and proven that
+    /// every consumed move stays within representable bounds, so the move
+    /// performed here cannot overflow or underflow and the interval
+    /// constructed from it cannot be rejected.
     fn advance(pointer: &mut Coordinate, length: Number) -> Interval {
         let start = pointer.clone();
         // The move below cannot fail; see the proof on this function.
