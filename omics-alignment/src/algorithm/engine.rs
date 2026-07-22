@@ -165,6 +165,9 @@ fn push_operation(
 fn path_to_cigar(path: &[OperationKind]) -> Result<Cigar, Error> {
     let first = path.first().copied().ok_or(Error::TracebackInvariant)?;
     let mut operations = Vec::new();
+    operations
+        .try_reserve_exact(path.len())
+        .map_err(|source| Error::MatrixAllocation { source })?;
     let mut kind = first;
     let mut run_length = 1usize;
 
@@ -321,7 +324,13 @@ fn compute_global<T: Eq>(reference: &[T], query: &[T], scoring: Scoring) -> Resu
         Error::TracebackInvariant
     })?;
 
+    let max_path_length = reference
+        .len()
+        .checked_add(query.len())
+        .ok_or(Error::MatrixSizeOverflow)?;
     let mut path: Vec<OperationKind> = Vec::new();
+    path.try_reserve_exact(max_path_length)
+        .map_err(|source| Error::MatrixAllocation { source })?;
     let mut i = reference.len();
     let mut j = query.len();
 
