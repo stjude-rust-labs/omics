@@ -79,6 +79,15 @@ impl Scoring {
     pub const fn gap_extend_score(self) -> Score {
         self.gap_extend_score
     }
+
+    /// Returns the match or mismatch score for two symbols.
+    pub(crate) fn substitution<T: Eq>(self, reference: &T, query: &T) -> Score {
+        if reference == query {
+            self.match_score
+        } else {
+            self.mismatch_score
+        }
+    }
 }
 
 /// The result of one non-empty pairwise alignment.
@@ -113,6 +122,21 @@ impl Outcome {
     /// Returns the half-open query input range.
     pub const fn query_range(&self) -> &Range<usize> {
         &self.query_range
+    }
+
+    /// Constructs an outcome from a checked traceback.
+    pub(crate) fn new(
+        score: Score,
+        cigar: Cigar,
+        reference_range: Range<usize>,
+        query_range: Range<usize>,
+    ) -> Self {
+        Self {
+            score,
+            cigar,
+            reference_range,
+            query_range,
+        }
     }
 }
 
@@ -186,6 +210,14 @@ pub enum Error {
     },
 }
 
+/// Dynamic-programming and traceback implementation.
+mod engine;
+
+/// Computes a global affine-gap alignment over two complete inputs.
+pub fn global<T: Eq>(reference: &[T], query: &[T], scoring: Scoring) -> Result<Outcome, Error> {
+    engine::global(reference, query, scoring)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -232,6 +264,55 @@ mod tests {
         assert_eq!(outcome.cigar().to_string(), "2=1X");
         assert_eq!(outcome.reference_range(), &(3..6));
         assert_eq!(outcome.query_range(), &(5..8));
+        Ok(())
+    }
+
+    #[test]
+    fn global_aligns_matches_and_one_deletion() -> Result<(), Error> {
+        let scoring = Scoring::try_new(2, -3, -2, -1)?;
+        let outcome = global(b"ACGT", b"AGT", scoring)?;
+        assert_eq!(outcome.score(), 4);
+        assert_eq!(outcome.cigar().to_string(), "1=1D2=");
+        assert_eq!(outcome.reference_range(), &(0..4));
+        assert_eq!(outcome.query_range(), &(0..3));
+        Ok(())
+    }
+
+    #[test]
+    fn global_prefers_two_gaps_to_an_expensive_mismatch() -> Result<(), Error> {
+        let scoring = Scoring::try_new(1, -5, -1, -1)?;
+        let outcome = global(b"A", b"B", scoring)?;
+        assert_eq!(outcome.score(), -2);
+        assert_eq!(outcome.cigar().to_string(), "1I1D");
+        Ok(())
+    }
+
+    #[test]
+    fn global_handles_one_empty_input() -> Result<(), Error> {
+        let scoring = Scoring::try_new(2, -3, -2, -1)?;
+        let outcome = global(b"", b"AAA", scoring)?;
+        assert_eq!(outcome.score(), -4);
+        assert_eq!(outcome.cigar().to_string(), "3I");
+        Ok(())
+    }
+
+    #[test]
+    fn global_rejects_two_empty_inputs() -> Result<(), Error> {
+        let scoring = Scoring::try_new(2, -3, -2, -1)?;
+        assert!(matches!(
+            global::<u8>(b"", b"", scoring),
+            Err(Error::EmptyGlobal)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn global_reports_intermediate_score_overflow() -> Result<(), Error> {
+        let scoring = Scoring::try_new(1, -1, Score::MIN, -1)?;
+        assert!(matches!(
+            global(b"", b"AA", scoring),
+            Err(Error::ScoreOverflow)
+        ));
         Ok(())
     }
 }
