@@ -17,5 +17,8 @@ thiserror.workspace = true
 default = []
 position-u64 = ["omics-coordinate/position-u64"]
 
+[dev-dependencies]
+omics-molecule = { path = "../omics-molecule", version = "0.2.0" }
+
 [lints]
 workspace = true
