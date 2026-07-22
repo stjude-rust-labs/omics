@@ -147,14 +147,7 @@ fn push_operation(
     kind: OperationKind,
     run_length: usize,
 ) -> Result<(), Error> {
-    let length = Number::try_from(run_length).map_err(|_| Error::LengthOutOfRange {
-        axis: if kind == OperationKind::Insertion {
-            Axis::Query
-        } else {
-            Axis::Reference
-        },
-        length: run_length,
-    })?;
+    let length = Number::try_from(run_length).map_err(|_| Error::TracebackInvariant)?;
     operations.push(Operation::try_new(kind, length)?);
     Ok(())
 }
@@ -221,7 +214,8 @@ fn matrix_dimensions(reference: usize, query: usize) -> Result<(usize, usize), E
     Ok((rows, columns))
 }
 
-/// Recovers the unit-operation path and local start coordinates.
+/// Recovers the unit-operation path and start coordinates reached by walking
+/// backward to an entry without a predecessor.
 fn traceback<T: Eq>(
     matrix: &Matrix,
     reference: &[T],
@@ -471,8 +465,7 @@ fn compute_local<T: Eq>(
             let cell = matrix.get_mut(i, j);
             cell.aligned = match aligned.score {
                 Some(score) if score > 0 => aligned,
-                Some(_) => Entry::RESET,
-                None => Entry::UNREACHABLE,
+                _ => Entry::RESET,
             };
             cell.insertion = insertion;
             cell.deletion = deletion;
@@ -573,9 +566,11 @@ mod tests {
 
     #[test]
     fn matrix_allocation_failure_is_reported() {
-        assert!(matches!(
-            Matrix::try_new(1, usize::MAX),
-            Err(Error::MatrixAllocation { .. })
-        ));
+        let error = match Matrix::try_new(1, usize::MAX) {
+            Err(error) => error,
+            Ok(_) => panic!("expected allocation failure"),
+        };
+        assert!(matches!(error, Error::MatrixAllocation { .. }));
+        assert_eq!(error.to_string(), "failed to allocate alignment storage");
     }
 }

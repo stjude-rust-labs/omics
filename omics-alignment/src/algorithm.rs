@@ -251,7 +251,7 @@ pub enum Error {
     #[error("alignment matrix dimensions overflow usize")]
     MatrixSizeOverflow,
     /// Matrix memory could not be reserved.
-    #[error("failed to allocate alignment matrix")]
+    #[error("failed to allocate alignment storage")]
     MatrixAllocation {
         /// Allocation failure reported by `Vec`.
         #[source]
