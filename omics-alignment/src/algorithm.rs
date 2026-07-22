@@ -218,6 +218,15 @@ pub fn global<T: Eq>(reference: &[T], query: &[T], scoring: Scoring) -> Result<O
     engine::global(reference, query, scoring)
 }
 
+/// Computes the highest-scoring positive local affine-gap alignment.
+pub fn local<T: Eq>(
+    reference: &[T],
+    query: &[T],
+    scoring: Scoring,
+) -> Result<Option<Outcome>, Error> {
+    engine::local(reference, query, scoring)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -313,6 +322,48 @@ mod tests {
             global(b"", b"AA", scoring),
             Err(Error::ScoreOverflow)
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn local_returns_best_positive_subsequences() -> Result<(), Error> {
+        let scoring = Scoring::try_new(2, -3, -2, -1)?;
+        let outcome = local(b"GGACGTCC", b"TTACGAAA", scoring)?.unwrap();
+        assert_eq!(outcome.score(), 6);
+        assert_eq!(outcome.cigar().to_string(), "3=");
+        assert_eq!(outcome.reference_range(), &(2..5));
+        assert_eq!(outcome.query_range(), &(2..5));
+        Ok(())
+    }
+
+    #[test]
+    fn local_returns_none_without_a_positive_alignment() -> Result<(), Error> {
+        let scoring = Scoring::try_new(2, -3, -2, -1)?;
+        assert!(local(b"AAAA", b"CCCC", scoring)?.is_none());
+        assert!(local::<u8>(b"", b"", scoring)?.is_none());
+        assert!(local(b"", b"AAAA", scoring)?.is_none());
+        assert!(local(b"AAAA", b"", scoring)?.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn local_trims_zero_cost_leading_gaps() -> Result<(), Error> {
+        let scoring = Scoring::try_new(1, 0, 0, 0)?;
+        let outcome = local(b"A", b"BA", scoring)?.unwrap();
+        assert_eq!(outcome.score(), 1);
+        assert_eq!(outcome.cigar().to_string(), "1=");
+        assert_eq!(outcome.reference_range(), &(0..1));
+        assert_eq!(outcome.query_range(), &(1..2));
+        Ok(())
+    }
+
+    #[test]
+    fn local_chooses_the_earliest_equal_endpoint() -> Result<(), Error> {
+        let scoring = Scoring::try_new(1, 0, 0, 0)?;
+        let outcome = local(b"AA", b"A", scoring)?.unwrap();
+        assert_eq!(outcome.cigar().to_string(), "1=");
+        assert_eq!(outcome.reference_range(), &(0..1));
+        assert_eq!(outcome.query_range(), &(0..1));
         Ok(())
     }
 }

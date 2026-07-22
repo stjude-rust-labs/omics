@@ -2,15 +2,14 @@
 
 use omics_coordinate::position::Number;
 
-use crate::cigar::Axis;
-use crate::cigar::Cigar;
-use crate::cigar::Operation;
-use crate::cigar::OperationKind;
-
 use super::Error;
 use super::Outcome;
 use super::Score;
 use super::Scoring;
+use crate::cigar::Axis;
+use crate::cigar::Cigar;
+use crate::cigar::Operation;
+use crate::cigar::OperationKind;
 
 /// One terminal state in the affine-gap recurrence.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -33,15 +32,14 @@ struct Entry {
 }
 
 impl Entry {
-    /// An unreachable state.
-    const UNREACHABLE: Self = Self {
-        score: None,
-        predecessor: None,
-    };
-
     /// A zero-valued origin or local reset.
     const RESET: Self = Self {
         score: Some(0),
+        predecessor: None,
+    };
+    /// An unreachable state.
+    const UNREACHABLE: Self = Self {
+        score: None,
         predecessor: None,
     };
 
@@ -194,29 +192,94 @@ pub(super) fn global<T: Eq>(
     compute_global(reference, query, scoring)
 }
 
-/// Drives global matrix initialization, fill, endpoint selection, and traceback.
+/// Computes a checked local alignment.
+pub(super) fn local<T: Eq>(
+    reference: &[T],
+    query: &[T],
+    scoring: Scoring,
+) -> Result<Option<Outcome>, Error> {
+    compute_local(reference, query, scoring)
+}
+
+/// Validates the input lengths against the active coordinate type.
+fn validate_lengths(reference: usize, query: usize) -> Result<(), Error> {
+    Number::try_from(reference).map_err(|_| Error::LengthOutOfRange {
+        axis: Axis::Reference,
+        length: reference,
+    })?;
+    Number::try_from(query).map_err(|_| Error::LengthOutOfRange {
+        axis: Axis::Query,
+        length: query,
+    })?;
+    Ok(())
+}
+
+/// Returns the checked dynamic-programming dimensions.
+fn matrix_dimensions(reference: usize, query: usize) -> Result<(usize, usize), Error> {
+    let rows = reference.checked_add(1).ok_or(Error::MatrixSizeOverflow)?;
+    let columns = query.checked_add(1).ok_or(Error::MatrixSizeOverflow)?;
+    Ok((rows, columns))
+}
+
+/// Recovers the unit-operation path and local start coordinates.
+fn traceback<T: Eq>(
+    matrix: &Matrix,
+    reference: &[T],
+    query: &[T],
+    mut state: State,
+    mut i: usize,
+    mut j: usize,
+) -> Result<(Vec<OperationKind>, usize, usize), Error> {
+    let max_path_length = reference
+        .len()
+        .checked_add(query.len())
+        .ok_or(Error::MatrixSizeOverflow)?;
+    let mut path = Vec::new();
+    path.try_reserve_exact(max_path_length)
+        .map_err(|source| Error::MatrixAllocation { source })?;
+
+    loop {
+        let entry = matrix.get(i, j).entry(state);
+        let Some(predecessor) = entry.predecessor else {
+            break;
+        };
+
+        match state {
+            State::Aligned => {
+                path.push(if reference[i - 1] == query[j - 1] {
+                    OperationKind::SequenceMatch
+                } else {
+                    OperationKind::SequenceMismatch
+                });
+                i -= 1;
+                j -= 1;
+            }
+            State::Insertion => {
+                path.push(OperationKind::Insertion);
+                j -= 1;
+            }
+            State::Deletion => {
+                path.push(OperationKind::Deletion);
+                i -= 1;
+            }
+        }
+
+        state = predecessor;
+    }
+
+    path.reverse();
+    Ok((path, i, j))
+}
+
+/// Drives global matrix initialization, fill, endpoint selection, and
+/// traceback.
 fn compute_global<T: Eq>(reference: &[T], query: &[T], scoring: Scoring) -> Result<Outcome, Error> {
     if reference.is_empty() && query.is_empty() {
         return Err(Error::EmptyGlobal);
     }
 
-    Number::try_from(reference.len()).map_err(|_| Error::LengthOutOfRange {
-        axis: Axis::Reference,
-        length: reference.len(),
-    })?;
-    Number::try_from(query.len()).map_err(|_| Error::LengthOutOfRange {
-        axis: Axis::Query,
-        length: query.len(),
-    })?;
-
-    let rows = reference
-        .len()
-        .checked_add(1)
-        .ok_or(Error::MatrixSizeOverflow)?;
-    let columns = query
-        .len()
-        .checked_add(1)
-        .ok_or(Error::MatrixSizeOverflow)?;
+    validate_lengths(reference.len(), query.len())?;
+    let (rows, columns) = matrix_dimensions(reference.len(), query.len())?;
 
     let mut matrix = Matrix::try_new(rows, columns)?;
 
@@ -319,51 +382,20 @@ fn compute_global<T: Eq>(reference: &[T], query: &[T], scoring: Scoring) -> Resu
         debug_assert!(false, "global endpoint is unreachable");
         Error::TracebackInvariant
     })?;
-    let mut state = endpoint.predecessor.ok_or_else(|| {
+    let state = endpoint.predecessor.ok_or_else(|| {
         debug_assert!(false, "global endpoint has no predecessor");
         Error::TracebackInvariant
     })?;
-
-    let max_path_length = reference
-        .len()
-        .checked_add(query.len())
-        .ok_or(Error::MatrixSizeOverflow)?;
-    let mut path: Vec<OperationKind> = Vec::new();
-    path.try_reserve_exact(max_path_length)
-        .map_err(|source| Error::MatrixAllocation { source })?;
-    let mut i = reference.len();
-    let mut j = query.len();
-
-    loop {
-        let entry = matrix.get(i, j).entry(state);
-        let Some(predecessor) = entry.predecessor else {
-            break;
-        };
-
-        match state {
-            State::Aligned => {
-                path.push(if reference[i - 1] == query[j - 1] {
-                    OperationKind::SequenceMatch
-                } else {
-                    OperationKind::SequenceMismatch
-                });
-                i -= 1;
-                j -= 1;
-            }
-            State::Insertion => {
-                path.push(OperationKind::Insertion);
-                j -= 1;
-            }
-            State::Deletion => {
-                path.push(OperationKind::Deletion);
-                i -= 1;
-            }
-        }
-
-        state = predecessor;
-    }
-
-    path.reverse();
+    let (path, reference_start, query_start) = traceback(
+        &matrix,
+        reference,
+        query,
+        state,
+        reference.len(),
+        query.len(),
+    )?;
+    debug_assert_eq!(reference_start, 0);
+    debug_assert_eq!(query_start, 0);
     let cigar = path_to_cigar(&path)?;
     Ok(Outcome::new(
         score,
@@ -371,6 +403,128 @@ fn compute_global<T: Eq>(reference: &[T], query: &[T], scoring: Scoring) -> Resu
         0..reference.len(),
         0..query.len(),
     ))
+}
+
+/// Drives local matrix initialization, fill, endpoint selection, and traceback.
+fn compute_local<T: Eq>(
+    reference: &[T],
+    query: &[T],
+    scoring: Scoring,
+) -> Result<Option<Outcome>, Error> {
+    if reference.is_empty() || query.is_empty() {
+        return Ok(None);
+    }
+
+    validate_lengths(reference.len(), query.len())?;
+    let (rows, columns) = matrix_dimensions(reference.len(), query.len())?;
+
+    let mut matrix = Matrix::try_new(rows, columns)?;
+
+    for j in 0..columns {
+        matrix.get_mut(0, j).aligned = Entry::RESET;
+    }
+    for i in 1..rows {
+        matrix.get_mut(i, 0).aligned = Entry::RESET;
+    }
+
+    for i in 1..rows {
+        for j in 1..columns {
+            let subst = scoring.substitution(&reference[i - 1], &query[j - 1]);
+            let diag = matrix.get(i - 1, j - 1);
+            let left = matrix.get(i, j - 1);
+            let up = matrix.get(i - 1, j);
+
+            let aligned = choose([
+                (checked_add(diag.aligned.score, subst)?, State::Aligned),
+                (checked_add(diag.deletion.score, subst)?, State::Deletion),
+                (checked_add(diag.insertion.score, subst)?, State::Insertion),
+            ]);
+            let insertion = choose([
+                (
+                    checked_add(left.insertion.score, scoring.gap_extend_score())?,
+                    State::Insertion,
+                ),
+                (
+                    checked_add(left.aligned.score, scoring.gap_open_score())?,
+                    State::Aligned,
+                ),
+                (
+                    checked_add(left.deletion.score, scoring.gap_open_score())?,
+                    State::Deletion,
+                ),
+            ]);
+            let deletion = choose([
+                (
+                    checked_add(up.deletion.score, scoring.gap_extend_score())?,
+                    State::Deletion,
+                ),
+                (
+                    checked_add(up.aligned.score, scoring.gap_open_score())?,
+                    State::Aligned,
+                ),
+                (
+                    checked_add(up.insertion.score, scoring.gap_open_score())?,
+                    State::Insertion,
+                ),
+            ]);
+
+            let cell = matrix.get_mut(i, j);
+            cell.aligned = match aligned.score {
+                Some(score) if score > 0 => aligned,
+                Some(_) => Entry::RESET,
+                None => Entry::UNREACHABLE,
+            };
+            cell.insertion = insertion;
+            cell.deletion = deletion;
+        }
+    }
+
+    let mut endpoint: Option<(Score, usize, usize)> = None;
+    for i in 1..rows {
+        for j in 1..columns {
+            let score = matrix.get(i, j).aligned.score;
+            let Some(score) = score.filter(|score| *score > 0) else {
+                continue;
+            };
+
+            if endpoint
+                .as_ref()
+                .map(|(best, ..)| score > *best)
+                .unwrap_or(true)
+            {
+                endpoint = Some((score, i, j));
+            }
+        }
+    }
+
+    let Some((score, reference_end, query_end)) = endpoint else {
+        return Ok(None);
+    };
+
+    let (path, reference_start, query_start) = traceback(
+        &matrix,
+        reference,
+        query,
+        State::Aligned,
+        reference_end,
+        query_end,
+    )?;
+    debug_assert!(matches!(
+        path.first(),
+        Some(OperationKind::SequenceMatch | OperationKind::SequenceMismatch)
+    ));
+    debug_assert!(matches!(
+        path.last(),
+        Some(OperationKind::SequenceMatch | OperationKind::SequenceMismatch)
+    ));
+    let cigar = path_to_cigar(&path)?;
+
+    Ok(Some(Outcome::new(
+        score,
+        cigar,
+        reference_start..reference_end,
+        query_start..query_end,
+    )))
 }
 
 #[cfg(test)]
