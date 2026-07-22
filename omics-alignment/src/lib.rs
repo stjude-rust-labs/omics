@@ -60,6 +60,9 @@
 pub use alignment::Alignment;
 pub use step::Step;
 
+/// Global and local pairwise sequence-alignment algorithms.
+pub mod algorithm;
+
 /// Validated pairwise alignments with lossless per-operation traversal.
 pub mod alignment;
 
