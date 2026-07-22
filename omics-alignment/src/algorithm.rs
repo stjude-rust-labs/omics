@@ -25,9 +25,13 @@
 //! `0..reference.len()` and `0..query.len()`. [`crate::algorithm::local`]
 //! returns the best-scoring subsequence ranges, and the returned CIGAR starts
 //! at `reference_range().start` and `query_range().start` within the original
-//! inputs. Callers that need genomic placement can advance the reference and
-//! query coordinates for input index `0` by those starts and then pass the
-//! returned CIGAR to [`crate::Alignment::try_new`].
+//! inputs. Callers that need genomic placement can apply
+//! `reference_range().start` and `query_range().start` with
+//! [`Coordinate::move_forward`](omics_coordinate::Coordinate::move_forward)
+//! to coordinates that represent input index `0` before calling
+//! [`crate::Alignment::try_new`]. `move_forward` advances positions on the
+//! positive strand and retreats them on the negative strand, so the offset
+//! follows sequence traversal direction.
 //!
 //! # Determinism
 //!

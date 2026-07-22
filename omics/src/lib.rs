@@ -11,8 +11,8 @@
 //!
 //! Enable the `alignment` feature to access validated pairwise sequence
 //! traversal and deterministic affine-gap alignment. The feature automatically
-//! enables `coordinate`. It re-exports
-//! `omics::alignment::algorithm::{global, local}` for generic symbol slices.
+//! enables `coordinate`. It makes `omics::alignment::algorithm::{global,
+//! local}` available for generic symbol slices.
 //!
 //! ```
 //! # #[cfg(feature = "alignment")]
