@@ -1,9 +1,9 @@
-//! Foundational representations of sequence alignments in the Rust omics
-//! ecosystem.
+//! Foundational representations and algorithms for sequence alignments in the
+//! Rust omics ecosystem.
 //!
-//! This crate provides validated pairwise alignments and lossless
-//! per-operation traversal. It has no dependency on SAM records, BAM, PAF, or
-//! chainfile libraries.
+//! This crate provides validated pairwise alignments, lossless per-operation
+//! traversal, and deterministic global and local affine-gap alignment. It has
+//! no dependency on SAM records, BAM, PAF, or chainfile libraries.
 //!
 //! # Quick start
 //!
@@ -56,11 +56,19 @@
 //!
 //! The [`cigar`] module provides the checked CIGAR model, including
 //! [`cigar::OperationKind`], [`cigar::Operation`], and [`cigar::Cigar`].
+//!
+//! # Algorithms
+//!
+//! The [`algorithm`] module computes deterministic global and local affine-gap
+//! alignments over generic symbol slices. Its [`algorithm::Outcome`] reports a
+//! score, a canonical CIGAR built from `=`, `X`, `I`, and `D`, and half-open
+//! input ranges that place the CIGAR on the original sequences.
 
 pub use alignment::Alignment;
 pub use step::Step;
 
-/// Global and local pairwise sequence-alignment algorithms.
+/// Deterministic global and local affine-gap alignment over generic symbol
+/// slices.
 pub mod algorithm;
 
 /// Validated pairwise alignments with lossless per-operation traversal.

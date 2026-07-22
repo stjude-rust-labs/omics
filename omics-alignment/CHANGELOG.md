@@ -19,3 +19,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   losslessly, and `Step::is_aligned` supports filtering to aligned operations
   (`M`, `=`, `X`) without discarding operation boundaries
   ([#18](https://github.com/stjude-rust-labs/omics/pull/18)).
+* Added generic global and local affine-gap alignment with deterministic canonical
+  CIGAR output using `=`, `X`, `I`, and `D`, plus returned half-open local input
+  ranges that place each result on the original sequences.
