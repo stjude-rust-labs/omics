@@ -86,10 +86,6 @@ impl Count {
             return Err(LogarithmicError::Underflow);
         }
 
-        if copies > f64::from(u32::MAX) {
-            return Err(LogarithmicError::Overflow);
-        }
-
         let rounded = copies.round();
         if rounded == 0.0 {
             return Err(LogarithmicError::Underflow);
@@ -98,6 +94,10 @@ impl Count {
         let tolerance = 8.0 * f64::EPSILON * copies.abs().max(1.0);
         if (copies - rounded).abs() > tolerance {
             return Err(LogarithmicError::NonIntegral);
+        }
+
+        if rounded > f64::from(u32::MAX) {
+            return Err(LogarithmicError::Overflow);
         }
 
         Ok(Self::new(rounded as u32))
@@ -247,10 +247,16 @@ pub enum ParseError {
     /// The region end precedes the start.
     #[error("copy-number region end must be greater than start")]
     ReversedRegion,
+}
 
-    /// Construction failed after parsing.
-    #[error(transparent)]
-    Construct(#[from] Error),
+impl From<Error> for ParseError {
+    fn from(value: Error) -> Self {
+        match value {
+            Error::Contig(err) => Self::Contig(err),
+            Error::EmptyRegion => Self::EmptyRegion,
+            Error::ReversedRegion => Self::ReversedRegion,
+        }
+    }
 }
 
 /// A strandless, half-open copy-number variant.
@@ -351,7 +357,7 @@ impl FromStr for Variant {
             copies: (*copies).to_string(),
         })?;
 
-        Variant::try_new(*contig, start.get(), end.get(), copies).map_err(ParseError::Construct)
+        Ok(Variant::try_new(*contig, start.get(), end.get(), copies)?)
     }
 }
 

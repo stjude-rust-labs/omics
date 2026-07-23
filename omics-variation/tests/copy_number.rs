@@ -144,6 +144,18 @@ fn rejects_invalid_logarithmic_values() {
 }
 
 #[test]
+fn final_review_accepts_a_maximum_count_log2_round_trip_within_tolerance() {
+    let max_count = Count::new(u32::MAX);
+    let log2 = max_count.log2(Ploidy::DIPLOID);
+
+    // SAFETY: a logarithmic round trip from a valid maximum count must
+    // reconstruct the same count when it stays within tolerance.
+    let round_trip = Count::try_from_log2(log2, Ploidy::DIPLOID).unwrap();
+
+    assert_eq!(round_trip, max_count);
+}
+
+#[test]
 fn accepts_negative_infinity_and_tolerant_rounding() {
     // SAFETY: negative infinity is defined to round-trip to zero copies.
     let zero_from_log2 = Count::try_from_log2(f64::NEG_INFINITY, Ploidy::DIPLOID).unwrap();
@@ -171,4 +183,25 @@ fn rejects_finite_inputs_that_round_to_zero() {
         Count::try_from_log2(tiny_log2, Ploidy::DIPLOID),
         Err(LogarithmicError::Underflow)
     );
+}
+
+#[test]
+fn final_review_maps_an_invalid_contig_to_the_dedicated_parse_error() {
+    let err = ":100-200(i):3".parse::<Variant>().unwrap_err();
+
+    assert!(matches!(err, ParseError::Contig(_)));
+}
+
+#[test]
+fn final_review_maps_an_empty_region_to_the_dedicated_parse_error() {
+    let err = "seq0:100-100(i):3".parse::<Variant>().unwrap_err();
+
+    assert_eq!(err, ParseError::EmptyRegion);
+}
+
+#[test]
+fn final_review_maps_a_reversed_region_to_the_dedicated_parse_error() {
+    let err = "seq0:200-100(i):3".parse::<Variant>().unwrap_err();
+
+    assert_eq!(err, ParseError::ReversedRegion);
 }
