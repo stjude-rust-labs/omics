@@ -458,6 +458,7 @@ pub mod coordinate;
 pub mod interval;
 pub mod math;
 pub mod position;
+pub mod span;
 pub mod strand;
 pub mod system;
 
@@ -468,5 +469,6 @@ pub use coordinate::base;
 pub use coordinate::interbase;
 pub use interval::Interval;
 pub use position::Position;
+pub use span::Span;
 pub use strand::Strand;
 pub use system::System;
