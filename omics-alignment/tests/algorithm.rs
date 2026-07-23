@@ -21,10 +21,13 @@ enum Move {
 }
 
 /// Returns the affine gap score for a run of the given length.
+///
+/// Caller must ensure that `length` is at least `1` and that `length - 1`
+/// fits in [`Score`].
 fn gap_score(scoring: Scoring, length: usize) -> Score {
-    // SAFETY: every call site finds a maximal run of length >= 1, so
-    // length - 1 >= 0 and fits in i64 for inputs bounded by 3.
-    scoring.gap_open_score() + Score::try_from(length - 1).unwrap() * scoring.gap_extend_score()
+    // SAFETY: exhaustive callers provide maximal runs from inputs bounded by 3.
+    let extensions = Score::try_from(length - 1).unwrap();
+    scoring.gap_open_score() + extensions * scoring.gap_extend_score()
 }
 
 /// Scores a complete path against the given input slices.
