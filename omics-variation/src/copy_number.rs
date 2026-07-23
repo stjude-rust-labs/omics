@@ -14,14 +14,14 @@ use omics_coordinate::system::Interbase;
 use omics_core::VARIANT_SEPARATOR;
 use thiserror::Error;
 
-/// The copy-number change relative to a baseline.
+/// The copy-number change relative to the reference ploidy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Change {
-    /// The observed copy number is below baseline.
+    /// The observed copy number is below the reference ploidy.
     Loss,
-    /// The observed copy number matches baseline.
-    Baseline,
-    /// The observed copy number is above baseline.
+    /// The observed copy number matches the reference ploidy.
+    Reference,
+    /// The observed copy number is above the reference ploidy.
     Gain,
 }
 
@@ -270,6 +270,8 @@ pub struct Variant {
     end: Position<Interbase>,
     /// The observed copy count over the interval.
     count: Count,
+    /// The reference ploidy for the interval.
+    ploidy: Ploidy,
 }
 
 impl Variant {
@@ -279,6 +281,7 @@ impl Variant {
         start: Number,
         end: Number,
         copies: u32,
+        ploidy: Ploidy,
     ) -> Result<Self, Error> {
         let contig = contig.try_into()?;
 
@@ -293,6 +296,7 @@ impl Variant {
             start: InterbasePosition::new(start),
             end: InterbasePosition::new(end),
             count: Count::new(copies),
+            ploidy,
         })
     }
 
@@ -316,13 +320,28 @@ impl Variant {
         self.count
     }
 
-    /// Classifies the variant against a baseline copy number.
-    pub fn change(&self, baseline: Count) -> Change {
-        match self.count.cmp(&baseline) {
+    /// Gets the reference ploidy.
+    pub fn ploidy(&self) -> Ploidy {
+        self.ploidy
+    }
+
+    /// Classifies the variant against its stored reference ploidy.
+    pub fn change(&self) -> Change {
+        match self.count.get().cmp(&self.ploidy.get()) {
             Ordering::Less => Change::Loss,
-            Ordering::Equal => Change::Baseline,
+            Ordering::Equal => Change::Reference,
             Ordering::Greater => Change::Gain,
         }
+    }
+
+    /// Gets the base-2 logarithmic ratio relative to the reference ploidy.
+    pub fn log2(&self) -> f64 {
+        self.count.log2(self.ploidy)
+    }
+
+    /// Gets the base-10 logarithmic ratio relative to the reference ploidy.
+    pub fn log10(&self) -> f64 {
+        self.count.log10(self.ploidy)
     }
 }
 
@@ -359,7 +378,13 @@ impl FromStr for Variant {
             copies: copies.to_string(),
         })?;
 
-        Ok(Variant::try_new(contig, start.get(), end.get(), copies)?)
+        Ok(Variant::try_new(
+            contig,
+            start.get(),
+            end.get(),
+            copies,
+            Ploidy::DIPLOID,
+        )?)
     }
 }
 
