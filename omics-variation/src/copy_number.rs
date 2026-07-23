@@ -90,6 +90,10 @@ impl Count {
         }
 
         let rounded = copies.round();
+        if rounded == 0.0 {
+            return Err(LogarithmicError::Underflow);
+        }
+
         let tolerance = 8.0 * f64::EPSILON * copies.abs().max(1.0);
         if (copies - rounded).abs() > tolerance {
             return Err(LogarithmicError::NonIntegral);

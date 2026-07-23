@@ -139,3 +139,13 @@ fn accepts_negative_infinity_and_tolerant_rounding() {
     assert!(Count::new(0).log10(Ploidy::DIPLOID).is_infinite());
     assert!(Count::new(0).log10(Ploidy::DIPLOID).is_sign_negative());
 }
+
+#[test]
+fn rejects_finite_inputs_that_round_to_zero() {
+    let tiny_log2 = (5e-301_f64).log2();
+
+    assert_eq!(
+        Count::try_from_log2(tiny_log2, Ploidy::DIPLOID),
+        Err(LogarithmicError::Underflow)
+    );
+}
