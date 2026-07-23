@@ -185,7 +185,7 @@ pub struct Span<S: System> {
 
 impl<S: System> Span<S>
 where
-    Position<S>: position::r#trait::Position<S> + r#trait::PositionForSpan<S>,
+    Position<S>: r#trait::PositionForSpan<S>,
 {
     /// Creates a span from start and end numbers.
     pub fn try_new(start: Number, end: Number) -> Result<Self> {
@@ -196,7 +196,12 @@ where
 
         Ok(Self { start, end })
     }
+}
 
+impl<S: System> Span<S>
+where
+    Position<S>: position::r#trait::Position<S>,
+{
     /// Returns the start position.
     pub fn start(&self) -> &Position<S> {
         &self.start

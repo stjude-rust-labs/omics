@@ -205,7 +205,7 @@ impl Alignment {
     /// position on the positive strand and retreats it on the negative
     /// strand. Either way, the coordinate observed before the move and the
     /// coordinate observed after the move are ordered exactly as
-    /// [`Interval::try_new`] requires of a start and an end on that strand
+    /// [`Interval::try_from`] requires of a start and an end on that strand
     /// (start at or before end on the positive strand, end at or before
     /// start on the negative strand).
     ///
@@ -220,10 +220,9 @@ impl Alignment {
         let moved = pointer.move_forward(length);
         debug_assert!(moved, "movement already validated by Alignment::try_new");
 
-        // SAFETY: the proof on this function guarantees `start` and
-        // `pointer` are ordered as `Interval::try_new` requires for this
-        // strand.
-        Interval::try_new(start, pointer.clone()).unwrap()
+        // SAFETY: the proof above guarantees the endpoints have compatible context and
+        // direction.
+        Interval::try_from((start, pointer.clone())).unwrap()
     }
 }
 

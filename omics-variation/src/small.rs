@@ -59,14 +59,13 @@ pub enum Kind {
 pub(crate) fn base_interval(start: &Coordinate<Base>, len: usize) -> Option<Interval<Base>> {
     let span = Number::try_from(len.checked_sub(1)?).ok()?;
     let end = start.clone().into_move_forward(span)?;
-    Interval::try_new(start.clone(), end).ok()
+    Interval::try_from((start.clone(), end)).ok()
 }
 
 /// Builds a zero-width interbase interval at a boundary coordinate.
 pub(crate) fn interbase_interval(coordinate: &Coordinate<Interbase>) -> Interval<Interbase> {
-    // SAFETY: an interbase interval whose start equals its end is always
-    // valid.
-    Interval::try_new(coordinate.clone(), coordinate.clone()).unwrap()
+    // SAFETY: equal endpoints share context and form a stationary span.
+    Interval::try_from((coordinate.clone(), coordinate.clone())).unwrap()
 }
 
 /// Builds a zero-width interbase interval immediately before a base coordinate.

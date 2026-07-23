@@ -1,28 +1,26 @@
 //! Intervals.
 
-use std::cmp::max;
-use std::cmp::min;
-
 use omics_core::VARIANT_SEPARATOR;
 use thiserror::Error;
 
 use crate::Contig;
 use crate::Position;
+use crate::Span;
 use crate::Strand;
 use crate::System;
+use crate::contig;
 use crate::coordinate;
 use crate::coordinate::Coordinate;
 use crate::coordinate::CoordinateRef;
 use crate::position;
 use crate::position::Number;
+use crate::span;
+use crate::span::Direction;
 use crate::strand;
 use crate::system::Base;
 
 pub mod base;
 pub mod interbase;
-
-/// The separator between an interval's start and end positions.
-const INTERVAL_SEPARATOR: &str = "-";
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // Errors
@@ -114,24 +112,6 @@ pub enum NonsensicalError {
         /// The strand of the interval doing the clamping.
         end: Strand,
     },
-
-    /// A negative sized interval.
-    ///
-    /// This error occurs when the start of the interval comes _after_ the end
-    /// of the interval.
-    ///
-    /// On positive stranded intervals, this is when the start position is
-    /// _greater than_ the end position. On negative stranded intervals, this is
-    /// when the start position is _less than_ the end position.
-    #[error("negatively sized interval: start is `{start}`, end is `{end}`, strand is `{strand}`")]
-    NegativelySized {
-        /// The start position.
-        start: Number,
-        /// The end position.
-        end: Number,
-        /// The strand.
-        strand: Strand,
-    },
 }
 
 /// A [`Result`](std::result::Result) with a [`NonsensicalError`].
@@ -158,9 +138,23 @@ pub enum Error {
     #[error("clamp error: {0}")]
     Clamp(#[from] ClampError),
 
+    /// A contig error.
+    #[error("contig error: {0}")]
+    Contig(#[from] contig::Error),
+
     /// A coordinate error.
     #[error("coordinate error: {0}")]
     Coordinate(#[from] coordinate::Error),
+
+    /// The span direction does not agree with the strand.
+    #[error("span direction `{direction}` is incompatible with strand `{strand}`")]
+    DirectionMismatch {
+        /// The interval strand.
+        strand: Strand,
+
+        /// The span direction.
+        direction: Direction,
+    },
 
     /// A nonsensical interval.
     #[error("nonsensical interval: {0}")]
@@ -216,11 +210,8 @@ pub struct Interval<S: System> {
     /// The strand.
     strand: Strand,
 
-    /// The start position.
-    start: Position<S>,
-
-    /// The end position.
-    end: Position<S>,
+    /// The directed span.
+    span: Span<S>,
 }
 
 impl<S: System> Interval<S>
@@ -228,107 +219,58 @@ where
     Interval<S>: r#trait::Interval<S>,
     Position<S>: position::r#trait::Position<S>,
 {
-    /// Creates a new interval if the following invariants are upheld.
+    /// Creates an interval from genomic context and a directed span.
     ///
-    /// * The contigs of the two coordinates must match.
-    ///   * If this does not hold, a [`NonsensicalError::MismatchedContigs`]
-    ///     will be returned.
-    /// * The strands of the two coordinates must match.
-    ///   * If this does not hold, a [`NonsensicalError::MismatchedStrands`]
-    ///     will be returned.
-    /// * The start must come _before or be equal to_ the end in that (a) on
-    ///   positive strand, `start <= end`, or, (b) on the negative strand, `end
-    ///   <= start`. This ensures that the interval is always oriented from
-    ///   start to end of the molecule.
-    ///   * If this does not hold, a [`NonsensicalError::NegativelySized`] will
-    ///     be returned.
+    /// Positive strands accept ascending and stationary spans. Negative
+    /// strands accept descending and stationary spans.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::DirectionMismatch`] when the span direction does not
+    /// agree with the strand.
     ///
     /// # Examples
     ///
     /// ```
-    /// use omics_coordinate::Coordinate;
     /// use omics_coordinate::Interval;
-    /// use omics_coordinate::system::Base;
+    /// use omics_coordinate::Span;
     /// use omics_coordinate::system::Interbase;
     ///
-    /// //===========//
-    /// // Interbase //
-    /// //===========//
-    ///
-    /// // Positive strand.
-    ///
-    /// let start = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
-    /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
-    /// let interval = Interval::try_new(start, end)?;
-    ///
-    /// // Negative strand.
-    ///
-    /// let start = Coordinate::<Interbase>::try_new("seq0", "-", 20)?;
-    /// let end = Coordinate::<Interbase>::try_new("seq0", "-", 10)?;
-    /// let interval = Interval::try_new(start, end)?;
-    ///
-    /// //======//
-    /// // Base //
-    /// //======//
-    ///
-    /// // Positive strand.
-    ///
-    /// let start = Coordinate::<Base>::try_new("seq0", "+", 10)?;
-    /// let end = Coordinate::<Base>::try_new("seq0", "+", 20)?;
-    /// let interval = Interval::try_new(start, end)?;
-    ///
-    /// // Negative strand.
-    ///
-    /// let start = Coordinate::<Base>::try_new("seq0", "-", 20)?;
-    /// let end = Coordinate::<Base>::try_new("seq0", "-", 10)?;
-    /// let interval = Interval::try_new(start, end)?;
+    /// let span = Span::<Interbase>::try_new(10, 20)?;
+    /// let interval = Interval::try_new("seq0", "+", span)?;
+    /// assert_eq!(interval.to_string(), "seq0:+:10-20");
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn try_new(start: Coordinate<S>, end: Coordinate<S>) -> Result<super::Interval<S>> {
-        let (start_contig, start_strand, start_position) = start.into_parts();
-        let (end_contig, end_strand, end_position) = end.into_parts();
+    pub fn try_new(
+        contig: impl TryInto<Contig, Error = contig::Error>,
+        strand: impl TryInto<Strand, Error = strand::Error>,
+        span: Span<S>,
+    ) -> Result<Self> {
+        let contig = contig.try_into()?;
+        let strand = strand.try_into()?;
+        let compatible = matches!(
+            (strand, span.direction()),
+            (
+                Strand::Positive,
+                Direction::Ascending | Direction::Stationary
+            ) | (
+                Strand::Negative,
+                Direction::Descending | Direction::Stationary
+            )
+        );
 
-        if start_contig != end_contig {
-            return Err(Error::Nonsensical(NonsensicalError::MismatchedContigs {
-                start: start_contig,
-                end: end_contig,
-            }));
+        if !compatible {
+            return Err(Error::DirectionMismatch {
+                strand,
+                direction: span.direction(),
+            });
         }
 
-        if start_strand != end_strand {
-            return Err(Error::Nonsensical(NonsensicalError::MismatchedStrands {
-                start: start_strand,
-                end: end_strand,
-            }));
-        }
-
-        match start_strand {
-            Strand::Positive => {
-                if start_position > end_position {
-                    return Err(Error::Nonsensical(NonsensicalError::NegativelySized {
-                        start: start_position.get(),
-                        end: end_position.get(),
-                        strand: start_strand,
-                    }));
-                }
-            }
-            Strand::Negative => {
-                if end_position > start_position {
-                    return Err(Error::Nonsensical(NonsensicalError::NegativelySized {
-                        start: start_position.get(),
-                        end: end_position.get(),
-                        strand: start_strand,
-                    }));
-                }
-            }
-        }
-
-        Ok(Interval {
-            contig: start_contig,
-            strand: start_strand,
-            start: start_position,
-            end: end_position,
+        Ok(Self {
+            contig,
+            strand,
+            span,
         })
     }
 
@@ -348,7 +290,7 @@ where
     ///
     /// let start = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
     /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
-    /// let interval = Interval::try_new(start.clone(), end)?;
+    /// let interval = Interval::try_from((start.clone(), end))?;
     ///
     /// assert_eq!(interval.start().into_owned(), start);
     ///
@@ -358,14 +300,14 @@ where
     ///
     /// let start = Coordinate::<Base>::try_new("seq0", "+", 10)?;
     /// let end = Coordinate::<Base>::try_new("seq0", "+", 20)?;
-    /// let interval = Interval::try_new(start.clone(), end)?;
+    /// let interval = Interval::try_from((start.clone(), end))?;
     ///
     /// assert_eq!(interval.start().into_owned(), start);
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn start(&self) -> CoordinateRef<'_, S> {
-        CoordinateRef::new(&self.contig, self.strand, &self.start)
+        CoordinateRef::new(&self.contig, self.strand, self.span.start())
     }
 
     /// Consumes `self` and returns the start coordinate.
@@ -384,7 +326,7 @@ where
     ///
     /// let start = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
     /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
-    /// let interval = Interval::try_new(start.clone(), end)?;
+    /// let interval = Interval::try_from((start.clone(), end))?;
     ///
     /// assert_eq!(interval.into_start(), start);
     ///
@@ -394,14 +336,15 @@ where
     ///
     /// let start = Coordinate::<Base>::try_new("seq0", "+", 10)?;
     /// let end = Coordinate::<Base>::try_new("seq0", "+", 20)?;
-    /// let interval = Interval::try_new(start.clone(), end)?;
+    /// let interval = Interval::try_from((start.clone(), end))?;
     ///
     /// assert_eq!(interval.into_start(), start);
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn into_start(self) -> Coordinate<S> {
-        Coordinate::new(self.contig, self.strand, self.start)
+        let (start, _) = self.span.into_positions();
+        Coordinate::new(self.contig, self.strand, start)
     }
 
     /// Gets a borrowed end coordinate.
@@ -420,7 +363,7 @@ where
     ///
     /// let start = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
     /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
-    /// let interval = Interval::try_new(start, end.clone())?;
+    /// let interval = Interval::try_from((start, end.clone()))?;
     ///
     /// assert_eq!(interval.end().into_owned(), end);
     ///
@@ -430,14 +373,14 @@ where
     ///
     /// let start = Coordinate::<Base>::try_new("seq0", "+", 10)?;
     /// let end = Coordinate::<Base>::try_new("seq0", "+", 20)?;
-    /// let interval = Interval::try_new(start, end.clone())?;
+    /// let interval = Interval::try_from((start, end.clone()))?;
     ///
     /// assert_eq!(interval.end().into_owned(), end);
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn end(&self) -> CoordinateRef<'_, S> {
-        CoordinateRef::new(&self.contig, self.strand, &self.end)
+        CoordinateRef::new(&self.contig, self.strand, self.span.end())
     }
 
     /// Consumes `self` and returns the end coordinate.
@@ -456,7 +399,7 @@ where
     ///
     /// let start = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
     /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
-    /// let interval = Interval::try_new(start, end.clone())?;
+    /// let interval = Interval::try_from((start, end.clone()))?;
     ///
     /// assert_eq!(interval.into_end(), end);
     ///
@@ -466,14 +409,15 @@ where
     ///
     /// let start = Coordinate::<Base>::try_new("seq0", "+", 10)?;
     /// let end = Coordinate::<Base>::try_new("seq0", "+", 20)?;
-    /// let interval = Interval::try_new(start, end.clone())?;
+    /// let interval = Interval::try_from((start, end.clone()))?;
     ///
     /// assert_eq!(interval.into_end(), end);
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn into_end(self) -> Coordinate<S> {
-        Coordinate::new(self.contig, self.strand, self.end)
+        let (_, end) = self.span.into_positions();
+        Coordinate::new(self.contig, self.strand, end)
     }
 
     /// Consumes `self` and returns the start and end coordinates.
@@ -492,7 +436,7 @@ where
     ///
     /// let start = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
     /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
-    /// let interval = Interval::try_new(start.clone(), end.clone())?;
+    /// let interval = Interval::try_from((start.clone(), end.clone()))?;
     /// let parts = interval.into_coordinates();
     ///
     /// assert_eq!(parts.0, start);
@@ -504,7 +448,7 @@ where
     ///
     /// let start = Coordinate::<Base>::try_new("seq0", "+", 10)?;
     /// let end = Coordinate::<Base>::try_new("seq0", "+", 20)?;
-    /// let interval = Interval::try_new(start.clone(), end.clone())?;
+    /// let interval = Interval::try_from((start.clone(), end.clone()))?;
     /// let parts = interval.into_coordinates();
     ///
     /// assert_eq!(parts.0, start);
@@ -513,10 +457,21 @@ where
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn into_coordinates(self) -> (Coordinate<S>, Coordinate<S>) {
+        let (start, end) = self.span.into_positions();
         (
-            Coordinate::new(self.contig.clone(), self.strand, self.start),
-            Coordinate::new(self.contig, self.strand, self.end),
+            Coordinate::new(self.contig.clone(), self.strand, start),
+            Coordinate::new(self.contig, self.strand, end),
         )
+    }
+
+    /// Returns the directed span.
+    pub fn span(&self) -> &Span<S> {
+        &self.span
+    }
+
+    /// Consumes the interval and returns its directed span.
+    pub fn into_span(self) -> Span<S> {
+        self.span
     }
 
     /// Returns a reference to the contig.
@@ -535,7 +490,7 @@ where
     ///
     /// let start = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
     /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
-    /// let interval = Interval::try_new(start, end)?;
+    /// let interval = Interval::try_from((start, end))?;
     ///
     /// assert_eq!(interval.contig().as_str(), "seq0");
     ///
@@ -545,7 +500,7 @@ where
     ///
     /// let start = Coordinate::<Base>::try_new("seq0", "+", 10)?;
     /// let end = Coordinate::<Base>::try_new("seq0", "+", 20)?;
-    /// let interval = Interval::try_new(start, end)?;
+    /// let interval = Interval::try_from((start, end))?;
     ///
     /// assert_eq!(interval.contig().as_str(), "seq0");
     ///
@@ -572,7 +527,7 @@ where
     ///
     /// let start = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
     /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
-    /// let interval = Interval::try_new(start, end)?;
+    /// let interval = Interval::try_from((start, end))?;
     ///
     /// assert_eq!(interval.strand(), Strand::Positive);
     ///
@@ -582,7 +537,7 @@ where
     ///
     /// let start = Coordinate::<Base>::try_new("seq0", "-", 20)?;
     /// let end = Coordinate::<Base>::try_new("seq0", "-", 10)?;
-    /// let interval = Interval::try_new(start, end)?;
+    /// let interval = Interval::try_from((start, end))?;
     ///
     /// assert_eq!(interval.strand(), Strand::Negative);
     ///
@@ -624,7 +579,7 @@ where
     ///
     /// let start = Coordinate::<Interbase>::try_new("seq0", "+", 0)?;
     /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
-    /// let interval = Interval::try_new(start, end)?;
+    /// let interval = Interval::try_from((start, end))?;
     ///
     /// // Coordinates on the same contig, strand, and within the interval's range
     /// // are contained within the interval.
@@ -644,7 +599,7 @@ where
     ///
     /// let start = Coordinate::<Interbase>::try_new("seq0", "+", 1)?;
     /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
-    /// let interval = Interval::try_new(start, end)?;
+    /// let interval = Interval::try_from((start, end))?;
     ///
     /// // Coordinates on the same contig, strand, and within the interval's range
     /// // are contained within the interval.
@@ -661,24 +616,9 @@ where
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn contains_coordinate(&self, coordinate: &crate::Coordinate<S>) -> bool {
-        if self.contig() != coordinate.contig() {
-            return false;
-        }
-
-        if self.strand() != coordinate.strand() {
-            return false;
-        }
-
-        match self.strand() {
-            Strand::Positive => {
-                self.start().position().get() <= coordinate.position().get()
-                    && self.end().position().get() >= coordinate.position().get()
-            }
-            Strand::Negative => {
-                self.start().position().get() >= coordinate.position().get()
-                    && self.end().position().get() <= coordinate.position().get()
-            }
-        }
+        self.contig() == coordinate.contig()
+            && self.strand() == coordinate.strand()
+            && self.span.contains_position(coordinate.position())
     }
 
     /// Returns whether or not the entity at the in-base coordinate is
@@ -705,7 +645,7 @@ where
     ///
     /// let start = Coordinate::<Interbase>::try_new("seq0", "+", 0)?;
     /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
-    /// let interval = Interval::try_new(start, end)?;
+    /// let interval = Interval::try_from((start, end))?;
     ///
     /// // Coordinates on the same contig, strand, and within the interval's range
     /// // are contained within the interval.
@@ -725,7 +665,7 @@ where
     ///
     /// let start = Coordinate::<Interbase>::try_new("seq0", "+", 1)?;
     /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
-    /// let interval = Interval::try_new(start, end)?;
+    /// let interval = Interval::try_from((start, end))?;
     ///
     /// // Coordinates on the same contig, strand, and within the interval's range
     /// // are contained within the interval.
@@ -763,7 +703,7 @@ where
     ///
     /// let start = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
     /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
-    /// let interval = Interval::try_new(start, end)?;
+    /// let interval = Interval::try_from((start, end))?;
     ///
     /// assert_eq!(interval.count_entities(), 10);
     ///
@@ -771,7 +711,7 @@ where
     ///
     /// let start = Coordinate::<Interbase>::try_new("seq0", "-", 20)?;
     /// let end = Coordinate::<Interbase>::try_new("seq0", "-", 10)?;
-    /// let interval = Interval::try_new(start, end)?;
+    /// let interval = Interval::try_from((start, end))?;
     ///
     /// assert_eq!(interval.count_entities(), 10);
     ///
@@ -783,7 +723,7 @@ where
     ///
     /// let start = Coordinate::<Base>::try_new("seq0", "+", 10)?;
     /// let end = Coordinate::<Base>::try_new("seq0", "+", 20)?;
-    /// let interval = Interval::try_new(start, end)?;
+    /// let interval = Interval::try_from((start, end))?;
     ///
     /// assert_eq!(interval.count_entities(), 11);
     ///
@@ -791,7 +731,7 @@ where
     ///
     /// let start = Coordinate::<Base>::try_new("seq0", "-", 20)?;
     /// let end = Coordinate::<Base>::try_new("seq0", "-", 10)?;
-    /// let interval = Interval::try_new(start, end)?;
+    /// let interval = Interval::try_from((start, end))?;
     ///
     /// assert_eq!(interval.count_entities(), 11);
     ///
@@ -908,62 +848,53 @@ where
     #[must_use = "this method returns a new interval"]
     pub fn clamp(self, interval: Interval<S>) -> Result<Interval<S>> {
         let Self {
-            contig: start_contig,
-            strand: start_strand,
-            start,
-            end,
+            contig,
+            strand,
+            span,
         } = self;
         let Self {
             contig: operand_contig,
             strand: operand_strand,
-            start: operand_start,
-            end: operand_end,
+            span: operand_span,
         } = interval;
 
-        if start_contig != operand_contig {
+        if contig != operand_contig {
             return Err(Error::Clamp(ClampError::MismatchedContigs {
-                original: start_contig,
+                original: contig,
                 operand: operand_contig,
             }));
         }
 
-        if start_strand != operand_strand {
+        if strand != operand_strand {
             return Err(Error::Clamp(ClampError::MismatchedStrand {
-                original: start_strand,
+                original: strand,
                 operand: operand_strand,
             }));
         }
 
-        let original_start = start.get();
-        let original_end = end.get();
-        let operand_start_value = operand_start.get();
-        let operand_end_value = operand_end.get();
-
-        let (new_start, new_end) = match start_strand {
-            Strand::Positive => (max(start, operand_start), min(end, operand_end)),
-            Strand::Negative => (min(start, operand_start), max(end, operand_end)),
-        };
-
-        let disjoint = match start_strand {
-            Strand::Positive => new_start > new_end,
-            Strand::Negative => new_start < new_end,
-        };
-
-        if disjoint {
-            return Err(Error::Clamp(ClampError::Disjoint {
+        let span = span.clamp(operand_span).map_err(|error| match error {
+            span::ClampError::Disjoint {
                 original_start,
                 original_end,
-                operand_start: operand_start_value,
-                operand_end: operand_end_value,
-                strand: start_strand,
-            }));
-        }
+                operand_start,
+                operand_end,
+            } => Error::Clamp(ClampError::Disjoint {
+                original_start,
+                original_end,
+                operand_start,
+                operand_end,
+                strand,
+            }),
+            span::ClampError::DirectionMismatch { .. } => {
+                // SAFETY: intervals on one strand always have compatible span directions.
+                unreachable!()
+            }
+        })?;
 
         Ok(Self {
-            contig: start_contig,
-            strand: start_strand,
-            start: new_start,
-            end: new_end,
+            contig,
+            strand,
+            span,
         })
     }
 
@@ -986,7 +917,7 @@ where
     ///
     /// let start = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
     /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
-    /// let interval = Interval::try_new(start, end)?;
+    /// let interval = Interval::try_from((start, end))?;
     ///
     /// let query = Coordinate::<Interbase>::try_new("seq0", "+", 15)?;
     /// assert_eq!(interval.coordinate_offset(&query).unwrap(), 5);
@@ -1003,7 +934,7 @@ where
     ///
     /// let start = Coordinate::<Base>::try_new("seq0", "-", 20)?;
     /// let end = Coordinate::<Base>::try_new("seq0", "-", 10)?;
-    /// let interval = Interval::try_new(start, end)?;
+    /// let interval = Interval::try_from((start, end))?;
     ///
     /// let query = Coordinate::<Base>::try_new("seq0", "-", 15)?;
     /// assert_eq!(interval.coordinate_offset(&query).unwrap(), 5);
@@ -1017,15 +948,9 @@ where
     /// Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn coordinate_offset(&self, coordinate: &Coordinate<S>) -> Option<Number> {
-        if !self.contains_coordinate(coordinate) {
-            return None;
-        }
-
-        Some(
-            coordinate
-                .position()
-                .distance_unchecked(self.start().position()),
-        )
+        (self.contig() == coordinate.contig() && self.strand() == coordinate.strand())
+            .then(|| self.span.position_offset(coordinate.position()))
+            .flatten()
     }
 
     /// Returns the coordinate at the offset within the interval.
@@ -1100,12 +1025,9 @@ where
     /// Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn coordinate_at_offset(&self, offset: Number) -> Option<Coordinate<S>> {
-        let coordinate = self.start().into_owned().into_move_forward(offset)?;
-
-        match self.contains_coordinate(&coordinate) {
-            true => Some(coordinate),
-            false => None,
-        }
+        self.span
+            .position_at_offset(offset)
+            .map(|position| Coordinate::new(self.contig.clone(), self.strand, position))
     }
 
     /// Reverse complements the interval, meaning that:
@@ -1127,7 +1049,7 @@ where
     ///
     /// let start = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
     /// let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
-    /// let original = Interval::try_new(start, end)?;
+    /// let original = Interval::try_from((start, end))?;
     ///
     /// let complemented = original.clone().reverse_complement();
     /// assert_eq!(complemented, "seq0:-:20-10".parse::<Interval<Interbase>>()?);
@@ -1141,7 +1063,7 @@ where
     ///
     /// let start = Coordinate::<Base>::try_new("seq0", "+", 10)?;
     /// let end = Coordinate::<Base>::try_new("seq0", "+", 20)?;
-    /// let original = Interval::try_new(start, end)?;
+    /// let original = Interval::try_from((start, end))?;
     ///
     /// let complemented = original.clone().reverse_complement();
     /// assert_eq!(complemented, "seq0:-:20-10".parse::<Interval<Base>>()?);
@@ -1156,9 +1078,43 @@ where
         Self {
             contig: self.contig,
             strand: self.strand.complement(),
-            start: self.end,
-            end: self.start,
+            span: self.span.reversed(),
         }
+    }
+}
+
+impl<S: System> TryFrom<(Coordinate<S>, Coordinate<S>)> for Interval<S>
+where
+    Interval<S>: r#trait::Interval<S>,
+    Position<S>: position::r#trait::Position<S>,
+{
+    type Error = Error;
+
+    fn try_from((start, end): (Coordinate<S>, Coordinate<S>)) -> Result<Self> {
+        let (start_contig, start_strand, start_position) = start.into_parts();
+        let (end_contig, end_strand, end_position) = end.into_parts();
+
+        if start_contig != end_contig {
+            return Err(Error::Nonsensical(NonsensicalError::MismatchedContigs {
+                start: start_contig,
+                end: end_contig,
+            }));
+        }
+
+        if start_strand != end_strand {
+            return Err(Error::Nonsensical(NonsensicalError::MismatchedStrands {
+                start: start_strand,
+                end: end_strand,
+            }));
+        }
+
+        let strand = match start_strand {
+            Strand::Positive => "+",
+            Strand::Negative => "-",
+        };
+        let span = Span::from((start_position, end_position));
+
+        Self::try_new(start_contig.as_str(), strand, span)
     }
 }
 
@@ -1172,14 +1128,7 @@ where
     Position<S>: position::r#trait::Position<S>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}:{}:{}-{}",
-            self.contig(),
-            self.strand(),
-            self.start().position(),
-            self.end().position(),
-        )
+        write!(f, "{}:{}:{}", self.contig(), self.strand(), self.span())
     }
 }
 
@@ -1208,22 +1157,20 @@ where
                 value: s.to_string(),
             })
         })?;
-
         let strand = strand.parse::<Strand>().map_err(Error::Strand)?;
-        let (start, end) = positions
-            .split_once(INTERVAL_SEPARATOR)
-            .filter(|(_, end)| !end.contains(INTERVAL_SEPARATOR))
-            .ok_or_else(|| ParseError::Format {
+        let strand = match strand {
+            Strand::Positive => "+",
+            Strand::Negative => "-",
+        };
+
+        let span = positions.parse::<Span<S>>().map_err(|error| match error {
+            span::ParseError::Format(_) => Error::Parse(ParseError::Format {
                 value: s.to_owned(),
-            })?;
+            }),
+            span::ParseError::Start(error) | span::ParseError::End(error) => Error::Position(error),
+        })?;
 
-        let start = start.parse::<Position<S>>().map_err(Error::Position)?;
-        let end = end.parse::<Position<S>>().map_err(Error::Position)?;
-
-        Interval::try_new(
-            Coordinate::new(contig.clone(), strand, start),
-            Coordinate::new(contig, strand, end),
-        )
+        Interval::try_new(contig.as_str(), strand, span)
     }
 }
 
@@ -1243,7 +1190,8 @@ mod tests {
         let start = "seq0:+:0".parse::<Coordinate<Interbase>>().unwrap();
         let end = "seq0:+:9".parse::<Coordinate<Interbase>>().unwrap();
 
-        let interval = Interval::try_new(start, end).unwrap();
+        // SAFETY: the endpoints share context and follow the positive strand.
+        let interval = Interval::try_from((start, end)).unwrap();
         assert_eq!(interval.count_entities(), 9);
     }
 
@@ -1252,7 +1200,7 @@ mod tests {
         let start = "seq0:+:0".parse::<Coordinate<Interbase>>().unwrap();
         let end = "seq1:+:10".parse::<Coordinate<Interbase>>().unwrap();
 
-        let err = Interval::try_new(start, end).unwrap_err();
+        let err = Interval::try_from((start, end)).unwrap_err();
         assert_eq!(
             err,
             Error::Nonsensical(NonsensicalError::MismatchedContigs {
@@ -1272,7 +1220,7 @@ mod tests {
         let start = "seq0:+:0".parse::<Coordinate<Interbase>>().unwrap();
         let end = "seq0:-:10".parse::<Coordinate<Interbase>>().unwrap();
 
-        let err = Interval::try_new(start, end).unwrap_err();
+        let err = Interval::try_from((start, end)).unwrap_err();
         assert_eq!(
             err,
             Error::Nonsensical(NonsensicalError::MismatchedStrands {
@@ -1296,21 +1244,19 @@ mod tests {
         let start = "seq0:+:10".parse::<Coordinate<Interbase>>().unwrap();
         let end = "seq0:+:0".parse::<Coordinate<Interbase>>().unwrap();
 
-        let err = Interval::try_new(start, end).unwrap_err();
+        let err = Interval::try_from((start, end)).unwrap_err();
 
         assert_eq!(
             err,
-            Error::Nonsensical(NonsensicalError::NegativelySized {
-                start: 10,
-                end: 0,
-                strand: Strand::Positive
-            })
+            Error::DirectionMismatch {
+                strand: Strand::Positive,
+                direction: Direction::Descending,
+            }
         );
 
         assert_eq!(
             err.to_string(),
-            "nonsensical interval: negatively sized interval: start is `10`, end is `0`, strand \
-             is `+`"
+            "span direction `descending` is incompatible with strand `+`"
         );
 
         //===================//
@@ -1320,21 +1266,19 @@ mod tests {
         let start = "seq0:-:0".parse::<Coordinate<Interbase>>().unwrap();
         let end = "seq0:-:10".parse::<Coordinate<Interbase>>().unwrap();
 
-        let err = Interval::try_new(start, end).unwrap_err();
+        let err = Interval::try_from((start, end)).unwrap_err();
 
         assert_eq!(
             err,
-            Error::Nonsensical(NonsensicalError::NegativelySized {
-                start: 0,
-                end: 10,
-                strand: Strand::Negative
-            })
+            Error::DirectionMismatch {
+                strand: Strand::Negative,
+                direction: Direction::Ascending,
+            }
         );
 
         assert_eq!(
             err.to_string(),
-            "nonsensical interval: negatively sized interval: start is `0`, end is `10`, strand \
-             is `-`"
+            "span direction `ascending` is incompatible with strand `-`"
         );
     }
 
@@ -1343,7 +1287,8 @@ mod tests {
         let start = "seq0:+:10".parse::<Coordinate<Interbase>>().unwrap();
         let end = "seq0:+:10".parse::<Coordinate<Interbase>>().unwrap();
 
-        let interval = Interval::try_new(start.clone(), end.clone()).unwrap();
+        // SAFETY: stationary spans are valid on the positive strand.
+        let interval = Interval::try_from((start.clone(), end.clone())).unwrap();
         assert!(interval.end().position().get() - interval.start().position().get() == 0);
         assert!(interval.contains_coordinate(&start));
         assert!(interval.contains_coordinate(&end));
@@ -1367,7 +1312,7 @@ mod tests {
     fn endpoint_views_borrow_interval_data() -> Result<()> {
         let start = Coordinate::<Interbase>::try_new("seq0", "+", 10)?;
         let end = Coordinate::<Interbase>::try_new("seq0", "+", 20)?;
-        let interval = Interval::try_new(start.clone(), end.clone())?;
+        let interval = Interval::try_from((start.clone(), end.clone()))?;
 
         let start_ref: CoordinateRef<'_, Interbase> = interval.start();
         let end_ref: CoordinateRef<'_, Interbase> = interval.end();
@@ -1677,7 +1622,7 @@ mod tests {
     fn contig_with_colons_round_trips() -> Result<()> {
         let start = Coordinate::<Interbase>::try_new("assembly:chr:1", "+", 10)?;
         let end = Coordinate::<Interbase>::try_new("assembly:chr:1", "+", 20)?;
-        let interval = Interval::try_new(start, end)?;
+        let interval = Interval::try_from((start, end))?;
         let parsed = interval.to_string().parse::<Interval<Interbase>>()?;
 
         assert_eq!(parsed, interval);
@@ -1761,14 +1706,16 @@ mod tests {
         // Positive-stranded interval
         let start = "seq0:+:0".parse::<Coordinate<Interbase>>().unwrap();
         let end = "seq0:+:10".parse::<Coordinate<Interbase>>().unwrap();
-        let interval = Interval::try_new(start, end).unwrap();
+        // SAFETY: the endpoints share context and follow the positive strand.
+        let interval = Interval::try_from((start, end)).unwrap();
 
         assert_eq!(interval.to_string(), "seq0:+:0-10");
 
         // Negative-stranded interval
         let start = "seq0:-:10".parse::<Coordinate<Interbase>>().unwrap();
         let end = "seq0:-:0".parse::<Coordinate<Interbase>>().unwrap();
-        let interval = Interval::try_new(start, end).unwrap();
+        // SAFETY: the endpoints share context and follow the negative strand.
+        let interval = Interval::try_from((start, end)).unwrap();
 
         assert_eq!(interval.to_string(), "seq0:-:10-0");
     }

@@ -1,10 +1,10 @@
 //! Interbase intervals.
 
-use crate::Strand;
 use crate::base;
 use crate::interbase::Coordinate;
 use crate::interval::Number;
 use crate::interval::r#trait;
+use crate::span::Span;
 use crate::system::Base;
 use crate::system::Interbase;
 
@@ -147,8 +147,15 @@ impl Interval {
 
         let start = start.nudge_forward()?;
         let end = end.nudge_backward()?;
+        let (contig, strand, start) = start.into_parts();
+        let (_, _, end) = end.into_parts();
+        let span = Span::from((start, end));
+        let strand = match strand {
+            crate::Strand::Positive => "+",
+            crate::Strand::Negative => "-",
+        };
 
-        crate::interval::Interval::<Base>::try_new(start, end).ok()
+        crate::interval::Interval::<Base>::try_new(contig.as_str(), strand, span).ok()
     }
 }
 
@@ -158,31 +165,14 @@ impl Interval {
 
 impl r#trait::Interval<Interbase> for Interval {
     fn contains_entity(&self, coordinate: &base::Coordinate) -> bool {
-        if self.contig() != coordinate.contig() {
-            return false;
-        }
-
-        if self.strand() != coordinate.strand() {
-            return false;
-        }
-
-        match self.strand() {
-            Strand::Positive => {
-                self.start().position().get() < coordinate.position().get()
-                    && self.end().position().get() >= coordinate.position().get()
-            }
-            Strand::Negative => {
-                self.start().position().get() >= coordinate.position().get()
-                    && self.end().position().get() < coordinate.position().get()
-            }
-        }
+        self.contig() == coordinate.contig()
+            && self.strand() == coordinate.strand()
+            && self.span().contains_entity(coordinate.position())
     }
 
     /// Gets the number of entities within the interval.
     fn count_entities(&self) -> Number {
-        self.start()
-            .position()
-            .distance_unchecked(self.end().position())
+        self.span().count_entities()
     }
 }
 
@@ -209,11 +199,13 @@ mod tests {
     }
 
     fn create_interval(contig: &str, strand: &str, start: Number, end: Number) -> Interval {
-        Interval::try_new(
+        let interval = Interval::try_from((
             create_coordinate(contig, strand, start),
             create_coordinate(contig, strand, end),
-        )
-        .unwrap()
+        ));
+        // SAFETY: the test helper receives endpoints compatible with the requested
+        // strand.
+        interval.unwrap()
     }
 
     #[test]

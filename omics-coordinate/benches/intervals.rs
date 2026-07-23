@@ -29,7 +29,7 @@ pub mod interbase {
             Coordinate::<Interbase>::try_new(black_box("seq0"), black_box("+"), black_box(20))
                 .unwrap();
         // SAFETY: the endpoints share metadata and form a positively sized interval.
-        black_box(Interval::try_new(start, end).unwrap());
+        black_box(Interval::try_from((start, end)).unwrap());
     }
 
     pub fn benches(c: &mut Criterion) {
@@ -47,7 +47,7 @@ pub mod interbase {
                 || (start.clone(), end.clone()),
                 |(start, end)| {
                     // SAFETY: the prepared endpoints form a valid interval.
-                    black_box(Interval::try_new(start, end).unwrap())
+                    black_box(Interval::try_from((start, end)).unwrap())
                 },
                 BatchSize::SmallInput,
             )
