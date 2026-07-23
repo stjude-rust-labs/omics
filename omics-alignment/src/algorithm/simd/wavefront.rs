@@ -396,6 +396,39 @@ impl<S: Narrow> Values<S> {
     }
 }
 
+/// Holds recurrence constants broadcast across every kernel lane.
+struct VectorValues<K: Kernel> {
+    /// Unreachable lane score.
+    unreachable: K::Vector,
+    /// Reachable zero lane score.
+    zero: K::Vector,
+    /// Gap-open score.
+    gap_open_score: K::Vector,
+    /// Gap-extension score.
+    gap_extend_score: K::Vector,
+    /// Encoded aligned predecessor.
+    aligned_code: K::Vector,
+    /// Encoded insertion predecessor.
+    insertion_code: K::Vector,
+    /// Encoded deletion predecessor.
+    deletion_code: K::Vector,
+}
+
+impl<K: Kernel> VectorValues<K> {
+    /// Broadcasts narrow recurrence constants before the diagonal loop.
+    fn new(values: &Values<K::Score>) -> Self {
+        Self {
+            unreachable: K::splat(K::Score::MIN),
+            zero: K::splat(K::Score::ZERO),
+            gap_open_score: K::splat(values.gap_open_score),
+            gap_extend_score: K::splat(values.gap_extend_score),
+            aligned_code: K::splat(values.aligned_code),
+            insertion_code: K::splat(values.insertion_code),
+            deletion_code: K::splat(values.deletion_code),
+        }
+    }
+}
+
 /// Converts one scalar score into a usable narrow lane.
 fn narrow<S: Narrow>(score: Score) -> Result<S, Error> {
     S::try_from_score(score).ok_or(Error::ScoreOverflow)
@@ -479,8 +512,11 @@ fn choose_scalar<S: Narrow>(candidates: [(S, S, State); 3]) -> Result<(S, Option
 }
 
 /// Forms one candidate score while retaining unreachable lanes.
-fn vector_candidate<K: Kernel>(predecessor: K::Vector, delta: K::Vector) -> K::Vector {
-    let unreachable = K::splat(K::Score::MIN);
+fn vector_candidate<K: Kernel>(
+    predecessor: K::Vector,
+    delta: K::Vector,
+    unreachable: K::Vector,
+) -> K::Vector {
     let candidate = K::add(predecessor, delta);
 
     K::select(K::equal(predecessor, unreachable), unreachable, candidate)
@@ -488,17 +524,18 @@ fn vector_candidate<K: Kernel>(predecessor: K::Vector, delta: K::Vector) -> K::V
 
 /// Evaluates three vector candidates in the required deterministic order.
 fn choose_vector<K: Kernel>(
-    candidates: [(K::Vector, K::Vector, K::Score); 3],
+    unreachable: K::Vector,
+    zero: K::Vector,
+    candidates: [(K::Vector, K::Vector, K::Vector); 3],
 ) -> (K::Vector, K::Vector) {
-    let unreachable = K::splat(K::Score::MIN);
     let mut best_score = unreachable;
-    let mut best_predecessor = K::splat(K::Score::ZERO);
+    let mut best_predecessor = zero;
 
     for (predecessor, delta, state) in candidates {
-        let candidate = vector_candidate::<K>(predecessor, delta);
+        let candidate = vector_candidate::<K>(predecessor, delta, unreachable);
         let replace = K::greater_than(candidate, best_score);
         best_score = K::select(replace, candidate, best_score);
-        best_predecessor = K::select(replace, K::splat(state), best_predecessor);
+        best_predecessor = K::select(replace, state, best_predecessor);
     }
 
     (best_score, best_predecessor)
@@ -594,6 +631,7 @@ fn fill_vector<K: Kernel>(
     reference: &[u8],
     query: &[u8],
     values: &Values<K::Score>,
+    vector_values: &VectorValues<K>,
     mode: Mode,
     predecessors: &mut PredecessorScratch<K::Score>,
     traceback: &mut [u8],
@@ -632,51 +670,66 @@ fn fill_vector<K: Kernel>(
             ),
         )
     };
-    let (mut aligned, mut aligned_predecessor) = choose_vector::<K>([
-        (diagonal_aligned, substitution, values.aligned_code),
-        (diagonal_deletion, substitution, values.deletion_code),
-        (diagonal_insertion, substitution, values.insertion_code),
-    ]);
-    let (insertion, insertion_predecessor) = choose_vector::<K>([
-        (
-            left_insertion,
-            K::splat(values.gap_extend_score),
-            values.insertion_code,
-        ),
-        (
-            left_aligned,
-            K::splat(values.gap_open_score),
-            values.aligned_code,
-        ),
-        (
-            left_deletion,
-            K::splat(values.gap_open_score),
-            values.deletion_code,
-        ),
-    ]);
-    let (deletion, deletion_predecessor) = choose_vector::<K>([
-        (
-            up_deletion,
-            K::splat(values.gap_extend_score),
-            values.deletion_code,
-        ),
-        (
-            up_aligned,
-            K::splat(values.gap_open_score),
-            values.aligned_code,
-        ),
-        (
-            up_insertion,
-            K::splat(values.gap_open_score),
-            values.insertion_code,
-        ),
-    ]);
+    let (mut aligned, mut aligned_predecessor) = choose_vector::<K>(
+        vector_values.unreachable,
+        vector_values.zero,
+        [
+            (diagonal_aligned, substitution, vector_values.aligned_code),
+            (diagonal_deletion, substitution, vector_values.deletion_code),
+            (
+                diagonal_insertion,
+                substitution,
+                vector_values.insertion_code,
+            ),
+        ],
+    );
+    let (insertion, insertion_predecessor) = choose_vector::<K>(
+        vector_values.unreachable,
+        vector_values.zero,
+        [
+            (
+                left_insertion,
+                vector_values.gap_extend_score,
+                vector_values.insertion_code,
+            ),
+            (
+                left_aligned,
+                vector_values.gap_open_score,
+                vector_values.aligned_code,
+            ),
+            (
+                left_deletion,
+                vector_values.gap_open_score,
+                vector_values.deletion_code,
+            ),
+        ],
+    );
+    let (deletion, deletion_predecessor) = choose_vector::<K>(
+        vector_values.unreachable,
+        vector_values.zero,
+        [
+            (
+                up_deletion,
+                vector_values.gap_extend_score,
+                vector_values.deletion_code,
+            ),
+            (
+                up_aligned,
+                vector_values.gap_open_score,
+                vector_values.aligned_code,
+            ),
+            (
+                up_insertion,
+                vector_values.gap_open_score,
+                vector_values.insertion_code,
+            ),
+        ],
+    );
 
     if mode == Mode::Local {
-        let zero = K::splat(K::Score::ZERO);
-        let positive = K::greater_than(aligned, zero);
-        aligned = K::select(positive, aligned, zero);
-        aligned_predecessor = K::select(positive, aligned_predecessor, zero);
+        let positive = K::greater_than(aligned, vector_values.zero);
+        aligned = K::select(positive, aligned, vector_values.zero);
+        aligned_predecessor = K::select(positive, aligned_predecessor, vector_values.zero);
     }
 
     // SAFETY: The complete interior vector supplies `K::LANES` writable
@@ -958,6 +1011,7 @@ fn compute<K: Kernel>(
     engine::validate_lengths(reference.len(), query.len())?;
     let (rows, columns) = engine::matrix_dimensions(reference.len(), query.len())?;
     let values = Values::<K::Score>::try_new(scoring)?;
+    let vector_values = VectorValues::<K>::new(&values);
     let traceback = TracebackMatrix::try_new(Layout::try_new(rows, columns)?)?;
     let maximum_diagonal_length = rows.min(columns);
 
@@ -1022,6 +1076,7 @@ fn compute<K: Kernel>(
                     reference,
                     query,
                     &values,
+                    &vector_values,
                     mode,
                     &mut predecessors,
                     &mut traceback.entries,
@@ -1331,6 +1386,21 @@ mod tests {
             }
             values
         }
+    }
+
+    #[test]
+    fn vector_values_broadcast_recurrence_constants() -> Result<(), Error> {
+        let values = Values::<i16>::try_new(Scoring::try_new(2, -3, -2, -1)?)?;
+        let vectors = VectorValues::<TestI16>::new(&values);
+
+        assert_eq!(vectors.unreachable, [i16::MIN; TestI16::LANES]);
+        assert_eq!(vectors.zero, [0; TestI16::LANES]);
+        assert_eq!(vectors.gap_open_score, [-2; TestI16::LANES]);
+        assert_eq!(vectors.gap_extend_score, [-1; TestI16::LANES]);
+        assert_eq!(vectors.aligned_code, [1; TestI16::LANES]);
+        assert_eq!(vectors.insertion_code, [2; TestI16::LANES]);
+        assert_eq!(vectors.deletion_code, [3; TestI16::LANES]);
+        Ok(())
     }
 
     /// Returns every binary byte sequence through `maximum_length`.

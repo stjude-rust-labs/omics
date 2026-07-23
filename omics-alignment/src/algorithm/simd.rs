@@ -234,7 +234,8 @@ fn assert_same_global_result(
             );
         }
         (actual, expected) => panic!(
-            "forced global result mismatch; case={case_name} actual={actual:?} expected={expected:?}"
+            "forced global result mismatch; case={case_name} actual={actual:?} \
+             expected={expected:?}"
         ),
     }
 }
@@ -262,7 +263,8 @@ fn assert_same_local_result(
             );
         }
         (actual, expected) => panic!(
-            "forced local result mismatch; case={case_name} actual={actual:?} expected={expected:?}"
+            "forced local result mismatch; case={case_name} actual={actual:?} \
+             expected={expected:?}"
         ),
     }
 }

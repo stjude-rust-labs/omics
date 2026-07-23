@@ -28,7 +28,12 @@ jobs:
       - run: cargo clippy --all-features -- --deny warnings
 
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        runner:
+          - ubuntu-latest
+          - macos-14
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v3
       - name: Update Rust

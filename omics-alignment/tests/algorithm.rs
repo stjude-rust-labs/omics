@@ -552,7 +552,8 @@ fn assert_same_public_global_result(
             );
         }
         (actual, expected) => panic!(
-            "public global result mismatch; case={case_name} actual={actual:?} expected={expected:?}"
+            "public global result mismatch; case={case_name} actual={actual:?} \
+             expected={expected:?}"
         ),
     }
 }
@@ -579,7 +580,8 @@ fn assert_same_public_local_result(
             );
         }
         (actual, expected) => panic!(
-            "public local result mismatch; case={case_name} actual={actual:?} expected={expected:?}"
+            "public local result mismatch; case={case_name} actual={actual:?} \
+             expected={expected:?}"
         ),
     }
 }
@@ -630,7 +632,7 @@ fn assert_random_public_simd_global_cases(
         "native backend unavailable for randomized public global coverage",
     );
 
-    let mut generator = Xorshift64::new(0x9e37_79b9_7f4a_7c15);
+    let mut generator = Xorshift64::new(0x9E37_79B9_7F4A_7C15);
     for case_index in 0..case_count {
         let case = random_native_case(&mut generator, case_index)?;
         let case_name = format!("{} index={case_index}", case.name);
@@ -652,7 +654,7 @@ fn assert_random_public_simd_local_cases(
         "native backend unavailable for randomized public local coverage",
     );
 
-    let mut generator = Xorshift64::new(0xd1b5_4a32_d192_ed03);
+    let mut generator = Xorshift64::new(0xD1B5_4A32_D192_ED03);
     for case_index in 0..case_count {
         let case = random_native_case(&mut generator, case_index)?;
         let case_name = format!("{} index={case_index}", case.name);

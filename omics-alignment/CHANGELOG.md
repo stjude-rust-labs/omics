@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+* Added exact-parity SIMD dispatch for byte-slice global and local affine-gap
+  alignment with Apple Silicon NEON and Linux `x86_64` AVX2 wavefront kernels.
 * Added the initial version of the `omics-alignment` crate, including a complete
   checked CIGAR model with `OperationKind`, `Operation`, and `Cigar` types supporting
   `FromStr`, `Display`, and aggregate length validation
