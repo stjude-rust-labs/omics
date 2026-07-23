@@ -147,14 +147,18 @@ fn push_operation(
     kind: OperationKind,
     run_length: usize,
 ) -> Result<(), Error> {
-    let length = Number::try_from(run_length).map_err(|_| Error::TracebackInvariant)?;
+    // SAFETY: input lengths are validated against Number before traceback,
+    // and a coalesced run cannot exceed the input length for its axis.
+    let length = Number::try_from(run_length).unwrap();
     operations.push(Operation::try_new(kind, length)?);
     Ok(())
 }
 
 /// Converts a non-empty unit-operation path into a canonical CIGAR.
 fn path_to_cigar(path: &[OperationKind]) -> Result<Cigar, Error> {
-    let first = path.first().copied().ok_or(Error::TracebackInvariant)?;
+    // SAFETY: global alignment rejects two empty inputs, and local alignment
+    // reaches this function only after finding a positive aligned endpoint.
+    let first = path.first().copied().unwrap();
     let mut operations = Vec::new();
     operations
         .try_reserve_exact(path.len())
@@ -194,7 +198,7 @@ pub(super) fn local<T: Eq>(
     compute_local(reference, query, scoring)
 }
 
-/// Validates the input lengths against the active coordinate type.
+/// Validates that traceback run lengths fit the active CIGAR number type.
 fn validate_lengths(reference: usize, query: usize) -> Result<(), Error> {
     Number::try_from(reference).map_err(|_| Error::LengthOutOfRange {
         axis: Axis::Reference,
@@ -372,14 +376,12 @@ fn compute_global<T: Eq>(reference: &[T], query: &[T], scoring: Scoring) -> Resu
         (end_cell.insertion.score, State::Insertion),
     ]);
 
-    let score = endpoint.score.ok_or_else(|| {
-        debug_assert!(false, "global endpoint is unreachable");
-        Error::TracebackInvariant
-    })?;
-    let state = endpoint.predecessor.ok_or_else(|| {
-        debug_assert!(false, "global endpoint has no predecessor");
-        Error::TracebackInvariant
-    })?;
+    // SAFETY: every non-empty global alignment has at least one reachable
+    // terminal state after matrix initialization and recurrence evaluation.
+    let score = endpoint.score.unwrap();
+    // SAFETY: choose assigns a predecessor whenever it selects a reachable
+    // terminal state.
+    let state = endpoint.predecessor.unwrap();
     let (path, reference_start, query_start) = traceback(
         &matrix,
         reference,
@@ -554,6 +556,12 @@ mod tests {
         ])?;
         assert_eq!(cigar.to_string(), "2=1I2X");
         Ok(())
+    }
+
+    #[test]
+    fn empty_traceback_path_panics() {
+        let result = std::panic::catch_unwind(|| path_to_cigar(&[]));
+        assert!(result.is_err());
     }
 
     #[test]

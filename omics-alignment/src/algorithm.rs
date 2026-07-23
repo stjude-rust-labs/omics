@@ -260,9 +260,6 @@ pub enum Error {
     /// Checked score arithmetic overflowed.
     #[error("alignment score arithmetic overflowed i64")]
     ScoreOverflow,
-    /// A reachable endpoint produced an empty or incomplete traceback.
-    #[error("alignment traceback invariant failed")]
-    TracebackInvariant,
     /// A traceback operation could not be constructed.
     #[error("failed to construct a traceback operation")]
     Operation {
