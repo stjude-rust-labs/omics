@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or complex) is derived from breakend geometry rather than stored. The tier
   parses and serializes a compact crate-local string format and ships Criterion
   benchmarks ([#16](https://github.com/stjude-rust-labs/omics/pull/16)).
+* Added a copy-number tier with strandless half-open regions, typed absolute
+  `Count` observations, required reference `Ploidy` on every `Variant`,
+  canonical `contig:start-end(i):copies/ploidy` serialization,
+  reference-relative `Change` classification, strict base-2 and base-10
+  logarithmic conversions, and top-level `CopyNumber*` aliases.
 
 ### Changed
 
@@ -58,6 +63,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   coordinates or `(i)` for interbase coordinates. `SNV`, `MNV`, deletion, and
   delins records accept only `(b)`, while insertion records accept only `(i)`
   ([#15](https://github.com/stjude-rust-labs/omics/pull/15)).
+* **Breaking:** copy-number `Variant` constructors now require a reference
+  `Ploidy`, copy-number `Variant` identity now includes that ploidy, and
+  canonical copy-number strings now serialize as `contig:start-end(i):copies/ploidy`.
+* **Breaking:** copy-number `Variant::change`, `Variant::log2`, and
+  `Variant::log10` now use the stored reference ploidy without arguments, and
+  `Change::Baseline` is renamed to `Change::Reference`.
 
 ### Crate Updates
 

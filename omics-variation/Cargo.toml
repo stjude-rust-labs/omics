@@ -32,3 +32,7 @@ harness = false
 [[bench]]
 name = "structural"
 harness = false
+
+[[bench]]
+name = "copy_number"
+harness = false
