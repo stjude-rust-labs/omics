@@ -169,6 +169,18 @@ pub enum LogarithmicError {
     NonIntegral,
 }
 
+/// An error related to logarithmic variant construction.
+#[derive(Error, Debug, PartialEq, Eq)]
+pub enum LogarithmicVariantError {
+    /// The logarithmic copy count was invalid.
+    #[error(transparent)]
+    Logarithmic(#[from] LogarithmicError),
+
+    /// The variant interval was invalid.
+    #[error(transparent)]
+    Variant(#[from] Error),
+}
+
 /// A logarithmic base used for copy-number conversion.
 #[derive(Debug, Clone, Copy)]
 enum LogarithmicBase {
@@ -309,6 +321,43 @@ impl Variant {
             count: Count::new(copies),
             ploidy,
         })
+    }
+
+    /// Attempts to create a copy-number variant from a base-2 logarithmic
+    /// ratio.
+    pub fn try_from_log2(
+        contig: impl TryInto<Contig, Error = contig::Error>,
+        start: Number,
+        end: Number,
+        value: f64,
+        ploidy: Ploidy,
+    ) -> Result<Self, LogarithmicVariantError> {
+        let count = Count::try_from_log2(value, ploidy)?;
+        Ok(Self::try_from_count(contig, start, end, count, ploidy)?)
+    }
+
+    /// Attempts to create a copy-number variant from a base-10 logarithmic
+    /// ratio.
+    pub fn try_from_log10(
+        contig: impl TryInto<Contig, Error = contig::Error>,
+        start: Number,
+        end: Number,
+        value: f64,
+        ploidy: Ploidy,
+    ) -> Result<Self, LogarithmicVariantError> {
+        let count = Count::try_from_log10(value, ploidy)?;
+        Ok(Self::try_from_count(contig, start, end, count, ploidy)?)
+    }
+
+    /// Attempts to create a new copy-number variant from a validated count.
+    fn try_from_count(
+        contig: impl TryInto<Contig, Error = contig::Error>,
+        start: Number,
+        end: Number,
+        count: Count,
+        ploidy: Ploidy,
+    ) -> Result<Self, Error> {
+        Self::try_new(contig, start, end, count.get(), ploidy)
     }
 
     /// Gets the contig this variant sits on.

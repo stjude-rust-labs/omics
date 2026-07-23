@@ -8,6 +8,7 @@ use omics_variation::copy_number::Change;
 use omics_variation::copy_number::Count;
 use omics_variation::copy_number::Error;
 use omics_variation::copy_number::LogarithmicError;
+use omics_variation::copy_number::LogarithmicVariantError;
 use omics_variation::copy_number::ParseError;
 use omics_variation::copy_number::Ploidy;
 use omics_variation::copy_number::PloidyError;
@@ -16,7 +17,8 @@ use omics_variation::copy_number::Variant;
 #[test]
 fn imports_top_level_copy_number_aliases() {
     let variant = CopyNumberVariant::try_new("seq0", 100, 200, 3, CopyNumberPloidy::DIPLOID);
-    // SAFETY: the constructor is expected to accept this valid contig, span, and ploidy.
+    // SAFETY: the constructor is expected to accept this valid contig, span, and
+    // ploidy.
     let variant = variant.unwrap();
     let count = variant.count();
     let log2 = variant.log2();
@@ -68,7 +70,8 @@ fn converts_exact_counts_to_and_from_logarithmic_ratios() {
 
 #[test]
 fn stores_reference_ploidy_and_derives_change() {
-    // SAFETY: the constructor is expected to accept this valid contig, span, and diploid ploidy.
+    // SAFETY: the constructor is expected to accept this valid contig, span, and
+    // diploid ploidy.
     let variant = Variant::try_new("seq0", 100, 200, 3, Ploidy::DIPLOID).unwrap();
 
     assert_eq!(variant.contig().as_str(), "seq0");
@@ -82,12 +85,114 @@ fn stores_reference_ploidy_and_derives_change() {
 }
 
 #[test]
+fn constructs_variants_from_exact_logarithmic_ratios() {
+    let diploid_log2 = Variant::try_from_log2("seq0", 100, 200, (1.5_f64).log2(), Ploidy::DIPLOID);
+    // SAFETY: `log2(3 / 2)` must reconstruct three copies at diploid ploidy.
+    let diploid_log2 = diploid_log2.unwrap();
+    let haploid_log10 = Variant::try_from_log10("seq0", 300, 400, 0.0, Ploidy::HAPLOID);
+    // SAFETY: `log10(1 / 1)` must reconstruct one copy at haploid ploidy.
+    let haploid_log10 = haploid_log10.unwrap();
+    // SAFETY: `4` is a valid nonzero ploidy.
+    let tetraploid = Ploidy::try_new(4).unwrap();
+    let tetraploid_log2 = Variant::try_from_log2("seq0", 500, 600, (1.5_f64).log2(), tetraploid);
+    // SAFETY: `log2(6 / 4)` must reconstruct six copies while preserving tetraploid
+    // identity.
+    let tetraploid_log2 = tetraploid_log2.unwrap();
+
+    assert_eq!(diploid_log2.count(), Count::new(3));
+    assert_eq!(diploid_log2.ploidy(), Ploidy::DIPLOID);
+    assert_eq!(diploid_log2.change(), Change::Gain);
+    assert_eq!(haploid_log10.count(), Count::new(1));
+    assert_eq!(haploid_log10.ploidy(), Ploidy::HAPLOID);
+    assert_eq!(haploid_log10.change(), Change::Reference);
+    assert_eq!(tetraploid_log2.count(), Count::new(6));
+    assert_eq!(tetraploid_log2.ploidy(), tetraploid);
+    assert_eq!(tetraploid_log2.change(), Change::Gain);
+}
+
+#[test]
+fn constructs_logarithmic_variants_for_complete_copy_loss() {
+    let zero_from_log2 =
+        Variant::try_from_log2("seq0", 100, 200, f64::NEG_INFINITY, Ploidy::DIPLOID);
+    // SAFETY: negative infinity is defined to map to zero copies.
+    let zero_from_log2 = zero_from_log2.unwrap();
+    let zero_from_log10 =
+        Variant::try_from_log10("seq0", 300, 400, f64::NEG_INFINITY, Ploidy::DIPLOID);
+    // SAFETY: negative infinity is defined to map to zero copies.
+    let zero_from_log10 = zero_from_log10.unwrap();
+
+    assert_eq!(zero_from_log2.count(), Count::new(0));
+    assert_eq!(zero_from_log2.ploidy(), Ploidy::DIPLOID);
+    assert_eq!(zero_from_log2.change(), Change::Loss);
+    assert_eq!(zero_from_log10.count(), Count::new(0));
+    assert_eq!(zero_from_log10.ploidy(), Ploidy::DIPLOID);
+    assert_eq!(zero_from_log10.change(), Change::Loss);
+}
+
+#[test]
+fn rejects_non_integral_logarithmic_variant_counts() {
+    let from_log2 = Variant::try_from_log2("seq0", 100, 200, (1.25_f64).log2(), Ploidy::DIPLOID);
+    let from_log10 = Variant::try_from_log10("seq0", 100, 200, (1.25_f64).log10(), Ploidy::DIPLOID);
+
+    assert_eq!(
+        from_log2,
+        Err(LogarithmicVariantError::Logarithmic(
+            LogarithmicError::NonIntegral,
+        ))
+    );
+    assert_eq!(
+        from_log10,
+        Err(LogarithmicVariantError::Logarithmic(
+            LogarithmicError::NonIntegral,
+        ))
+    );
+}
+
+#[test]
+fn rejects_overflow_and_underflow_in_logarithmic_variant_construction() {
+    let overflow = Variant::try_from_log2(
+        "seq0",
+        100,
+        200,
+        ((f64::from(u32::MAX) + 1.0) / 2.0).log2(),
+        Ploidy::DIPLOID,
+    );
+    let underflow =
+        Variant::try_from_log10("seq0", 100, 200, (5e-301_f64).log10(), Ploidy::DIPLOID);
+
+    assert_eq!(
+        overflow,
+        Err(LogarithmicVariantError::Logarithmic(
+            LogarithmicError::Overflow,
+        ))
+    );
+    assert_eq!(
+        underflow,
+        Err(LogarithmicVariantError::Logarithmic(
+            LogarithmicError::Underflow,
+        ))
+    );
+}
+
+#[test]
+fn rejects_invalid_contigs_in_logarithmic_variant_construction() {
+    let err = Variant::try_from_log2("", 100, 200, (1.5_f64).log2(), Ploidy::DIPLOID);
+
+    assert!(matches!(
+        err,
+        Err(LogarithmicVariantError::Variant(Error::Contig(_)))
+    ));
+}
+
+#[test]
 fn reference_ploidy_participates_in_identity() {
-    // SAFETY: the constructor is expected to accept this valid contig, span, and diploid ploidy.
+    // SAFETY: the constructor is expected to accept this valid contig, span, and
+    // diploid ploidy.
     let diploid = Variant::try_new("seq0", 100, 200, 3, Ploidy::DIPLOID).unwrap();
     // SAFETY: `3` is a valid nonzero ploidy.
     let triploid_ploidy = Ploidy::try_new(3).unwrap();
-    // SAFETY: the constructor is expected to accept this valid contig, span, and triploid ploidy.
+    // SAFETY: the constructor is expected to accept this valid contig, span, and
+    // triploid ploidy.
     let triploid = Variant::try_new("seq0", 100, 200, 3, triploid_ploidy).unwrap();
 
     assert_ne!(diploid, triploid);
@@ -97,12 +202,14 @@ fn reference_ploidy_participates_in_identity() {
 fn round_trips_a_non_diploid_variant_through_the_canonical_form() {
     // SAFETY: `4` is a valid nonzero ploidy.
     let tetraploid = Ploidy::try_new(4).unwrap();
-    // SAFETY: the constructor is expected to accept this valid contig, span, and tetraploid ploidy.
+    // SAFETY: the constructor is expected to accept this valid contig, span, and
+    // tetraploid ploidy.
     let variant = Variant::try_new("seq0", 100, 200, 3, tetraploid).unwrap();
     let rendered = variant.to_string();
 
     assert_eq!(rendered, "seq0:100-200(i):3/4");
-    // SAFETY: parsing a displayed valid variant should reconstruct the original value.
+    // SAFETY: parsing a displayed valid variant should reconstruct the original
+    // value.
     let reparsed = rendered.parse::<Variant>().unwrap();
 
     assert_eq!(reparsed, variant);
@@ -110,13 +217,17 @@ fn round_trips_a_non_diploid_variant_through_the_canonical_form() {
 
 #[test]
 fn classifies_loss_reference_gain_and_complete_loss() {
-    // SAFETY: the constructor is expected to accept this valid contig, span, and diploid ploidy.
+    // SAFETY: the constructor is expected to accept this valid contig, span, and
+    // diploid ploidy.
     let loss = Variant::try_new("seq0", 100, 200, 1, Ploidy::DIPLOID).unwrap();
-    // SAFETY: the constructor is expected to accept this valid contig, span, and diploid ploidy.
+    // SAFETY: the constructor is expected to accept this valid contig, span, and
+    // diploid ploidy.
     let reference = Variant::try_new("seq0", 100, 200, 2, Ploidy::DIPLOID).unwrap();
-    // SAFETY: the constructor is expected to accept this valid contig, span, and diploid ploidy.
+    // SAFETY: the constructor is expected to accept this valid contig, span, and
+    // diploid ploidy.
     let gain = Variant::try_new("seq0", 100, 200, 3, Ploidy::DIPLOID).unwrap();
-    // SAFETY: the constructor is expected to accept a complete copy loss with a valid diploid ploidy.
+    // SAFETY: the constructor is expected to accept a complete copy loss with a
+    // valid diploid ploidy.
     let complete_loss = Variant::try_new("seq0", 100, 200, 0, Ploidy::DIPLOID).unwrap();
 
     assert_eq!(loss.change(), Change::Loss);
@@ -148,12 +259,14 @@ fn parses_and_displays_the_canonical_form() {
 
 #[test]
 fn round_trips_a_variant_whose_contig_contains_separators() {
-    // SAFETY: the constructor is expected to accept this non-empty contig, span, and diploid ploidy.
+    // SAFETY: the constructor is expected to accept this non-empty contig, span,
+    // and diploid ploidy.
     let variant = Variant::try_new("assembly:chr:1", 100, 200, 3, Ploidy::DIPLOID).unwrap();
     let rendered = variant.to_string();
 
     assert_eq!(rendered, "assembly:chr:1:100-200(i):3/2");
-    // SAFETY: parsing a displayed valid variant should reconstruct the original value.
+    // SAFETY: parsing a displayed valid variant should reconstruct the original
+    // value.
     let reparsed = rendered.parse::<Variant>().unwrap();
 
     assert_eq!(reparsed, variant);
@@ -229,7 +342,8 @@ fn final_review_accepts_a_maximum_count_log2_round_trip_within_tolerance() {
     let max_count = Count::new(u32::MAX);
     let log2 = max_count.log2(Ploidy::DIPLOID);
 
-    // SAFETY: a logarithmic round trip from a valid maximum count must reconstruct the same count.
+    // SAFETY: a logarithmic round trip from a valid maximum count must reconstruct
+    // the same count.
     let round_trip = Count::try_from_log2(log2, Ploidy::DIPLOID).unwrap();
 
     assert_eq!(round_trip, max_count);
