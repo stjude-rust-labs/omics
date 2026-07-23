@@ -176,6 +176,7 @@ use omics_molecule::sequence::Sequence;
 use thiserror::Error;
 
 pub mod small;
+pub mod copy_number;
 pub mod structural;
 
 /// The small-variant module, retained at its historical path.
