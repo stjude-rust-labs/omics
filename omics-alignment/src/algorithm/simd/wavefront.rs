@@ -1406,28 +1406,118 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_kernel_matches_scalar_for_complete_vectors() -> Result<(), Error> {
-        let cases = [
-            (b"ACGTACGT".as_slice(), b"ACGTACGT".as_slice()),
-            (b"ACGTACGT".as_slice(), b"TGCATGCA".as_slice()),
-            (b"ACGTACGTT".as_slice(), b"AGGTACGTA".as_slice()),
-        ];
+    #[derive(Clone, Copy)]
+    struct DifferentialCase<'a> {
+        name: &'static str,
+        reference: &'a [u8],
+        query: &'a [u8],
+        full_vectors: usize,
+        tail_cells: usize,
+    }
+
+    /// Returns the deterministic `TestI16` cases used to reach vector paths.
+    fn vector_differential_cases() -> [DifferentialCase<'static>; 3] {
+        [
+            DifferentialCase {
+                name: "vector-only",
+                reference: b"ACGTACGT",
+                query: b"ACGTACGT",
+                full_vectors: 1,
+                tail_cells: 0,
+            },
+            DifferentialCase {
+                name: "vector-plus-tail",
+                reference: b"CGTACGTAC",
+                query: b"CGTACGTAC",
+                full_vectors: 1,
+                tail_cells: 1,
+            },
+            DifferentialCase {
+                name: "two-full-vectors",
+                reference: b"TGCATGCATGCATGCA",
+                query: b"TGCATGCATGCATGCA",
+                full_vectors: 2,
+                tail_cells: 0,
+            },
+        ]
+    }
+
+    /// Returns the `TestI16` full-vector and scalar-tail counts implied by the
+    /// input lengths.
+    fn vector_path_counts(reference_len: usize, query_len: usize) -> (usize, usize) {
+        let maximum_interior = reference_len.min(query_len);
+        (
+            maximum_interior / TestI16::LANES,
+            maximum_interior % TestI16::LANES,
+        )
+    }
+
+    fn assert_vector_case_shape(case: DifferentialCase<'_>) {
+        assert_eq!(
+            vector_path_counts(case.reference.len(), case.query.len()),
+            (case.full_vectors, case.tail_cells),
+            "{} lengths should imply {} full vectors and {} tail cells",
+            case.name,
+            case.full_vectors,
+            case.tail_cells,
+        );
+    }
+
+    fn differential_global_cases<K: Kernel>(cases: &[DifferentialCase<'_>]) -> Result<(), Error> {
+        for case in cases {
+            assert_vector_case_shape(*case);
+        }
 
         for scoring in exhaustive_scorings()? {
-            for (reference, query) in cases {
+            for case in cases {
                 assert_eq!(
-                    global::<TestI16>(reference, query, scoring)?,
-                    engine::global(reference, query, scoring)?
-                );
-                assert_eq!(
-                    local::<TestI16>(reference, query, scoring)?,
-                    engine::local(reference, query, scoring)?
+                    global::<K>(case.reference, case.query, scoring)?,
+                    engine::global(case.reference, case.query, scoring)?,
+                    "global mismatch; case={} scoring={scoring:?}",
+                    case.name,
                 );
             }
         }
 
         Ok(())
+    }
+
+    fn differential_local_cases<K: Kernel>(cases: &[DifferentialCase<'_>]) -> Result<(), Error> {
+        for case in cases {
+            assert_vector_case_shape(*case);
+        }
+
+        for scoring in exhaustive_scorings()? {
+            for case in cases {
+                assert_eq!(
+                    local::<K>(case.reference, case.query, scoring)?,
+                    engine::local(case.reference, case.query, scoring)?,
+                    "local mismatch; case={} scoring={scoring:?}",
+                    case.name,
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_vector_differential_cases_cover_test_i16_paths() {
+        assert_eq!(vector_path_counts(5, 5), (0, 5));
+
+        for case in vector_differential_cases() {
+            assert_vector_case_shape(case);
+        }
+    }
+
+    #[test]
+    fn test_kernel_matches_scalar_for_global_vector_paths() -> Result<(), Error> {
+        differential_global_cases::<TestI16>(&vector_differential_cases())
+    }
+
+    #[test]
+    fn test_kernel_matches_scalar_for_local_vector_paths() -> Result<(), Error> {
+        differential_local_cases::<TestI16>(&vector_differential_cases())
     }
 
     #[test]
