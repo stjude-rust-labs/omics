@@ -1,5 +1,9 @@
 #![expect(missing_docs, reason = "integration tests do not need crate docs")]
 
+use omics_variation::CopyNumberChange;
+use omics_variation::CopyNumberCount;
+use omics_variation::CopyNumberPloidy;
+use omics_variation::CopyNumberVariant;
 use omics_variation::copy_number::Change;
 use omics_variation::copy_number::Count;
 use omics_variation::copy_number::Error;
@@ -8,6 +12,25 @@ use omics_variation::copy_number::ParseError;
 use omics_variation::copy_number::Ploidy;
 use omics_variation::copy_number::PloidyError;
 use omics_variation::copy_number::Variant;
+
+#[test]
+fn imports_top_level_copy_number_aliases() {
+    // SAFETY: the constructor is expected to accept this valid contig and span.
+    let variant = CopyNumberVariant::try_new("seq0", 100, 200, 3).unwrap();
+    let count = variant.count();
+    let log2 = count.log2(CopyNumberPloidy::DIPLOID);
+
+    assert_eq!(count, CopyNumberCount::new(3));
+    // SAFETY: `log2(3 / 2)` round-trips to the original typed copy-number count.
+    assert_eq!(
+        CopyNumberCount::try_from_log2(log2, CopyNumberPloidy::DIPLOID).unwrap(),
+        count
+    );
+    assert_eq!(
+        variant.change(CopyNumberCount::new(2)),
+        CopyNumberChange::Gain
+    );
+}
 
 #[test]
 fn constructs_count_and_ploidy_values() {

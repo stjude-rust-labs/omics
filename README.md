@@ -63,8 +63,10 @@ following features are included and are top-level goals of the project.
   relevant in omics including smaller compounds (e.g., nucleotides) and larger
   polymers (e.g., DNA, RNA).
 - **Variation (`omics::variation`).** Facilities for expressing small sequence
-  variants, including single nucleotide variants (SNVs), multi-nucleotide
-  variants (MNVs), insertions, deletions, and deletion-insertions (delins).
+  variants, strandless copy-number variants over half-open regions, and
+  adjacency-defined structural variants. Small variants include single
+  nucleotide variants (SNVs), multi-nucleotide variants (MNVs), insertions,
+  deletions, and deletion-insertions (delins).
 
 ## 🖥️ Development
 

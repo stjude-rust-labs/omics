@@ -1,4 +1,4 @@
-//! Sequence and structural variants.
+//! Sequence, copy-number, and structural variants.
 //!
 //! `omics-variation` represents genomic changes that can be written as a
 //! reference allele and an alternate allele at one locus. This covers single
@@ -16,6 +16,13 @@
 //! insertions, inversions, tandem duplications, and translocations. A
 //! structural variant derives its [`structural::Kind`] from breakend geometry
 //! rather than storing it.
+//!
+//! The [`copy_number`] module models strandless, half-open copy-number
+//! observations with typed absolute counts and typed ploidy baselines.
+//! Top-level aliases such as [`CopyNumberVariant`] keep these types available
+//! alongside [`Variant`] and [`StructuralVariant`]. Unlike [`structural`], a
+//! copy-number variant records an observed count over an interval and does not
+//! encode a breakpoint adjacency.
 //!
 //! ```
 //! use omics_molecule::polymer::dna;
@@ -42,6 +49,29 @@
 //! let variant = StructuralVariant::try_new(vec![adjacency])?;
 //! assert_eq!(variant.kind(), StructuralKind::Deletion);
 //! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! ```
+//! use omics_variation::CopyNumberVariant;
+//!
+//! let variant = "seq0:100-200(i):3".parse::<CopyNumberVariant>()?;
+//! assert_eq!(variant.count().get(), 3);
+//! assert_eq!(variant.to_string(), "seq0:100-200(i):3");
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! ```
+//! use omics_variation::CopyNumberCount;
+//! use omics_variation::CopyNumberPloidy;
+//!
+//! let count = CopyNumberCount::new(3);
+//! let log2 = count.log2(CopyNumberPloidy::DIPLOID);
+//!
+//! assert_eq!(
+//!     CopyNumberCount::try_from_log2(log2, CopyNumberPloidy::DIPLOID)?,
+//!     count
+//! );
+//! # Ok::<(), omics_variation::copy_number::LogarithmicError>(())
 //! ```
 //!
 //! # Variant strings
@@ -111,7 +141,8 @@
 //!
 //! let variant = "seq0:+:100(i):.:AT".parse::<Variant<dna::Nucleotide>>()?;
 //! let Variant::Insertion(insertion) = variant else {
-//!     unreachable!("the empty reference allele classifies as an insertion");
+//!     // SAFETY: an empty reference allele always classifies as an insertion.
+//!     unreachable!();
 //! };
 //!
 //! let interval = insertion.interbase_interval();
@@ -175,10 +206,18 @@ use omics_molecule::compound::Nucleotide;
 use omics_molecule::sequence::Sequence;
 use thiserror::Error;
 
-pub mod small;
 pub mod copy_number;
+pub mod small;
 pub mod structural;
 
+/// The top-level alias for a copy-number change.
+pub use copy_number::Change as CopyNumberChange;
+/// The top-level alias for a typed copy-number count.
+pub use copy_number::Count as CopyNumberCount;
+/// The top-level alias for a typed copy-number ploidy.
+pub use copy_number::Ploidy as CopyNumberPloidy;
+/// The top-level alias for a copy-number variant.
+pub use copy_number::Variant as CopyNumberVariant;
 /// The small-variant module, retained at its historical path.
 pub use small as variant;
 use small::Alteration;
@@ -748,6 +787,7 @@ mod tests {
 
     #[test]
     fn it_reports_reference_and_alternate_intervals() {
+        // SAFETY: this canonical insertion parses successfully.
         let insertion = "seq0:+:100(i):.:AT"
             .parse::<Variant<dna::Nucleotide>>()
             .unwrap();
@@ -755,6 +795,7 @@ mod tests {
             insertion.reference_interval(),
             VariantInterval::Interbase(_)
         ));
+        // SAFETY: insertions always expose an alternate interval.
         match insertion.alternate_interval().unwrap() {
             VariantInterval::Base(interval) => {
                 assert_eq!(interval.start().position().get(), 101);
@@ -763,6 +804,7 @@ mod tests {
             VariantInterval::Interbase(_) => panic!("expected base alternate interval"),
         }
 
+        // SAFETY: this canonical deletion parses successfully.
         let deletion = "seq0:+:100(b):AT:."
             .parse::<Variant<dna::Nucleotide>>()
             .unwrap();
@@ -770,6 +812,7 @@ mod tests {
             deletion.reference_interval(),
             VariantInterval::Base(_)
         ));
+        // SAFETY: deletions always expose an alternate interval.
         match deletion.alternate_interval().unwrap() {
             VariantInterval::Interbase(interval) => {
                 assert_eq!(interval.start().position().get(), 99);
@@ -798,12 +841,10 @@ mod tests {
     }
 
     fn normalized(input: &str) -> String {
-        input
-            .parse::<Variant<dna::Nucleotide>>()
-            .unwrap()
-            .normalize()
-            .unwrap()
-            .to_string()
+        // SAFETY: this helper only receives canonical small-variant strings.
+        let variant = input.parse::<Variant<dna::Nucleotide>>().unwrap();
+        // SAFETY: these test inputs normalize without overflowing coordinates.
+        variant.normalize().unwrap().to_string()
     }
 
     #[test]
@@ -821,9 +862,11 @@ mod tests {
     #[test]
     fn it_collapses_to_an_insertion_at_the_correct_boundary() {
         // `A:AT` at base 100 inserts `T` after base 100 -> interbase 100.
+        // SAFETY: this canonical delins parses successfully.
         let variant = "seq0:+:100(b):A:AT"
             .parse::<Variant<dna::Nucleotide>>()
             .unwrap();
+        // SAFETY: this test case normalizes without overflowing coordinates.
         let normalized = variant.normalize().unwrap();
         assert_eq!(normalized.kind(), Kind::Insertion);
         assert_eq!(normalized.to_string(), "seq0:+:100(i):.:T");
@@ -837,9 +880,11 @@ mod tests {
 
     #[test]
     fn it_collapses_delins_to_a_deletion() {
+        // SAFETY: this canonical delins parses successfully.
         let variant = "seq0:+:100(b):ATG:AG"
             .parse::<Variant<dna::Nucleotide>>()
             .unwrap();
+        // SAFETY: this test case normalizes without overflowing coordinates.
         let normalized = variant.normalize().unwrap();
         assert_eq!(normalized.kind(), Kind::Deletion);
         assert_eq!(normalized.to_string(), "seq0:+:101(b):T:.");
@@ -851,11 +896,10 @@ mod tests {
     }
 
     fn normalized_kind_and_string(input: &str) -> (Kind, String) {
-        let normalized = input
-            .parse::<Variant<dna::Nucleotide>>()
-            .unwrap()
-            .normalize()
-            .unwrap();
+        // SAFETY: this helper only receives canonical small-variant strings.
+        let variant = input.parse::<Variant<dna::Nucleotide>>().unwrap();
+        // SAFETY: these test inputs normalize without overflowing coordinates.
+        let normalized = variant.normalize().unwrap();
         (normalized.kind(), normalized.to_string())
     }
 

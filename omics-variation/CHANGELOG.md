@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or complex) is derived from breakend geometry rather than stored. The tier
   parses and serializes a compact crate-local string format and ships Criterion
   benchmarks ([#16](https://github.com/stjude-rust-labs/omics/pull/16)).
+* Added a copy-number tier with strandless half-open regions, typed absolute
+  `Count` observations, nonzero `Ploidy` baselines, canonical
+  `contig:start-end(i):copies` serialization, baseline-relative `Change`
+  classification, strict base-2 and base-10 logarithmic conversions, and
+  top-level `CopyNumber*` aliases.
 
 ### Changed
 
