@@ -36,7 +36,8 @@ fn construct_variant() -> CopyNumberVariant {
     }
 }
 
-/// Constructs the canonical copy-number fixture from a base-2 logarithmic ratio.
+/// Constructs the canonical copy-number fixture from a base-2 logarithmic
+/// ratio.
 fn construct_variant_from_log2(
     value: f64,
 ) -> Result<CopyNumberVariant, omics_variation::copy_number::LogarithmicVariantError> {
@@ -49,7 +50,8 @@ fn construct_variant_from_log2(
     )
 }
 
-/// Constructs the canonical copy-number fixture from a base-10 logarithmic ratio.
+/// Constructs the canonical copy-number fixture from a base-10 logarithmic
+/// ratio.
 fn construct_variant_from_log10(
     value: f64,
 ) -> Result<CopyNumberVariant, omics_variation::copy_number::LogarithmicVariantError> {
