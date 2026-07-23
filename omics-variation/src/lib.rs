@@ -18,11 +18,12 @@
 //! rather than storing it.
 //!
 //! The [`copy_number`] module models strandless, half-open copy-number
-//! observations with typed absolute counts and typed ploidy baselines.
-//! Top-level aliases such as [`CopyNumberVariant`] keep these types available
-//! alongside [`Variant`] and [`StructuralVariant`]. Unlike [`structural`], a
-//! copy-number variant records an observed count over an interval and does not
-//! encode a breakpoint adjacency.
+//! observations with typed absolute counts and required reference ploidy as
+//! part of variant identity. Top-level aliases such as [`CopyNumberVariant`]
+//! keep these types available alongside [`Variant`] and
+//! [`StructuralVariant`]. Unlike [`structural`], a copy-number variant records
+//! an observed count over an interval, carries the reference ploidy that
+//! interprets that count, and does not encode a breakpoint adjacency.
 //!
 //! ```
 //! use omics_molecule::polymer::dna;
@@ -48,6 +49,29 @@
 //! let adjacency = Adjacency::<dna::Nucleotide>::try_new_paired(a, b, ".".parse()?)?;
 //! let variant = StructuralVariant::try_new(vec![adjacency])?;
 //! assert_eq!(variant.kind(), StructuralKind::Deletion);
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! ```
+//! use omics_variation::CopyNumberChange;
+//! use omics_variation::CopyNumberPloidy;
+//! use omics_variation::CopyNumberVariant;
+//!
+//! let variant =
+//!     CopyNumberVariant::try_new("seq0", 100, 200, 3, CopyNumberPloidy::DIPLOID)?;
+//! assert_eq!(variant.change(), CopyNumberChange::Gain);
+//!
+//! let log2 = variant.log2();
+//! let log10 = variant.log10();
+//!
+//! assert_eq!(
+//!     CopyNumberVariant::try_from_log2("seq0", 100, 200, log2, CopyNumberPloidy::DIPLOID)?,
+//!     variant
+//! );
+//! assert_eq!(
+//!     CopyNumberVariant::try_from_log10("seq0", 100, 200, log10, CopyNumberPloidy::DIPLOID)?,
+//!     variant
+//! );
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!

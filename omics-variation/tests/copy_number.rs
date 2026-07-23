@@ -23,6 +23,10 @@ fn imports_top_level_copy_number_aliases() {
     let count = variant.count();
     let log2 = variant.log2();
     let log10 = variant.log10();
+    let parsed = "seq0:100-200(i):3/2".parse::<CopyNumberVariant>();
+    // SAFETY: the canonical top-level alias form contains a valid region, count,
+    // and reference ploidy.
+    let parsed = parsed.unwrap();
 
     assert_eq!(count, CopyNumberCount::new(3));
     assert_eq!(variant.ploidy(), CopyNumberPloidy::DIPLOID);
@@ -32,10 +36,24 @@ fn imports_top_level_copy_number_aliases() {
     let count_from_log10 = CopyNumberCount::try_from_log10(log10, CopyNumberPloidy::DIPLOID);
     // SAFETY: `log10(3 / 2)` round-trips to the original typed copy-number count.
     let count_from_log10 = count_from_log10.unwrap();
+    let variant_from_log2 =
+        CopyNumberVariant::try_from_log2("seq0", 100, 200, log2, CopyNumberPloidy::DIPLOID);
+    // SAFETY: `log2(3 / 2)` round-trips to the original top-level copy-number
+    // variant.
+    let variant_from_log2 = variant_from_log2.unwrap();
+    let variant_from_log10 =
+        CopyNumberVariant::try_from_log10("seq0", 100, 200, log10, CopyNumberPloidy::DIPLOID);
+    // SAFETY: `log10(3 / 2)` round-trips to the original top-level copy-number
+    // variant.
+    let variant_from_log10 = variant_from_log10.unwrap();
 
     assert_eq!(count_from_log2, count);
     assert_eq!(count_from_log10, count);
     assert_eq!(variant.change(), CopyNumberChange::Gain);
+    assert_eq!(parsed, variant);
+    assert_eq!(variant_from_log2, variant);
+    assert_eq!(variant_from_log10, variant);
+    assert_eq!(variant.to_string(), "seq0:100-200(i):3/2");
 }
 
 #[test]
