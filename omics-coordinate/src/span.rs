@@ -66,18 +66,26 @@ pub enum ParseError {
 /// A result with a span parsing error.
 pub type ParseResult<T> = std::result::Result<T, ParseError>;
 
+/// Internal trait definitions for span operations.
 mod r#trait {
     use super::*;
 
+    /// Trait for creating positions from numeric values within coordinate
+    /// systems.
     pub trait PositionForSpan<S: System> {
+        /// Creates a new position from a numeric value.
         fn try_new_position(value: Number) -> std::result::Result<Position<S>, position::Error>;
     }
 
+    /// Trait for coordinate span operations.
     pub trait Span<S: System> {
+        /// Tests whether this span contains an entity at the given position.
         fn contains_entity(&self, position: &Position<Base>) -> bool;
 
+        /// Returns the count of entities in this span.
         fn count_entities(&self) -> Number;
 
+        /// Tests whether this span contains no entities.
         fn is_empty(&self) -> bool;
     }
 }
@@ -99,7 +107,9 @@ impl r#trait::PositionForSpan<Interbase> for Position<Interbase> {
 /// A span with a typed coordinate system.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Span<S: System> {
+    /// The start position of this span.
     start: Position<S>,
+    /// The end position of this span.
     end: Position<S>,
 }
 
