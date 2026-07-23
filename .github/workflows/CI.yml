@@ -28,12 +28,26 @@ jobs:
       - run: cargo clippy --all-features -- --deny warnings
 
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        runner:
+          - ubuntu-latest
+          - macos-14
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v3
       - name: Update Rust
         run: rustup update stable && rustup default stable
       - run: cargo test --all-features
+
+  msrv-apple-silicon:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.81.0
+        run: rustup toolchain install 1.81.0 --profile minimal
+      - name: Check the library with Rust 1.81.0
+        run: cargo +1.81.0 check -p omics-alignment --lib
 
   test-examples:
     runs-on: ubuntu-latest

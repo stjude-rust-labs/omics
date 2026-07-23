@@ -155,7 +155,7 @@ fn push_operation(
 }
 
 /// Converts a non-empty unit-operation path into a canonical CIGAR.
-fn path_to_cigar(path: &[OperationKind]) -> Result<Cigar, Error> {
+pub(super) fn path_to_cigar(path: &[OperationKind]) -> Result<Cigar, Error> {
     // SAFETY: global alignment rejects two empty inputs, and local alignment
     // reaches this function only after finding a positive aligned endpoint.
     let first = path.first().copied().unwrap();
@@ -199,7 +199,7 @@ pub(super) fn local<T: Eq>(
 }
 
 /// Validates that traceback run lengths fit the active CIGAR number type.
-fn validate_lengths(reference: usize, query: usize) -> Result<(), Error> {
+pub(super) fn validate_lengths(reference: usize, query: usize) -> Result<(), Error> {
     Number::try_from(reference).map_err(|_| Error::LengthOutOfRange {
         axis: Axis::Reference,
         length: reference,
@@ -212,7 +212,7 @@ fn validate_lengths(reference: usize, query: usize) -> Result<(), Error> {
 }
 
 /// Returns the checked dynamic-programming dimensions.
-fn matrix_dimensions(reference: usize, query: usize) -> Result<(usize, usize), Error> {
+pub(super) fn matrix_dimensions(reference: usize, query: usize) -> Result<(usize, usize), Error> {
     let rows = reference.checked_add(1).ok_or(Error::MatrixSizeOverflow)?;
     let columns = query.checked_add(1).ok_or(Error::MatrixSizeOverflow)?;
     Ok((rows, columns))

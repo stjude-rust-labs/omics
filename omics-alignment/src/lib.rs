@@ -62,7 +62,11 @@
 //! The [`algorithm`] module computes deterministic global and local affine-gap
 //! alignments over generic symbol slices. Its [`algorithm::Outcome`] reports a
 //! score, a canonical CIGAR built from `=`, `X`, `I`, and `D`, and half-open
-//! input ranges that place the CIGAR on the original sequences.
+//! input ranges that place the CIGAR on the original sequences. For byte
+//! slices, [`algorithm::simd`] dispatches to NEON on macOS `aarch64` and AVX2
+//! on supported Linux `x86_64` processors while preserving exact scalar
+//! results. It uses narrow `i16` or `i32` lanes when score bounds permit them
+//! and otherwise falls back to the scalar implementation.
 
 pub use alignment::Alignment;
 pub use step::Step;
