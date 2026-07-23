@@ -21,7 +21,8 @@
 //! * A [`Coordinate`] localizes a position to a contig and, when present, a
 //!   strand.
 //! * A [`Span`] stores directed geometry between two positions without contig
-//!   or strand context.
+//!   or strand context. `Span<S>` preserves the supplied endpoint order and
+//!   derives [`Direction`](crate::span::Direction) by comparing start and end.
 //! * An [`Interval`] localizes a span by adding contig and strand metadata.
 //!
 //! Coordinates, via their positions, can fall within the _interbase_ coordinate

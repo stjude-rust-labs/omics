@@ -1243,7 +1243,7 @@ mod tests {
     }
 
     #[test]
-    fn nonsensical_start_greater_than_end() {
+    fn direction_mismatch_when_endpoints_conflict_with_strand() {
         //===================//
         // Positive stranded //
         //===================//

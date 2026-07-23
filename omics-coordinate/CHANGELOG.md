@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   contig and strand once.
 * `Interval::try_new` now takes `(contig, strand, span)`, which breaks callers
   that previously constructed intervals from separate endpoint inputs.
+* Removed `NonsensicalError::NegativelySized`, added
+  `Error::DirectionMismatch`, and now report invalid strand and span direction
+  combinations with the typed direction error.
 * Changed `Interval<Interbase>::into_equivalent_base()` to return `Option`.
   Zero-width interbase intervals return `None`.
 
