@@ -62,6 +62,7 @@ impl Count {
         ratio.log10()
     }
 
+    /// Converts a logarithmic ratio at the given base into an absolute count.
     fn try_from_logarithmic(
         value: f64,
         ploidy: Ploidy,
@@ -168,13 +169,17 @@ pub enum LogarithmicError {
     NonIntegral,
 }
 
+/// A logarithmic base used for copy-number conversion.
 #[derive(Debug, Clone, Copy)]
 enum LogarithmicBase {
+    /// Base 2 ratios.
     Two,
+    /// Base 10 ratios.
     Ten,
 }
 
 impl LogarithmicBase {
+    /// Raises the selected base to the provided exponent.
     fn powf(self, value: f64) -> f64 {
         match self {
             Self::Two => 2.0_f64.powf(value),
@@ -251,9 +256,13 @@ pub enum ParseError {
 /// A strandless, half-open copy-number variant.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Variant {
+    /// The contig containing the affected interval.
     contig: Contig,
+    /// The half-open start position.
     start: Position<Interbase>,
+    /// The half-open end position.
     end: Position<Interbase>,
+    /// The observed copy count over the interval.
     count: Count,
 }
 
