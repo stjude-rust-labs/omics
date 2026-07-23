@@ -1,4 +1,5 @@
-//! Exhaustive oracle and public compatibility tests for the alignment algorithms.
+//! Exhaustive oracle and public compatibility tests for the alignment
+//! algorithms.
 
 use omics_alignment::algorithm::Outcome;
 use omics_alignment::algorithm::Score;
@@ -70,7 +71,8 @@ fn score_path<T: Eq>(reference: &[T], query: &[T], path: &[Move], scoring: Scori
     total
 }
 
-/// Recursively enumerates all complete alignment paths, updating the running best.
+/// Recursively enumerates all complete alignment paths, updating the running
+/// best.
 fn enumerate_paths<T: Eq>(
     reference: &[T],
     query: &[T],
@@ -326,8 +328,8 @@ fn exhaustive_local_score_matches_oracle() {
                 } else {
                     let outcome = result.unwrap_or_else(|| {
                         panic!(
-                            "expected Some; ref={reference:?} query={query:?} \
-                             scoring={scoring:?} oracle={expected}"
+                            "expected Some; ref={reference:?} query={query:?} scoring={scoring:?} \
+                             oracle={expected}"
                         )
                     });
                     assert_eq!(
@@ -344,13 +346,13 @@ fn exhaustive_local_score_matches_oracle() {
                     };
                     assert!(
                         is_aligned(first),
-                        "local CIGAR does not start with an aligned op; \
-                         ref={reference:?} query={query:?}"
+                        "local CIGAR does not start with an aligned op; ref={reference:?} \
+                         query={query:?}"
                     );
                     assert!(
                         is_aligned(last),
-                        "local CIGAR does not end with an aligned op; \
-                         ref={reference:?} query={query:?}"
+                        "local CIGAR does not end with an aligned op; ref={reference:?} \
+                         query={query:?}"
                     );
                     assert_outcome_consistent(reference, query, scoring, &outcome);
                 }
