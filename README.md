@@ -53,7 +53,8 @@ following features are included and are top-level goals of the project.
 - **Coordinate systems (`omics::coordinate`)**. Provides multiple genomic coordinate
   systems including both a 0-based, half-open coordinate system (also known as the
   _interbase_ coordinate system) and 1-based, fully-closed coordinate system (also known
-  as the _in-base_ or just _base_ coordinate system).
+  as the _in-base_ or just _base_ coordinate system), plus typed positions, localized
+  coordinates, context-free spans, and localized intervals.
 - **Sequence alignments (`omics::alignment`).** Validated pairwise alignments with
   deterministic global and local affine-gap alignment over generic symbol slices,
   plus lossless per-operation traversal via `Alignment::steps`; callers can select

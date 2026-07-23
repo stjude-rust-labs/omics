@@ -3,6 +3,7 @@
 use crate::base::Coordinate;
 use crate::interval::r#trait;
 use crate::position::Number;
+use crate::span::Span;
 use crate::system::Base;
 use crate::system::Interbase;
 
@@ -36,14 +37,22 @@ impl Interval {
     pub fn into_equivalent_interbase(self) -> crate::interval::Interval<Interbase> {
         let (start, end) = self.into_coordinates();
 
-        // SAFETY: given the rules of how interbase and base coordinate systems
-        // work, this should always unwrap.
+        // SAFETY: every valid base interval endpoint has the required interbase
+        // boundary.
         let start = start.nudge_backward().unwrap();
+        // SAFETY: every valid base interval endpoint has the required interbase
+        // boundary.
         let end = end.nudge_forward().unwrap();
+        let (contig, strand, start) = start.into_parts();
+        let (_, _, end) = end.into_parts();
+        let span = Span::from((start, end));
+        let strand = match strand {
+            crate::Strand::Positive => "+",
+            crate::Strand::Negative => "-",
+        };
 
-        // SAFETY: since this was previously a valid interbase interval, as long
-        // as the two nudges above succeed, this should always unwrap.
-        crate::interval::Interval::<Interbase>::try_new(start, end).unwrap()
+        // SAFETY: the converted span retains the direction required by the strand.
+        crate::interval::Interval::<Interbase>::try_new(contig.as_str(), strand, span).unwrap()
     }
 }
 
@@ -53,19 +62,14 @@ impl Interval {
 
 impl r#trait::Interval<Base> for Interval {
     fn contains_entity(&self, coordinate: &Coordinate) -> bool {
-        // NOTE: for in-base positions whether or not the entity is contained in
-        // the interval matches the implementation of whether or not the
-        // coordinate is contained within the interval, as entities and
-        // coordinates are essentially the same thing in this system.
-        self.contains_coordinate(coordinate)
+        self.contig() == coordinate.contig()
+            && self.strand() == coordinate.strand()
+            && self.span().contains_entity(coordinate.position())
     }
 
     /// Gets the number of entities within the interval.
     fn count_entities(&self) -> Number {
-        self.start()
-            .position()
-            .distance_unchecked(self.end().position())
-            + 1
+        self.span().count_entities()
     }
 }
 
@@ -80,11 +84,13 @@ mod tests {
     }
 
     fn create_interval(contig: &str, strand: &str, start: Number, end: Number) -> Interval {
-        Interval::try_new(
+        let interval = Interval::try_from((
             create_coordinate(contig, strand, start),
             create_coordinate(contig, strand, end),
-        )
-        .unwrap()
+        ));
+        // SAFETY: the test helper receives endpoints compatible with the requested
+        // strand.
+        interval.unwrap()
     }
 
     #[test]

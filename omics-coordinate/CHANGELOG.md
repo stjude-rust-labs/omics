@@ -9,17 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+* Added `Span<S>` and `span::Direction` for context-free directed geometry.
+* Added system-specific span emptiness and entity-count semantics, including
+  empty interbase spans for boundary events.
 * Added a `TryFrom<&str>` conversion for `Coordinate`, mirroring the existing
   `FromStr` so coordinates compose with `TryInto`-based constructors
   ([#15](https://github.com/stjude-rust-labs/omics/pull/15)).
+* Added coordinate-pair `TryFrom` support for `Interval<S>` so localized
+  endpoints still compose through `TryInto`.
 * Derived `Hash` for `Position`, `Base`, and `Interbase`
   ([#16](https://github.com/stjude-rust-labs/omics/pull/16)).
 * Added `CoordinateRef` for allocation-free access to interval endpoints.
 
 ### Changed
 
-* Compacted `Interval` storage so each interval stores its contig and strand
-  once.
+* `Interval` now owns its geometry as a `Span<S>`, so each interval stores its
+  contig and strand once.
+* `Interval::try_new` now takes `(contig, strand, span)`, which breaks callers
+  that previously constructed intervals from separate endpoint inputs.
+* Removed `NonsensicalError::NegativelySized`, added
+  `Error::DirectionMismatch`, and now report invalid strand and span direction
+  combinations with the typed direction error.
 * Changed `Interval<Interbase>::into_equivalent_base()` to return `Option`.
   Zero-width interbase intervals return `None`.
 
