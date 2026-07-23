@@ -39,6 +39,9 @@ pub(super) struct NeonI16;
 // SAFETY: Every method preserves the Kernel lane semantics for eight signed
 // sixteen-bit lanes. The substitution method consumes eight ascending
 // reference bytes and eight descending query bytes.
+// NOTE: Rust 1.81 requires these intrinsic calls inside unsafe blocks while
+// newer toolchains mark them safe, so `#[expect]` cannot work consistently.
+#[allow(unused_unsafe)]
 unsafe impl Kernel for NeonI16 {
     type Score = i16;
     type Vector = int16x8_t;
@@ -105,15 +108,20 @@ unsafe impl Kernel for NeonI16 {
         // SAFETY: This method enables `neon`, and `query_start` begins the
         // eight readable query bytes established by the Kernel contract.
         let query_bytes = unsafe { vld1_u8(query_start) };
-        let query_bytes = vrev64_u8(query_bytes);
-        let equal_bytes = vceq_u8(reference_bytes, query_bytes);
-        let equal_masks = vreinterpretq_u16_s16(vmovl_s8(vreinterpret_s8_u8(equal_bytes)));
+        // SAFETY: This method enables `neon`, and the loaded vectors contain
+        // the eight byte lanes required by the reversal, comparison, widening,
+        // and score-selection intrinsics.
+        unsafe {
+            let query_bytes = vrev64_u8(query_bytes);
+            let equal_bytes = vceq_u8(reference_bytes, query_bytes);
+            let equal_masks = vreinterpretq_u16_s16(vmovl_s8(vreinterpret_s8_u8(equal_bytes)));
 
-        vbslq_s16(
-            equal_masks,
-            vdupq_n_s16(match_score),
-            vdupq_n_s16(mismatch_score),
-        )
+            vbslq_s16(
+                equal_masks,
+                vdupq_n_s16(match_score),
+                vdupq_n_s16(mismatch_score),
+            )
+        }
     }
 }
 
@@ -124,6 +132,9 @@ pub(super) struct NeonI32;
 // SAFETY: Every method preserves the Kernel lane semantics for four signed
 // thirty-two-bit lanes. The substitution method consumes four ascending
 // reference bytes and four descending query bytes.
+// NOTE: Rust 1.81 requires these intrinsic calls inside unsafe blocks while
+// newer toolchains mark them safe, so `#[expect]` cannot work consistently.
+#[allow(unused_unsafe)]
 unsafe impl Kernel for NeonI32 {
     type Score = i32;
     type Vector = int32x4_t;
@@ -208,13 +219,18 @@ unsafe impl Kernel for NeonI32 {
         // SAFETY: This method enables `neon`, and the four-element local
         // staging array provides four readable signed thirty-two-bit lanes.
         let query_values = unsafe { vld1q_s32(query_values.as_ptr()) };
-        let equal_masks = vceqq_s32(reference_values, query_values);
+        // SAFETY: This method enables `neon`, and the loaded vectors contain
+        // the four lanes required by the comparison and score-selection
+        // intrinsics.
+        unsafe {
+            let equal_masks = vceqq_s32(reference_values, query_values);
 
-        vbslq_s32(
-            equal_masks,
-            vdupq_n_s32(match_score),
-            vdupq_n_s32(mismatch_score),
-        )
+            vbslq_s32(
+                equal_masks,
+                vdupq_n_s32(match_score),
+                vdupq_n_s32(mismatch_score),
+            )
+        }
     }
 }
 

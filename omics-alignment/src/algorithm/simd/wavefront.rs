@@ -1222,7 +1222,7 @@ pub(super) fn global<K: Kernel>(
 
     let (matrix, endpoint) = compute::<K>(reference, query, scoring, Mode::Global)?;
     let Some(endpoint) = endpoint else {
-        // INVARIANT: A non-empty global matrix always has a reachable endpoint.
+        // SAFETY: A non-empty global matrix always has a reachable endpoint.
         unreachable!()
     };
     let (path, reference_start, query_start) = traceback(
