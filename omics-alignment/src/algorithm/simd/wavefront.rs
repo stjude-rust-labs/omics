@@ -1,5 +1,5 @@
 #![cfg_attr(
-    not(test),
+    all(not(test), not(all(target_arch = "aarch64", target_os = "macos"))),
     expect(
         dead_code,
         reason = "target-specific SIMD backends are added after the generic wavefront engine"
@@ -17,7 +17,7 @@ use crate::cigar::OperationKind;
 
 /// The narrowest score lane proven safe for one alignment.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum LaneWidth {
+pub(super) enum LaneWidth {
     /// A sixteen-bit signed lane is sufficient.
     I16,
     /// A thirty-two-bit signed lane is sufficient.
@@ -27,7 +27,7 @@ enum LaneWidth {
 }
 
 /// Chooses the narrowest lane width whose full-path bound fits.
-fn lane_width(reference_len: usize, query_len: usize, scoring: Scoring) -> LaneWidth {
+pub(super) fn lane_width(reference_len: usize, query_len: usize, scoring: Scoring) -> LaneWidth {
     let Some(bound) = score_bound(reference_len, query_len, scoring) else {
         return LaneWidth::Scalar;
     };
@@ -135,6 +135,7 @@ impl Layout {
     }
 
     /// Maps one diagonal-major index back to its matrix coordinate.
+    #[cfg(test)]
     fn coordinate(&self, index: usize) -> (usize, usize) {
         debug_assert!(index < self.cells);
 
@@ -1421,7 +1422,7 @@ mod tests {
             DifferentialCase {
                 name: "vector-only",
                 reference: b"ACGTACGT",
-                query: b"ACGTACGT",
+                query: b"AGCATGCT",
                 full_vectors: 1,
                 tail_cells: 0,
             },
@@ -1501,6 +1502,31 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+    enum Backend {
+        Neon,
+    }
+
+    #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+    fn differential_native(backend: Backend) -> Result<(), Error> {
+        match backend {
+            Backend::Neon => {
+                differential_global::<super::super::aarch64::NeonI16>(5)?;
+                differential_local::<super::super::aarch64::NeonI16>(5)?;
+                differential_global_cases::<super::super::aarch64::NeonI16>(
+                    &vector_differential_cases(),
+                )?;
+                differential_local_cases::<super::super::aarch64::NeonI16>(
+                    &vector_differential_cases(),
+                )?;
+                differential_global::<super::super::aarch64::NeonI32>(5)?;
+                differential_local::<super::super::aarch64::NeonI32>(5)?;
+            }
+        }
+
+        Ok(())
+    }
+
     #[test]
     fn test_vector_differential_cases_cover_test_i16_paths() {
         assert_eq!(vector_path_counts(5, 5), (0, 5));
@@ -1508,6 +1534,19 @@ mod tests {
         for case in vector_differential_cases() {
             assert_vector_case_shape(case);
         }
+    }
+
+    #[test]
+    fn test_vector_differential_cases_include_mixed_substitutions() {
+        let case = vector_differential_cases()[0];
+        let mut comparisons = case.reference.iter().zip(case.query.iter().rev());
+
+        assert!(
+            comparisons
+                .clone()
+                .any(|(reference, query)| reference == query)
+        );
+        assert!(comparisons.any(|(reference, query)| reference != query));
     }
 
     #[test]
@@ -1557,6 +1596,12 @@ mod tests {
     #[test]
     fn test_kernel_matches_scalar_for_short_local_inputs() -> Result<(), Error> {
         differential_local::<TestI16>(5)
+    }
+
+    #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+    #[test]
+    fn neon_matches_scalar() -> Result<(), Error> {
+        differential_native(Backend::Neon)
     }
 
     #[test]
