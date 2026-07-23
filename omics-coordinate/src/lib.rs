@@ -15,6 +15,15 @@
 //! * Optionally, if the molecule is stranded, the strand upon which the
 //!   coordinate sits is known as the [**strand**](crate::Strand).
 //!
+//! The crate layers these ideas into four related types.
+//!
+//! * A [`Position`] is a typed offset within one coordinate system.
+//! * A [`Coordinate`] localizes a position to a contig and, when present, a
+//!   strand.
+//! * A [`Span`] stores directed geometry between two positions without contig
+//!   or strand context.
+//! * An [`Interval`] localizes a span by adding contig and strand metadata.
+//!
 //! Coordinates, via their positions, can fall within the _interbase_ coordinate
 //! system (which is closely related to the 0-based, half-open coordinate
 //! system) or the _in-base_ coordinate system (closely related to the 1-based,
@@ -77,6 +86,35 @@
 //!
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
+//!
+//! When you need geometry before you know its genomic context, build a
+//! [`Span`] first and localize it later with an [`Interval`].
+//!
+//! ```
+//! use omics_coordinate::Interval;
+//! use omics_coordinate::Span;
+//! use omics_coordinate::span::Direction;
+//! use omics_coordinate::system::Interbase;
+//!
+//! let ascending = Span::<Interbase>::try_new(10, 20)?;
+//! assert_eq!(ascending.direction(), Direction::Ascending);
+//! assert!(!ascending.is_empty());
+//!
+//! let empty = Span::<Interbase>::try_new(10, 10)?;
+//! assert!(empty.is_empty());
+//!
+//! let descending = Span::<Interbase>::try_new(20, 10)?;
+//! assert_eq!(descending.direction(), Direction::Descending);
+//!
+//! let interval = Interval::try_new("seq0", "-", descending)?;
+//! assert_eq!(interval.to_string(), "seq0:-:20-10");
+//!
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! Empty interbase spans are valid because they represent events at a boundary
+//! between entities. Insertions and breakends happen at one interbase position
+//! even when they cover no in-base entity.
 //!
 //! # Background
 //!
@@ -374,12 +412,18 @@
 //!   lost during any conversion from one to the other. If it is of interest,
 //!   you may keep track of this kind of thing on your own at conversion time.
 //!
-//! ## Intervals
+//! ## Spans and Intervals
 //!
-//! Intervals describe a range of positions upon a contiguous molecule.
-//! Generally speaking, you can think of an interval as simply a start
-//! coordinate and end coordinate within one of the coordinate systems.
-//! Intervals are always closed _with respect to their comprising coordinates_.
+//! A [`Span`] describes directed geometry between two positions in one
+//! coordinate system. Spans are context free. They do not name a contig or
+//! strand, so you can reuse the same geometry until you are ready to localize
+//! it.
+//!
+//! An [`Interval`] localizes a span to a contiguous molecule by attaching a
+//! contig and strand. Intervals are always closed _with respect to their
+//! comprising coordinates_. When you already have localized endpoints,
+//! `Interval::try_from((start, end))` builds the span and validates that both
+//! coordinates share the same genomic context.
 //!
 //! The following figure illustrates this concept using the notation described
 //! in [the position section of the docs](#positions).

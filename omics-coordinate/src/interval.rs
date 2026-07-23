@@ -221,6 +221,10 @@ where
 {
     /// Creates an interval from genomic context and a directed span.
     ///
+    /// Build the [`Span`] first when your geometry is context free. Use
+    /// `Interval::try_from((start, end))` when you already have localized
+    /// coordinates.
+    ///
     /// Positive strands accept ascending and stationary spans. Negative
     /// strands accept descending and stationary spans.
     ///
@@ -234,11 +238,14 @@ where
     /// ```
     /// use omics_coordinate::Interval;
     /// use omics_coordinate::Span;
+    /// use omics_coordinate::span::Direction;
     /// use omics_coordinate::system::Interbase;
     ///
-    /// let span = Span::<Interbase>::try_new(10, 20)?;
-    /// let interval = Interval::try_new("seq0", "+", span)?;
-    /// assert_eq!(interval.to_string(), "seq0:+:10-20");
+    /// let span = Span::<Interbase>::try_new(20, 10)?;
+    /// assert_eq!(span.direction(), Direction::Descending);
+    ///
+    /// let interval = Interval::try_new("seq0", "-", span)?;
+    /// assert_eq!(interval.to_string(), "seq0:-:20-10");
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
