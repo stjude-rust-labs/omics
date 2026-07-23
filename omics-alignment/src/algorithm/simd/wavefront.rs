@@ -416,6 +416,7 @@ struct VectorValues<K: Kernel> {
 
 impl<K: Kernel> VectorValues<K> {
     /// Broadcasts narrow recurrence constants before the diagonal loop.
+    #[cfg_attr(all(target_arch = "x86_64", target_os = "linux"), inline(always))]
     fn new(values: &Values<K::Score>) -> Self {
         Self {
             unreachable: K::splat(K::Score::MIN),
@@ -512,6 +513,7 @@ fn choose_scalar<S: Narrow>(candidates: [(S, S, State); 3]) -> Result<(S, Option
 }
 
 /// Forms one candidate score while retaining unreachable lanes.
+#[cfg_attr(all(target_arch = "x86_64", target_os = "linux"), inline(always))]
 fn vector_candidate<K: Kernel>(
     predecessor: K::Vector,
     delta: K::Vector,
@@ -523,6 +525,7 @@ fn vector_candidate<K: Kernel>(
 }
 
 /// Evaluates three vector candidates in the required deterministic order.
+#[cfg_attr(all(target_arch = "x86_64", target_os = "linux"), inline(always))]
 fn choose_vector<K: Kernel>(
     unreachable: K::Vector,
     zero: K::Vector,
@@ -618,6 +621,7 @@ fn pack_vector_predecessors<S: Narrow>(traceback: &mut [u8], predecessors: &Pred
     clippy::too_many_arguments,
     reason = "the recurrence needs all three diagonal states and coordinate offsets"
 )]
+#[cfg_attr(all(target_arch = "x86_64", target_os = "linux"), inline(always))]
 fn fill_vector<K: Kernel>(
     current: &mut Scores<K::Score>,
     previous: &Scores<K::Score>,
@@ -1002,6 +1006,7 @@ fn update_local_endpoint(endpoint: &mut Option<Endpoint>, score: Score, row: usi
 }
 
 /// Fills all anti-diagonals and returns their packed traceback matrix.
+#[cfg_attr(all(target_arch = "x86_64", target_os = "linux"), inline(always))]
 fn compute<K: Kernel>(
     reference: &[u8],
     query: &[u8],
@@ -1202,6 +1207,7 @@ fn traceback(
 }
 
 /// Computes a checked global alignment through a generic wavefront kernel.
+#[cfg_attr(all(target_arch = "x86_64", target_os = "linux"), inline(always))]
 pub(super) fn global<K: Kernel>(
     reference: &[u8],
     query: &[u8],
@@ -1216,7 +1222,7 @@ pub(super) fn global<K: Kernel>(
 
     let (matrix, endpoint) = compute::<K>(reference, query, scoring, Mode::Global)?;
     let Some(endpoint) = endpoint else {
-        // SAFETY: A non-empty global matrix always has a reachable endpoint.
+        // INVARIANT: A non-empty global matrix always has a reachable endpoint.
         unreachable!()
     };
     let (path, reference_start, query_start) = traceback(
@@ -1240,6 +1246,7 @@ pub(super) fn global<K: Kernel>(
 }
 
 /// Computes a checked local alignment through a generic wavefront kernel.
+#[cfg_attr(all(target_arch = "x86_64", target_os = "linux"), inline(always))]
 pub(super) fn local<K: Kernel>(
     reference: &[u8],
     query: &[u8],

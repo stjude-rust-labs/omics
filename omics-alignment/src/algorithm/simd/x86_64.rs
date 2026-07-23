@@ -1,6 +1,7 @@
 use std::arch::x86_64::__m128i;
 use std::arch::x86_64::__m256i;
 use std::arch::x86_64::_mm_cmpeq_epi8;
+use std::arch::x86_64::_mm_loadl_epi64;
 use std::arch::x86_64::_mm_loadu_si128;
 use std::arch::x86_64::_mm_setr_epi8;
 use std::arch::x86_64::_mm_shuffle_epi8;
@@ -12,6 +13,7 @@ use std::arch::x86_64::_mm256_cmpeq_epi32;
 use std::arch::x86_64::_mm256_cmpgt_epi16;
 use std::arch::x86_64::_mm256_cmpgt_epi32;
 use std::arch::x86_64::_mm256_cvtepi8_epi16;
+use std::arch::x86_64::_mm256_cvtepi8_epi32;
 use std::arch::x86_64::_mm256_loadu_si256;
 use std::arch::x86_64::_mm256_set1_epi16;
 use std::arch::x86_64::_mm256_set1_epi32;
@@ -39,6 +41,7 @@ impl Avx2I16 {
     ///
     /// The processor supports `avx2` and `pointer` addresses sixteen readable
     /// signed sixteen-bit values.
+    #[inline]
     #[target_feature(enable = "avx2")]
     unsafe fn load_avx2(pointer: *const i16) -> __m256i {
         // SAFETY: This function enables `avx2`, and its caller provides sixteen
@@ -53,6 +56,7 @@ impl Avx2I16 {
     ///
     /// The processor supports `avx2` and `pointer` addresses sixteen writable
     /// signed sixteen-bit values.
+    #[inline]
     #[target_feature(enable = "avx2")]
     unsafe fn store_avx2(pointer: *mut i16, value: __m256i) {
         // SAFETY: This function enables `avx2`, and its caller provides sixteen
@@ -66,6 +70,7 @@ impl Avx2I16 {
     /// # Safety
     ///
     /// The processor supports `avx2`.
+    #[inline]
     #[target_feature(enable = "avx2")]
     unsafe fn splat_avx2(value: i16) -> __m256i {
         // SAFETY: This target-feature function uses `avx2`, and its caller
@@ -78,6 +83,7 @@ impl Avx2I16 {
     /// # Safety
     ///
     /// The processor supports `avx2`.
+    #[inline]
     #[target_feature(enable = "avx2")]
     unsafe fn add_avx2(left: __m256i, right: __m256i) -> __m256i {
         // SAFETY: This target-feature function uses `avx2`, and its caller
@@ -90,6 +96,7 @@ impl Avx2I16 {
     /// # Safety
     ///
     /// The processor supports `avx2`.
+    #[inline]
     #[target_feature(enable = "avx2")]
     unsafe fn greater_than_avx2(left: __m256i, right: __m256i) -> __m256i {
         // SAFETY: This target-feature function uses `avx2`, and its caller
@@ -102,6 +109,7 @@ impl Avx2I16 {
     /// # Safety
     ///
     /// The processor supports `avx2`.
+    #[inline]
     #[target_feature(enable = "avx2")]
     unsafe fn equal_avx2(left: __m256i, right: __m256i) -> __m256i {
         // SAFETY: This target-feature function uses `avx2`, and its caller
@@ -115,6 +123,7 @@ impl Avx2I16 {
     /// # Safety
     ///
     /// The processor supports `avx2`.
+    #[inline]
     #[target_feature(enable = "avx2")]
     unsafe fn select_avx2(mask: __m256i, if_true: __m256i, if_false: __m256i) -> __m256i {
         // SAFETY: This target-feature function uses `avx2`, and its caller
@@ -128,6 +137,7 @@ impl Avx2I16 {
     ///
     /// The processor supports `avx2`. `reference` addresses sixteen readable
     /// bytes and `query_end` follows sixteen readable bytes.
+    #[inline]
     #[target_feature(enable = "avx2")]
     unsafe fn substitution_avx2(
         reference: *const u8,
@@ -253,6 +263,7 @@ impl Avx2I32 {
     ///
     /// The processor supports `avx2` and `pointer` addresses eight readable
     /// signed thirty-two-bit values.
+    #[inline]
     #[target_feature(enable = "avx2")]
     unsafe fn load_avx2(pointer: *const i32) -> __m256i {
         // SAFETY: This function enables `avx2`, and its caller provides eight
@@ -267,6 +278,7 @@ impl Avx2I32 {
     ///
     /// The processor supports `avx2` and `pointer` addresses eight writable
     /// signed thirty-two-bit values.
+    #[inline]
     #[target_feature(enable = "avx2")]
     unsafe fn store_avx2(pointer: *mut i32, value: __m256i) {
         // SAFETY: This function enables `avx2`, and its caller provides eight
@@ -280,6 +292,7 @@ impl Avx2I32 {
     /// # Safety
     ///
     /// The processor supports `avx2`.
+    #[inline]
     #[target_feature(enable = "avx2")]
     unsafe fn splat_avx2(value: i32) -> __m256i {
         // SAFETY: This target-feature function uses `avx2`, and its caller
@@ -292,6 +305,7 @@ impl Avx2I32 {
     /// # Safety
     ///
     /// The processor supports `avx2`.
+    #[inline]
     #[target_feature(enable = "avx2")]
     unsafe fn add_avx2(left: __m256i, right: __m256i) -> __m256i {
         // SAFETY: This target-feature function uses `avx2`, and its caller
@@ -304,6 +318,7 @@ impl Avx2I32 {
     /// # Safety
     ///
     /// The processor supports `avx2`.
+    #[inline]
     #[target_feature(enable = "avx2")]
     unsafe fn greater_than_avx2(left: __m256i, right: __m256i) -> __m256i {
         // SAFETY: This target-feature function uses `avx2`, and its caller
@@ -316,6 +331,7 @@ impl Avx2I32 {
     /// # Safety
     ///
     /// The processor supports `avx2`.
+    #[inline]
     #[target_feature(enable = "avx2")]
     unsafe fn equal_avx2(left: __m256i, right: __m256i) -> __m256i {
         // SAFETY: This target-feature function uses `avx2`, and its caller
@@ -329,6 +345,7 @@ impl Avx2I32 {
     /// # Safety
     ///
     /// The processor supports `avx2`.
+    #[inline]
     #[target_feature(enable = "avx2")]
     unsafe fn select_avx2(mask: __m256i, if_true: __m256i, if_false: __m256i) -> __m256i {
         // SAFETY: This target-feature function uses `avx2`, and its caller
@@ -342,6 +359,7 @@ impl Avx2I32 {
     ///
     /// The processor supports `avx2`. `reference` addresses eight readable
     /// bytes and `query_end` follows eight readable bytes.
+    #[inline]
     #[target_feature(enable = "avx2")]
     unsafe fn substitution_avx2(
         reference: *const u8,
@@ -350,40 +368,28 @@ impl Avx2I32 {
         mismatch_score: i32,
     ) -> __m256i {
         // SAFETY: The caller provides eight readable reference bytes at
-        // `reference`.
-        let reference_bytes = unsafe { std::slice::from_raw_parts(reference, Self::LANES) };
+        // `reference`. The load accesses exactly those bytes.
+        let reference_bytes = unsafe { _mm_loadl_epi64(reference.cast::<__m128i>()) };
         // SAFETY: The caller provides eight readable query bytes immediately
         // before `query_end`.
         let query_start = unsafe { query_end.sub(Self::LANES) };
         // SAFETY: `query_start` begins the eight readable query bytes
-        // established by the caller.
-        let query_bytes = unsafe { std::slice::from_raw_parts(query_start, Self::LANES) };
-        let reference_values = [
-            i32::from(reference_bytes[0]),
-            i32::from(reference_bytes[1]),
-            i32::from(reference_bytes[2]),
-            i32::from(reference_bytes[3]),
-            i32::from(reference_bytes[4]),
-            i32::from(reference_bytes[5]),
-            i32::from(reference_bytes[6]),
-            i32::from(reference_bytes[7]),
-        ];
-        let query_values = [
-            i32::from(query_bytes[7]),
-            i32::from(query_bytes[6]),
-            i32::from(query_bytes[5]),
-            i32::from(query_bytes[4]),
-            i32::from(query_bytes[3]),
-            i32::from(query_bytes[2]),
-            i32::from(query_bytes[1]),
-            i32::from(query_bytes[0]),
-        ];
-        // SAFETY: This function enables `avx2`, and the local staging array
-        // contains eight readable signed thirty-two-bit values.
-        let reference_values = unsafe { _mm256_loadu_si256(reference_values.as_ptr().cast()) };
-        // SAFETY: This function enables `avx2`, and the local staging array
-        // contains eight readable signed thirty-two-bit values.
-        let query_values = unsafe { _mm256_loadu_si256(query_values.as_ptr().cast()) };
+        // established by the caller. The load accesses exactly those bytes.
+        let query_bytes = unsafe { _mm_loadl_epi64(query_start.cast::<__m128i>()) };
+        // SAFETY: This function enables `avx2`, and the shuffle reverses the
+        // lower eight byte lanes that the subsequent widening operation reads.
+        let query_bytes = unsafe {
+            _mm_shuffle_epi8(
+                query_bytes,
+                _mm_setr_epi8(7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+            )
+        };
+        // SAFETY: This function enables `avx2`, and both values contain eight
+        // readable byte lanes for widening to signed thirty-two-bit lanes.
+        let reference_values = unsafe { _mm256_cvtepi8_epi32(reference_bytes) };
+        // SAFETY: The lower eight shuffled byte lanes map to the descending
+        // query order required by the Kernel contract.
+        let query_values = unsafe { _mm256_cvtepi8_epi32(query_bytes) };
         // SAFETY: This target-feature function uses `avx2`, and its caller
         // proves that the processor supports the lane comparison instruction.
         let equal_masks = unsafe { _mm256_cmpeq_epi32(reference_values, query_values) };
