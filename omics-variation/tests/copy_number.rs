@@ -16,6 +16,10 @@ use omics_variation::copy_number::Variant;
 
 #[test]
 fn imports_top_level_copy_number_aliases() {
+    let reference = CopyNumberVariant::try_new("seq0", 100, 200, 2, CopyNumberPloidy::DIPLOID);
+    // SAFETY: the constructor is expected to accept this valid contig, span, and
+    // reference ploidy where the count equals the stored ploidy.
+    let reference = reference.unwrap();
     let variant = CopyNumberVariant::try_new("seq0", 100, 200, 3, CopyNumberPloidy::DIPLOID);
     // SAFETY: the constructor is expected to accept this valid contig, span, and
     // ploidy.
@@ -29,6 +33,8 @@ fn imports_top_level_copy_number_aliases() {
     let parsed = parsed.unwrap();
 
     assert_eq!(count, CopyNumberCount::new(3));
+    assert_eq!(reference.count().get(), reference.ploidy().get());
+    assert_eq!(reference.change(), CopyNumberChange::Reference);
     assert_eq!(variant.ploidy(), CopyNumberPloidy::DIPLOID);
     let count_from_log2 = CopyNumberCount::try_from_log2(log2, CopyNumberPloidy::DIPLOID);
     // SAFETY: `log2(3 / 2)` round-trips to the original typed copy-number count.

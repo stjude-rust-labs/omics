@@ -57,6 +57,11 @@
 //! use omics_variation::CopyNumberPloidy;
 //! use omics_variation::CopyNumberVariant;
 //!
+//! let reference =
+//!     CopyNumberVariant::try_new("seq0", 100, 200, 2, CopyNumberPloidy::DIPLOID)?;
+//! assert_eq!(reference.count().get(), reference.ploidy().get());
+//! assert_eq!(reference.change(), CopyNumberChange::Reference);
+//!
 //! let variant =
 //!     CopyNumberVariant::try_new("seq0", 100, 200, 3, CopyNumberPloidy::DIPLOID)?;
 //! assert_eq!(variant.change(), CopyNumberChange::Gain);
