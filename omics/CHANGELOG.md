@@ -13,7 +13,8 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `omics-alignment` as `omics::alignment` and automatically enables the `coordinate`
   component ([#18](https://github.com/stjude-rust-labs/omics/pull/18)).
 * Added the `omics::alignment::algorithm` API under the existing `alignment`
-  feature, including the `global` and `local` affine-gap aligners.
+  feature, including the `global` and `local` affine-gap aligners
+  ([#19](https://github.com/stjude-rust-labs/omics/pull/19)).
 
 ## 0.4.0 - 03-19-2026
 
