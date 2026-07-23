@@ -76,7 +76,7 @@
 //!
 //! # Variant strings
 //!
-//! The crate uses a compact, crate-local string format:
+//! The crate uses a compact, crate-local string format.
 //!
 //! ```text
 //! contig:[strand:]position(system):reference:alternate

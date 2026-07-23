@@ -63,10 +63,12 @@ following features are included and are top-level goals of the project.
   relevant in omics including smaller compounds (e.g., nucleotides) and larger
   polymers (e.g., DNA, RNA).
 - **Variation (`omics::variation`).** Facilities for expressing small sequence
-  variants, strandless copy-number variants over half-open regions, and
-  adjacency-defined structural variants. Small variants include single
-  nucleotide variants (SNVs), multi-nucleotide variants (MNVs), insertions,
-  deletions, and deletion-insertions (delins).
+  variants, strandless copy-number variants over half-open regions with typed
+  absolute counts and typed ploidy baselines, and adjacency-defined structural
+  variants. Base-2 and base-10 count conversions require a nonzero typed
+  ploidy and reject ratios that do not reconstruct an integral absolute count.
+  Small variants include single nucleotide variants (SNVs), multi-nucleotide
+  variants (MNVs), insertions, deletions, and deletion-insertions (delins).
 
 ## 🖥️ Development
 
