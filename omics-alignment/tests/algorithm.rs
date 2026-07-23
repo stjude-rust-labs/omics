@@ -281,6 +281,26 @@ fn aligns_byte_slices_through_the_public_api() -> Result<(), Box<dyn std::error:
 }
 
 #[test]
+fn simd_public_api_matches_scalar_global() -> Result<(), Box<dyn std::error::Error>> {
+    let scoring = Scoring::try_new(2, -3, -2, -1)?;
+    assert_eq!(
+        omics_alignment::algorithm::simd::global(b"ACGT", b"AGT", scoring)?,
+        global(b"ACGT", b"AGT", scoring)?
+    );
+    Ok(())
+}
+
+#[test]
+fn simd_public_api_matches_scalar_local() -> Result<(), Box<dyn std::error::Error>> {
+    let scoring = Scoring::try_new(2, -3, -2, -1)?;
+    assert_eq!(
+        omics_alignment::algorithm::simd::local(b"GGACGT", b"TTACGA", scoring)?,
+        local(b"GGACGT", b"TTACGA", scoring)?
+    );
+    Ok(())
+}
+
+#[test]
 fn aligns_nucleotide_slices_without_a_production_dependency()
 -> Result<(), Box<dyn std::error::Error>> {
     let reference = [Nucleotide::A, Nucleotide::C];

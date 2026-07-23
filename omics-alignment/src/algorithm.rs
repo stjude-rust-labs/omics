@@ -279,6 +279,8 @@ pub enum Error {
 /// Dynamic-programming and traceback implementation.
 mod engine;
 
+pub mod simd;
+
 /// Computes a deterministic global affine-gap alignment over two complete
 /// inputs.
 ///
