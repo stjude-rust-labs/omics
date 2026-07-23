@@ -2,6 +2,7 @@
 
 use omics_coordinate::Position;
 use omics_coordinate::Span;
+use omics_coordinate::span::ClampError;
 use omics_coordinate::span::Direction;
 use omics_coordinate::system::Base;
 use omics_coordinate::system::Interbase;
@@ -124,6 +125,114 @@ fn exposes_system_aliases() -> Result<(), Box<dyn std::error::Error>> {
 
     assert_eq!(base.start().get(), 10);
     assert_eq!(interbase.end().get(), 12);
+
+    Ok(())
+}
+
+#[test]
+fn resolves_offsets_in_traversal_direction() -> Result<(), Box<dyn std::error::Error>> {
+    let ascending = Span::<Interbase>::try_new(10, 20)?;
+    let descending = Span::<Interbase>::try_new(20, 10)?;
+
+    assert_eq!(ascending.position_offset(&Position::new(15)), Some(5));
+    assert_eq!(descending.position_offset(&Position::new(15)), Some(5));
+    assert_eq!(ascending.position_offset(&Position::new(9)), None);
+    assert_eq!(descending.position_offset(&Position::new(21)), None);
+    assert_eq!(ascending.position_at_offset(5), Some(Position::new(15)));
+    assert_eq!(descending.position_at_offset(5), Some(Position::new(15)));
+    assert_eq!(descending.position_at_offset(11), None);
+
+    Ok(())
+}
+
+#[test]
+fn clamps_same_direction_overlaps() -> Result<(), Box<dyn std::error::Error>> {
+    let ascending = Span::<Interbase>::try_new(10, 20)?;
+    let ascending_operand = Span::<Interbase>::try_new(15, 25)?;
+    let descending = Span::<Interbase>::try_new(20, 10)?;
+    let descending_operand = Span::<Interbase>::try_new(18, 8)?;
+
+    assert_eq!(
+        ascending.clamp(ascending_operand)?,
+        Span::<Interbase>::try_new(15, 20)?
+    );
+    assert_eq!(
+        descending.clamp(descending_operand)?,
+        Span::<Interbase>::try_new(18, 10)?
+    );
+
+    Ok(())
+}
+
+#[test]
+fn clamps_stationary_spans_against_either_direction() -> Result<(), Box<dyn std::error::Error>> {
+    let point = Span::<Interbase>::try_new(15, 15)?;
+    let ascending = Span::<Interbase>::try_new(10, 20)?;
+    let descending = Span::<Interbase>::try_new(20, 10)?;
+
+    assert_eq!(point.clone().clamp(ascending)?, point);
+    assert_eq!(point.clone().clamp(descending)?, point);
+
+    Ok(())
+}
+
+#[test]
+fn clamps_when_operand_is_stationary() -> Result<(), Box<dyn std::error::Error>> {
+    let point = Span::<Interbase>::try_new(15, 15)?;
+    let ascending = Span::<Interbase>::try_new(10, 20)?;
+    let descending = Span::<Interbase>::try_new(20, 10)?;
+
+    assert_eq!(ascending.clamp(point.clone())?, point);
+    assert_eq!(descending.clamp(point.clone())?, point);
+
+    Ok(())
+}
+
+#[test]
+fn rejects_disjoint_spans() -> Result<(), Box<dyn std::error::Error>> {
+    let ascending = Span::<Interbase>::try_new(10, 20)?;
+    let operand = Span::<Interbase>::try_new(21, 30)?;
+
+    assert_eq!(
+        ascending.clamp(operand).unwrap_err(),
+        ClampError::Disjoint {
+            original_start: 10,
+            original_end: 20,
+            operand_start: 21,
+            operand_end: 30,
+        }
+    );
+
+    Ok(())
+}
+
+#[test]
+fn rejects_incompatible_directions() -> Result<(), Box<dyn std::error::Error>> {
+    let ascending = Span::<Interbase>::try_new(10, 20)?;
+    let descending = Span::<Interbase>::try_new(20, 10)?;
+
+    assert_eq!(
+        ascending.clone().clamp(descending.clone()).unwrap_err(),
+        ClampError::DirectionMismatch {
+            original_start: 10,
+            original_end: 20,
+            original_direction: Direction::Ascending,
+            operand_start: 20,
+            operand_end: 10,
+            operand_direction: Direction::Descending,
+        }
+    );
+    assert_eq!(
+        descending.clamp(ascending).unwrap_err(),
+        ClampError::DirectionMismatch {
+            original_start: 20,
+            original_end: 10,
+            original_direction: Direction::Descending,
+            operand_start: 10,
+            operand_end: 20,
+            operand_direction: Direction::Ascending,
+        }
+    );
 
     Ok(())
 }

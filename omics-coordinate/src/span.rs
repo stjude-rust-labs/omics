@@ -1,6 +1,8 @@
 //! Span values.
 
 use std::cmp::Ordering;
+use std::cmp::max;
+use std::cmp::min;
 use std::fmt;
 use std::str::FromStr;
 
@@ -31,6 +33,74 @@ pub enum Direction {
     /// The end lies before the start.
     Descending,
 }
+
+impl Direction {
+    /// Returns whether two directions can be clamped together.
+    pub(crate) fn is_compatible(self, other: Self) -> bool {
+        self == other || self == Self::Stationary || other == Self::Stationary
+    }
+}
+
+impl fmt::Display for Direction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = match self {
+            Self::Ascending => "ascending",
+            Self::Stationary => "stationary",
+            Self::Descending => "descending",
+        };
+
+        f.write_str(value)
+    }
+}
+
+/// An error from clamping one span by another.
+#[derive(Error, Debug, PartialEq, Eq)]
+pub enum ClampError {
+    /// The spans move in incompatible directions.
+    #[error(
+        "direction mismatch between spans `{original_start}-{original_end}` and \
+         `{operand_start}-{operand_end}`; directions are `{original_direction}` and \
+         `{operand_direction}`"
+    )]
+    DirectionMismatch {
+        /// The start position of the original span.
+        original_start: Number,
+
+        /// The end position of the original span.
+        original_end: Number,
+
+        /// The direction of the original span.
+        original_direction: Direction,
+
+        /// The start position of the operand span.
+        operand_start: Number,
+
+        /// The end position of the operand span.
+        operand_end: Number,
+
+        /// The direction of the operand span.
+        operand_direction: Direction,
+    },
+
+    /// The spans do not overlap.
+    #[error("disjoint spans `{original_start}-{original_end}` and `{operand_start}-{operand_end}`")]
+    Disjoint {
+        /// The start position of the original span.
+        original_start: Number,
+
+        /// The end position of the original span.
+        original_end: Number,
+
+        /// The start position of the operand span.
+        operand_start: Number,
+
+        /// The end position of the operand span.
+        operand_end: Number,
+    },
+}
+
+/// A result with a span clamping error.
+pub type ClampResult<T> = std::result::Result<T, ClampError>;
 
 /// An error from building a span from raw numbers.
 #[derive(Error, Debug, PartialEq, Eq)]
@@ -169,6 +239,67 @@ where
             Direction::Stationary => self.start == *position,
             Direction::Descending => self.end <= *position && *position <= self.start,
         }
+    }
+
+    /// Returns the offset of a position from the start of the span.
+    pub fn position_offset(&self, position: &Position<S>) -> Option<Number> {
+        self.contains_position(position)
+            .then(|| self.start.distance_unchecked(position))
+    }
+
+    /// Returns the position at an offset from the start of the span.
+    pub fn position_at_offset(&self, offset: Number) -> Option<Position<S>> {
+        let position = match self.direction() {
+            Direction::Ascending => self.start.checked_add(offset)?,
+            Direction::Stationary if offset == 0 => self.start.clone(),
+            Direction::Stationary => return None,
+            Direction::Descending => self.start.checked_sub(offset)?,
+        };
+
+        self.contains_position(&position).then_some(position)
+    }
+
+    /// Clamps this span by another span.
+    #[must_use = "this method returns a new span"]
+    pub fn clamp(self, operand: Self) -> ClampResult<Self> {
+        let original_direction = self.direction();
+        let operand_direction = operand.direction();
+        let original_start = self.start.get();
+        let original_end = self.end.get();
+        let operand_start = operand.start.get();
+        let operand_end = operand.end.get();
+
+        if !original_direction.is_compatible(operand_direction) {
+            return Err(ClampError::DirectionMismatch {
+                original_start,
+                original_end,
+                original_direction,
+                operand_start,
+                operand_end,
+                operand_direction,
+            });
+        }
+
+        let lower = max(
+            min(self.start.clone(), self.end.clone()),
+            min(operand.start.clone(), operand.end.clone()),
+        );
+        let upper = min(max(self.start, self.end), max(operand.start, operand.end));
+
+        if lower > upper {
+            return Err(ClampError::Disjoint {
+                original_start,
+                original_end,
+                operand_start,
+                operand_end,
+            });
+        }
+
+        Ok(match original_direction {
+            Direction::Ascending => Self::from((lower, upper)),
+            Direction::Stationary => Self::from((lower, upper)),
+            Direction::Descending => Self::from((upper, lower)),
+        })
     }
 }
 
