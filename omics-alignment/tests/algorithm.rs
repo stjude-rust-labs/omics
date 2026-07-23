@@ -6,6 +6,7 @@ use omics_alignment::algorithm::Score;
 use omics_alignment::algorithm::Scoring;
 use omics_alignment::algorithm::global;
 use omics_alignment::algorithm::local;
+use omics_alignment::algorithm::simd;
 use omics_alignment::cigar::OperationKind;
 use omics_molecule::polymer::dna::Nucleotide;
 
@@ -186,6 +187,60 @@ fn oracle_local_score<T: Eq>(reference: &[T], query: &[T], scoring: Scoring) -> 
     best
 }
 
+fn local_maximum_endpoints(
+    reference: &[u8],
+    query: &[u8],
+    scoring: Scoring,
+) -> Vec<(usize, usize)> {
+    let columns = query.len() + 1;
+    let cells = (reference.len() + 1) * columns;
+    let mut aligned = vec![0; cells];
+    let mut insertion = vec![0; cells];
+    let mut deletion = vec![0; cells];
+    let mut best = 0;
+    let mut endpoints = Vec::new();
+
+    let index = |row: usize, column: usize| row * columns + column;
+
+    for row in 1..=reference.len() {
+        for column in 1..=query.len() {
+            let here = index(row, column);
+            let left = index(row, column - 1);
+            let up = index(row - 1, column);
+            let diagonal = index(row - 1, column - 1);
+            let substitution = if reference[row - 1] == query[column - 1] {
+                scoring.match_score()
+            } else {
+                scoring.mismatch_score()
+            };
+
+            insertion[here] = 0
+                .max(aligned[left] + scoring.gap_open_score())
+                .max(insertion[left] + scoring.gap_extend_score())
+                .max(deletion[left] + scoring.gap_open_score());
+            deletion[here] = 0
+                .max(aligned[up] + scoring.gap_open_score())
+                .max(deletion[up] + scoring.gap_extend_score())
+                .max(insertion[up] + scoring.gap_open_score());
+            aligned[here] = 0
+                .max(aligned[diagonal] + substitution)
+                .max(insertion[diagonal] + substitution)
+                .max(deletion[diagonal] + substitution);
+
+            let score = aligned[here].max(insertion[here]).max(deletion[here]);
+            if score > best {
+                best = score;
+                endpoints.clear();
+            }
+            if score == best && score > 0 {
+                endpoints.push((row, column));
+            }
+        }
+    }
+
+    endpoints
+}
+
 /// Returns all binary sequences of length 0 through 3.
 fn all_binary_seqs() -> Vec<Vec<u8>> {
     let mut seqs = Vec::new();
@@ -271,6 +326,344 @@ fn exhaustive_scorings() -> [Scoring; 4] {
         Scoring::try_new(1, 0, 0, 0).unwrap(),
         Scoring::try_new(1, -1, 0, -1).unwrap(),
     ]
+}
+
+struct PublicSimdCase {
+    name: &'static str,
+    reference: Vec<u8>,
+    query: Vec<u8>,
+    scoring: Scoring,
+}
+
+impl PublicSimdCase {
+    fn try_new(name: &'static str, reference: Vec<u8>, query: Vec<u8>, scoring: Scoring) -> Self {
+        Self {
+            name,
+            reference,
+            query,
+            scoring,
+        }
+    }
+}
+
+struct Xorshift64 {
+    state: u64,
+}
+
+impl Xorshift64 {
+    fn new(seed: u64) -> Self {
+        assert_ne!(seed, 0, "xorshift seed must be non-zero");
+        Self { state: seed }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        let mut value = self.state;
+        value ^= value << 13;
+        value ^= value >> 7;
+        value ^= value << 17;
+        self.state = value;
+        value
+    }
+
+    fn next_usize(&mut self, minimum: usize, maximum: usize) -> usize {
+        debug_assert!(minimum <= maximum);
+        minimum + (self.next_u64() as usize % (maximum - minimum + 1))
+    }
+
+    fn next_sequence(&mut self, length: usize) -> Vec<u8> {
+        (0..length)
+            .map(|_| match self.next_u64() & 0b11 {
+                0 => b'A',
+                1 => b'C',
+                2 => b'G',
+                _ => b'T',
+            })
+            .collect()
+    }
+}
+
+fn patterned_bytes(length: usize) -> Vec<u8> {
+    [b'A', b'C', b'G', b'T']
+        .into_iter()
+        .cycle()
+        .take(length)
+        .collect()
+}
+
+fn repeated_bytes(byte: u8, length: usize) -> Vec<u8> {
+    vec![byte; length]
+}
+
+fn public_simd_regression_cases() -> Result<Vec<PublicSimdCase>, Box<dyn std::error::Error>> {
+    Ok(vec![
+        PublicSimdCase::try_new(
+            "empty-both",
+            Vec::new(),
+            Vec::new(),
+            Scoring::try_new(2, -3, -2, -1)?,
+        ),
+        PublicSimdCase::try_new(
+            "empty-reference",
+            Vec::new(),
+            patterned_bytes(5),
+            Scoring::try_new(2, -3, -2, -1)?,
+        ),
+        PublicSimdCase::try_new(
+            "empty-query",
+            patterned_bytes(5),
+            Vec::new(),
+            Scoring::try_new(2, -3, -2, -1)?,
+        ),
+        PublicSimdCase::try_new(
+            "equal-local-maxima-different-diagonals",
+            b"A".to_vec(),
+            b"AA".to_vec(),
+            Scoring::try_new(2, -3, -2, -1)?,
+        ),
+        PublicSimdCase::try_new(
+            "zero-cost-gaps",
+            repeated_bytes(b'A', 4),
+            repeated_bytes(b'A', 2),
+            Scoring::try_new(1, -1, 0, 0)?,
+        ),
+        PublicSimdCase::try_new(
+            "lane-4-minus-one",
+            patterned_bytes(3),
+            patterned_bytes(3),
+            Scoring::try_new(2, -3, -2, -1)?,
+        ),
+        PublicSimdCase::try_new(
+            "lane-4-exact",
+            patterned_bytes(4),
+            patterned_bytes(4),
+            Scoring::try_new(2, -3, -2, -1)?,
+        ),
+        PublicSimdCase::try_new(
+            "lane-4-plus-one",
+            patterned_bytes(5),
+            patterned_bytes(5),
+            Scoring::try_new(2, -3, -2, -1)?,
+        ),
+        PublicSimdCase::try_new(
+            "lane-8-minus-one",
+            patterned_bytes(7),
+            patterned_bytes(7),
+            Scoring::try_new(2, -3, -2, -1)?,
+        ),
+        PublicSimdCase::try_new(
+            "lane-8-exact",
+            patterned_bytes(8),
+            patterned_bytes(8),
+            Scoring::try_new(2, -3, -2, -1)?,
+        ),
+        PublicSimdCase::try_new(
+            "lane-8-plus-one",
+            patterned_bytes(9),
+            patterned_bytes(9),
+            Scoring::try_new(2, -3, -2, -1)?,
+        ),
+        PublicSimdCase::try_new(
+            "lane-16-minus-one",
+            patterned_bytes(15),
+            patterned_bytes(15),
+            Scoring::try_new(2, -3, -2, -1)?,
+        ),
+        PublicSimdCase::try_new(
+            "lane-16-exact",
+            patterned_bytes(16),
+            patterned_bytes(16),
+            Scoring::try_new(2, -3, -2, -1)?,
+        ),
+        PublicSimdCase::try_new(
+            "lane-16-plus-one",
+            patterned_bytes(17),
+            patterned_bytes(17),
+            Scoring::try_new(2, -3, -2, -1)?,
+        ),
+        PublicSimdCase::try_new(
+            "asymmetric-1x257",
+            repeated_bytes(b'A', 1),
+            repeated_bytes(b'A', 257),
+            Scoring::try_new(2, -3, -2, -1)?,
+        ),
+        PublicSimdCase::try_new(
+            "selects-i32-lanes",
+            patterned_bytes(4),
+            patterned_bytes(4),
+            Scoring::try_new(5_000, -1, -1, -1)?,
+        ),
+        PublicSimdCase::try_new(
+            "falls-back-for-score-min",
+            b"AC".to_vec(),
+            b"A".to_vec(),
+            Scoring::try_new(1, -1, Score::MIN, -1)?,
+        ),
+    ])
+}
+
+fn assert_public_simd_case(case: PublicSimdCase) -> Result<(), Box<dyn std::error::Error>> {
+    if case.name == "equal-local-maxima-different-diagonals" {
+        let endpoints = local_maximum_endpoints(&case.reference, &case.query, case.scoring);
+        let diagonals: std::collections::BTreeSet<_> =
+            endpoints.iter().map(|(row, column)| row + column).collect();
+        assert!(
+            endpoints.len() >= 2,
+            "case should have repeated local maxima"
+        );
+        assert!(
+            diagonals.len() >= 2,
+            "case should place equal local maxima on different diagonals",
+        );
+    }
+
+    assert_same_public_global_result(
+        simd::global(&case.reference, &case.query, case.scoring),
+        global(&case.reference, &case.query, case.scoring),
+        case.name,
+    );
+    assert_same_public_local_result(
+        simd::local(&case.reference, &case.query, case.scoring),
+        local(&case.reference, &case.query, case.scoring),
+        case.name,
+    );
+
+    Ok(())
+}
+
+fn assert_same_public_global_result(
+    actual: Result<Outcome, omics_alignment::algorithm::Error>,
+    expected: Result<Outcome, omics_alignment::algorithm::Error>,
+    case_name: &str,
+) {
+    match (actual, expected) {
+        (Ok(actual), Ok(expected)) => {
+            assert_eq!(actual, expected, "public global mismatch; case={case_name}",)
+        }
+        (Err(actual), Err(expected)) => {
+            assert_eq!(
+                actual.to_string(),
+                expected.to_string(),
+                "public global error mismatch; case={case_name}",
+            );
+            assert_eq!(
+                format!("{actual:?}"),
+                format!("{expected:?}"),
+                "public global error variant mismatch; case={case_name}",
+            );
+        }
+        (actual, expected) => panic!(
+            "public global result mismatch; case={case_name} actual={actual:?} expected={expected:?}"
+        ),
+    }
+}
+
+fn assert_same_public_local_result(
+    actual: Result<Option<Outcome>, omics_alignment::algorithm::Error>,
+    expected: Result<Option<Outcome>, omics_alignment::algorithm::Error>,
+    case_name: &str,
+) {
+    match (actual, expected) {
+        (Ok(actual), Ok(expected)) => {
+            assert_eq!(actual, expected, "public local mismatch; case={case_name}",)
+        }
+        (Err(actual), Err(expected)) => {
+            assert_eq!(
+                actual.to_string(),
+                expected.to_string(),
+                "public local error mismatch; case={case_name}",
+            );
+            assert_eq!(
+                format!("{actual:?}"),
+                format!("{expected:?}"),
+                "public local error variant mismatch; case={case_name}",
+            );
+        }
+        (actual, expected) => panic!(
+            "public local result mismatch; case={case_name} actual={actual:?} expected={expected:?}"
+        ),
+    }
+}
+
+fn random_native_case(
+    generator: &mut Xorshift64,
+    case_index: usize,
+) -> Result<PublicSimdCase, Box<dyn std::error::Error>> {
+    let (name, minimum_length, scoring) = if case_index % 2 == 0 {
+        ("random-native-i16", 1, Scoring::try_new(2, -3, -2, -1)?)
+    } else {
+        ("random-native-i32", 4, Scoring::try_new(5_000, -1, -1, -1)?)
+    };
+    let reference_length = generator.next_usize(minimum_length, 128);
+    let query_length = generator.next_usize(minimum_length, 128);
+
+    Ok(PublicSimdCase::try_new(
+        name,
+        generator.next_sequence(reference_length),
+        generator.next_sequence(query_length),
+        scoring,
+    ))
+}
+
+fn native_backend_available() -> bool {
+    #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+    {
+        true
+    }
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    {
+        std::is_x86_feature_detected!("avx2")
+    }
+    #[cfg(not(any(
+        all(target_arch = "aarch64", target_os = "macos"),
+        all(target_arch = "x86_64", target_os = "linux")
+    )))]
+    {
+        false
+    }
+}
+
+fn assert_random_public_simd_global_cases(
+    case_count: usize,
+) -> Result<(), Box<dyn std::error::Error>> {
+    assert!(
+        native_backend_available(),
+        "native backend unavailable for randomized public global coverage",
+    );
+
+    let mut generator = Xorshift64::new(0x9e37_79b9_7f4a_7c15);
+    for case_index in 0..case_count {
+        let case = random_native_case(&mut generator, case_index)?;
+        let case_name = format!("{} index={case_index}", case.name);
+        assert_same_public_global_result(
+            simd::global(&case.reference, &case.query, case.scoring),
+            global(&case.reference, &case.query, case.scoring),
+            &case_name,
+        );
+    }
+
+    Ok(())
+}
+
+fn assert_random_public_simd_local_cases(
+    case_count: usize,
+) -> Result<(), Box<dyn std::error::Error>> {
+    assert!(
+        native_backend_available(),
+        "native backend unavailable for randomized public local coverage",
+    );
+
+    let mut generator = Xorshift64::new(0xd1b5_4a32_d192_ed03);
+    for case_index in 0..case_count {
+        let case = random_native_case(&mut generator, case_index)?;
+        let case_name = format!("{} index={case_index}", case.name);
+        assert_same_public_local_result(
+            simd::local(&case.reference, &case.query, case.scoring),
+            local(&case.reference, &case.query, case.scoring),
+            &case_name,
+        );
+    }
+
+    Ok(())
 }
 
 #[test]
@@ -382,4 +775,34 @@ fn exhaustive_local_score_matches_oracle() {
             }
         }
     }
+}
+
+#[test]
+fn simd_public_api_matches_scalar_for_edge_case_regressions()
+-> Result<(), Box<dyn std::error::Error>> {
+    for case in public_simd_regression_cases()? {
+        assert_public_simd_case(case)?;
+    }
+
+    Ok(())
+}
+
+#[cfg(any(
+    all(target_arch = "aarch64", target_os = "macos"),
+    all(target_arch = "x86_64", target_os = "linux")
+))]
+#[test]
+fn simd_public_api_matches_scalar_for_1000_random_global_cases()
+-> Result<(), Box<dyn std::error::Error>> {
+    assert_random_public_simd_global_cases(1_000)
+}
+
+#[cfg(any(
+    all(target_arch = "aarch64", target_os = "macos"),
+    all(target_arch = "x86_64", target_os = "linux")
+))]
+#[test]
+fn simd_public_api_matches_scalar_for_1000_random_local_cases()
+-> Result<(), Box<dyn std::error::Error>> {
+    assert_random_public_simd_local_cases(1_000)
 }
