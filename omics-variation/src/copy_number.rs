@@ -330,15 +330,17 @@ impl FromStr for Variant {
     type Err = ParseError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        let parts = value.split(VARIANT_SEPARATOR).collect::<Vec<_>>();
-        let [contig, range, copies] = parts.as_slice() else {
+        let Some((contig_and_range, copies)) = value.rsplit_once(VARIANT_SEPARATOR) else {
+            return Err(ParseError::Format(value.to_string()));
+        };
+        let Some((contig, range)) = contig_and_range.rsplit_once(VARIANT_SEPARATOR) else {
             return Err(ParseError::Format(value.to_string()));
         };
 
         let range = range
             .strip_suffix("(i)")
             .ok_or_else(|| ParseError::Qualifier {
-                region: (*range).to_string(),
+                region: range.to_string(),
             })?;
 
         let (start, end) = range.split_once('-').ok_or_else(|| ParseError::Range {
@@ -354,10 +356,10 @@ impl FromStr for Variant {
         let start = start.parse::<InterbasePosition>()?;
         let end = end.parse::<InterbasePosition>()?;
         let copies = copies.parse::<u32>().map_err(|_| ParseError::Copies {
-            copies: (*copies).to_string(),
+            copies: copies.to_string(),
         })?;
 
-        Ok(Variant::try_new(*contig, start.get(), end.get(), copies)?)
+        Ok(Variant::try_new(contig, start.get(), end.get(), copies)?)
     }
 }
 

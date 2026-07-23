@@ -102,6 +102,19 @@ fn parses_and_displays_the_canonical_form() {
 }
 
 #[test]
+fn round_trips_a_variant_whose_contig_contains_separators() {
+    // SAFETY: the constructor is expected to accept this non-empty contig and span.
+    let variant = Variant::try_new("assembly:chr:1", 100, 200, 3).unwrap();
+    let rendered = variant.to_string();
+
+    assert_eq!(rendered, "assembly:chr:1:100-200(i):3");
+    // SAFETY: parsing a displayed valid variant should reconstruct the original value.
+    let reparsed = rendered.parse::<Variant>().unwrap();
+
+    assert_eq!(reparsed, variant);
+}
+
+#[test]
 fn rejects_a_missing_interbase_qualifier() {
     let err = "seq0:100-200:3".parse::<Variant>().unwrap_err();
     assert!(matches!(err, ParseError::Qualifier { .. }));
