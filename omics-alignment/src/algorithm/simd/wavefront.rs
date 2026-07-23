@@ -134,7 +134,10 @@ impl Layout {
             .binary_search_by(|entry| entry.offset.cmp(&index))
         {
             Ok(diagonal) => diagonal,
-            Err(diagonal) => diagonal - 1,
+            Err(diagonal) => {
+                debug_assert!(diagonal > 0, "index precedes all diagonal offsets");
+                diagonal - 1
+            }
         };
         let metadata = self.diagonals[diagonal];
         let row = metadata.first_row + (index - metadata.offset);
