@@ -13,6 +13,10 @@ use super::engine;
 #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
 mod aarch64;
 
+/// Linux x86_64 AVX2 wavefront kernels and dispatch.
+#[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+mod x86_64;
+
 /// Shared private wavefront helpers for future SIMD kernels.
 mod wavefront;
 
@@ -23,7 +27,16 @@ pub fn global(reference: &[u8], query: &[u8], scoring: Scoring) -> Result<Outcom
 }
 
 /// Returns the global alignment for byte slices.
-#[cfg(not(all(target_arch = "aarch64", target_os = "macos")))]
+#[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+pub fn global(reference: &[u8], query: &[u8], scoring: Scoring) -> Result<Outcome, Error> {
+    x86_64::global(reference, query, scoring)
+}
+
+/// Returns the global alignment for byte slices.
+#[cfg(not(any(
+    all(target_arch = "aarch64", target_os = "macos"),
+    all(target_arch = "x86_64", target_os = "linux")
+)))]
 pub fn global(reference: &[u8], query: &[u8], scoring: Scoring) -> Result<Outcome, Error> {
     engine::global(reference, query, scoring)
 }
@@ -35,7 +48,16 @@ pub fn local(reference: &[u8], query: &[u8], scoring: Scoring) -> Result<Option<
 }
 
 /// Returns the local alignment for byte slices.
-#[cfg(not(all(target_arch = "aarch64", target_os = "macos")))]
+#[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+pub fn local(reference: &[u8], query: &[u8], scoring: Scoring) -> Result<Option<Outcome>, Error> {
+    x86_64::local(reference, query, scoring)
+}
+
+/// Returns the local alignment for byte slices.
+#[cfg(not(any(
+    all(target_arch = "aarch64", target_os = "macos"),
+    all(target_arch = "x86_64", target_os = "linux")
+)))]
 pub fn local(reference: &[u8], query: &[u8], scoring: Scoring) -> Result<Option<Outcome>, Error> {
     engine::local(reference, query, scoring)
 }
@@ -66,6 +88,40 @@ mod tests {
             );
             assert_eq!(
                 aarch64::local(reference, query, scoring)?,
+                engine::local(reference, query, scoring)?
+            );
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(all(test, target_arch = "x86_64", target_os = "linux"))]
+mod x86_64_tests {
+    use super::*;
+
+    #[test]
+    fn avx2_dispatch_matches_scalar() -> Result<(), Error> {
+        let cases = [
+            (
+                b"ACGTACGT".as_slice(),
+                b"ACGTACGT".as_slice(),
+                Scoring::try_new(2, -3, -2, -1)?,
+            ),
+            (
+                b"ACGTACGT".as_slice(),
+                b"ACGTACGT".as_slice(),
+                Scoring::try_new(10_000, -1, -1, -1)?,
+            ),
+        ];
+
+        for (reference, query, scoring) in cases {
+            assert_eq!(
+                global(reference, query, scoring)?,
+                engine::global(reference, query, scoring)?
+            );
+            assert_eq!(
+                local(reference, query, scoring)?,
                 engine::local(reference, query, scoring)?
             );
         }

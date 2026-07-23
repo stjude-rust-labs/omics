@@ -1,5 +1,11 @@
 #![cfg_attr(
-    all(not(test), not(all(target_arch = "aarch64", target_os = "macos"))),
+    all(
+        not(test),
+        not(any(
+            all(target_arch = "aarch64", target_os = "macos"),
+            all(target_arch = "x86_64", target_os = "linux")
+        ))
+    ),
     expect(
         dead_code,
         reason = "target-specific SIMD backends are added after the generic wavefront engine"
@@ -1502,14 +1508,53 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
-    enum Backend {
-        Neon,
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    /// Compares both modes for an input that reaches a complete kernel vector.
+    fn differential_full_vector_case<K: Kernel>(
+        name: &str,
+        reference: &[u8],
+        query: &[u8],
+    ) -> Result<(), Error> {
+        assert!(
+            reference.len().min(query.len()).saturating_sub(1) >= K::LANES,
+            "{name} does not reach a complete {}-lane vector",
+            K::LANES,
+        );
+
+        for scoring in exhaustive_scorings()? {
+            assert_eq!(
+                global::<K>(reference, query, scoring)?,
+                engine::global(reference, query, scoring)?,
+                "global mismatch; case={name} scoring={scoring:?}",
+            );
+            assert_eq!(
+                local::<K>(reference, query, scoring)?,
+                engine::local(reference, query, scoring)?,
+                "local mismatch; case={name} scoring={scoring:?}",
+            );
+        }
+
+        Ok(())
     }
 
-    #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+    #[cfg(any(
+        all(target_arch = "aarch64", target_os = "macos"),
+        all(target_arch = "x86_64", target_os = "linux")
+    ))]
+    enum Backend {
+        #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+        Neon,
+        #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+        Avx2,
+    }
+
+    #[cfg(any(
+        all(target_arch = "aarch64", target_os = "macos"),
+        all(target_arch = "x86_64", target_os = "linux")
+    ))]
     fn differential_native(backend: Backend) -> Result<(), Error> {
         match backend {
+            #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
             Backend::Neon => {
                 differential_global::<super::super::aarch64::NeonI16>(5)?;
                 differential_local::<super::super::aarch64::NeonI16>(5)?;
@@ -1521,6 +1566,30 @@ mod tests {
                 )?;
                 differential_global::<super::super::aarch64::NeonI32>(5)?;
                 differential_local::<super::super::aarch64::NeonI32>(5)?;
+            }
+            #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+            Backend::Avx2 => {
+                differential_global::<super::super::x86_64::Avx2I16>(5)?;
+                differential_local::<super::super::x86_64::Avx2I16>(5)?;
+                differential_global_cases::<super::super::x86_64::Avx2I16>(
+                    &vector_differential_cases(),
+                )?;
+                differential_local_cases::<super::super::x86_64::Avx2I16>(
+                    &vector_differential_cases(),
+                )?;
+                differential_global::<super::super::x86_64::Avx2I32>(5)?;
+                differential_local::<super::super::x86_64::Avx2I32>(5)?;
+                differential_global_cases::<super::super::x86_64::Avx2I32>(
+                    &vector_differential_cases(),
+                )?;
+                differential_local_cases::<super::super::x86_64::Avx2I32>(
+                    &vector_differential_cases(),
+                )?;
+                differential_full_vector_case::<super::super::x86_64::Avx2I16>(
+                    "avx2-i16-mixed-substitutions",
+                    b"AAAAAAAAAAAAAAAAA",
+                    b"AAAAAAAABBBBBBBBB",
+                )?;
             }
         }
 
@@ -1602,6 +1671,16 @@ mod tests {
     #[test]
     fn neon_matches_scalar() -> Result<(), Error> {
         differential_native(Backend::Neon)
+    }
+
+    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    #[test]
+    fn avx2_matches_scalar_when_available() -> Result<(), Error> {
+        if std::is_x86_feature_detected!("avx2") {
+            differential_native(Backend::Avx2)?;
+        }
+
+        Ok(())
     }
 
     #[test]
