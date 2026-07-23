@@ -21,36 +21,43 @@ pub mod interbase {
     use omics_coordinate::system::Base;
     use omics_coordinate::system::Interbase;
 
+    /// Returns an ascending interbase span for benchmarking
     fn ascending_span() -> Span<Interbase> {
         // SAFETY: the benchmark endpoints form a valid interbase span.
         Span::<Interbase>::try_new(10, 20).unwrap()
     }
 
+    /// Returns a descending interbase span for benchmarking
     fn descending_span() -> Span<Interbase> {
         // SAFETY: the benchmark endpoints form a valid interbase span.
         Span::<Interbase>::try_new(20, 10).unwrap()
     }
 
+    /// Returns a descending operand interbase span for benchmarking
     fn descending_operand_span() -> Span<Interbase> {
         // SAFETY: the benchmark endpoints form a valid interbase span.
         Span::<Interbase>::try_new(18, 8).unwrap()
     }
 
+    /// Returns an ascending operand interbase span for benchmarking
     fn ascending_operand_span() -> Span<Interbase> {
         // SAFETY: the benchmark endpoints form a valid interbase span.
         Span::<Interbase>::try_new(15, 25).unwrap()
     }
 
+    /// Returns an empty interbase span for benchmarking
     fn empty_span() -> Span<Interbase> {
         // SAFETY: equal interbase endpoints are valid and represent an empty span.
         Span::<Interbase>::try_new(10, 10).unwrap()
     }
 
+    /// Returns an ascending interbase interval for benchmarking
     fn interval() -> Interval<Interbase> {
         // SAFETY: the positive strand accepts ascending spans.
         Interval::try_new("seq0", "+", ascending_span()).unwrap()
     }
 
+    /// Returns an ascending operand interbase interval for benchmarking
     fn operand_interval() -> Interval<Interbase> {
         // SAFETY: the positive strand accepts ascending spans.
         Interval::try_new("seq0", "+", ascending_operand_span()).unwrap()
