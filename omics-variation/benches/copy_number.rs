@@ -14,13 +14,10 @@ use omics_variation::CopyNumberPloidy;
 use omics_variation::CopyNumberVariant;
 
 /// A canonical copy-number variant fixture.
-const VARIANT: &str = "seq0:100-200(i):3";
+const VARIANT: &str = "seq0:100-200(i):3/2";
 
 /// The observed copy count used by the logarithmic benchmarks.
 const COUNT: CopyNumberCount = CopyNumberCount::new(3);
-
-/// The baseline count used by the change benchmark.
-const BASELINE: CopyNumberCount = CopyNumberCount::new(2);
 
 /// Constructs the canonical copy-number fixture.
 fn construct_variant() -> CopyNumberVariant {
@@ -29,6 +26,7 @@ fn construct_variant() -> CopyNumberVariant {
         black_box(100),
         black_box(200),
         black_box(3),
+        black_box(CopyNumberPloidy::DIPLOID),
     ) {
         Ok(variant) => variant,
         Err(err) => panic!("benchmark fixture failed to construct; {err}"),
@@ -48,9 +46,9 @@ fn display_variant(variant: &CopyNumberVariant) -> String {
     black_box(variant).to_string()
 }
 
-/// Classifies a copy-number variant against the baseline count.
+/// Classifies a copy-number variant against its stored ploidy.
 fn classify_change(variant: &CopyNumberVariant) -> omics_variation::CopyNumberChange {
-    black_box(variant).change(black_box(BASELINE))
+    black_box(variant).change()
 }
 
 /// Converts an absolute count into a base-2 logarithmic ratio.

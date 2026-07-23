@@ -54,9 +54,9 @@
 //! ```
 //! use omics_variation::CopyNumberVariant;
 //!
-//! let variant = "seq0:100-200(i):3".parse::<CopyNumberVariant>()?;
+//! let variant = "seq0:100-200(i):3/2".parse::<CopyNumberVariant>()?;
 //! assert_eq!(variant.count().get(), 3);
-//! assert_eq!(variant.to_string(), "seq0:100-200(i):3");
+//! assert_eq!(variant.to_string(), "seq0:100-200(i):3/2");
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!

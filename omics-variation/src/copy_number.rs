@@ -207,7 +207,7 @@ pub enum Error {
 /// An error related to parsing a copy-number variant.
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum ParseError {
-    /// The variant did not have the three colon-separated fields.
+    /// The variant did not match the canonical copy-number form.
     #[error("invalid copy-number format: `{0}`")]
     Format(String),
 
@@ -239,6 +239,17 @@ pub enum ParseError {
         /// The offending count token.
         copies: String,
     },
+
+    /// The ploidy failed to parse as a positive integer.
+    #[error("invalid copy-number ploidy: `{ploidy}`")]
+    Ploidy {
+        /// The offending ploidy token.
+        ploidy: String,
+    },
+
+    /// The ploidy was zero.
+    #[error("copy-number ploidy cannot be zero")]
+    ZeroPloidy,
 
     /// The region has no span.
     #[error("copy-number region cannot be empty")]
@@ -349,12 +360,20 @@ impl FromStr for Variant {
     type Err = ParseError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        let Some((contig_and_range, copies)) = value.rsplit_once(VARIANT_SEPARATOR) else {
+        let Some((contig_and_range, copies_and_ploidy)) = value.rsplit_once(VARIANT_SEPARATOR)
+        else {
             return Err(ParseError::Format(value.to_string()));
         };
         let Some((contig, range)) = contig_and_range.rsplit_once(VARIANT_SEPARATOR) else {
             return Err(ParseError::Format(value.to_string()));
         };
+        let Some((copies, ploidy)) = copies_and_ploidy.split_once('/') else {
+            return Err(ParseError::Format(value.to_string()));
+        };
+
+        if copies.is_empty() || ploidy.is_empty() || ploidy.contains('/') {
+            return Err(ParseError::Format(value.to_string()));
+        }
 
         let range = range
             .strip_suffix("(i)")
@@ -377,13 +396,17 @@ impl FromStr for Variant {
         let copies = copies.parse::<u32>().map_err(|_| ParseError::Copies {
             copies: copies.to_string(),
         })?;
+        let ploidy = ploidy.parse::<u32>().map_err(|_| ParseError::Ploidy {
+            ploidy: ploidy.to_string(),
+        })?;
+        let ploidy = Ploidy::try_new(ploidy).map_err(|_| ParseError::ZeroPloidy)?;
 
         Ok(Variant::try_new(
             contig,
             start.get(),
             end.get(),
             copies,
-            Ploidy::DIPLOID,
+            ploidy,
         )?)
     }
 }
@@ -392,11 +415,12 @@ impl fmt::Display for Variant {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
-            "{contig}{sep}{start}-{end}(i){sep}{copies}",
+            "{contig}{sep}{start}-{end}(i){sep}{copies}/{ploidy}",
             contig = self.contig,
             start = self.start.get(),
             end = self.end.get(),
             copies = self.count.get(),
+            ploidy = self.ploidy.get(),
             sep = VARIANT_SEPARATOR,
         )
     }

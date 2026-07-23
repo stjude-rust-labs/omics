@@ -94,6 +94,21 @@ fn reference_ploidy_participates_in_identity() {
 }
 
 #[test]
+fn round_trips_a_non_diploid_variant_through_the_canonical_form() {
+    // SAFETY: `4` is a valid nonzero ploidy.
+    let tetraploid = Ploidy::try_new(4).unwrap();
+    // SAFETY: the constructor is expected to accept this valid contig, span, and tetraploid ploidy.
+    let variant = Variant::try_new("seq0", 100, 200, 3, tetraploid).unwrap();
+    let rendered = variant.to_string();
+
+    assert_eq!(rendered, "seq0:100-200(i):3/4");
+    // SAFETY: parsing a displayed valid variant should reconstruct the original value.
+    let reparsed = rendered.parse::<Variant>().unwrap();
+
+    assert_eq!(reparsed, variant);
+}
+
+#[test]
 fn classifies_loss_reference_gain_and_complete_loss() {
     // SAFETY: the constructor is expected to accept this valid contig, span, and diploid ploidy.
     let loss = Variant::try_new("seq0", 100, 200, 1, Ploidy::DIPLOID).unwrap();
@@ -126,9 +141,9 @@ fn rejects_empty_and_reversed_regions() {
 #[test]
 fn parses_and_displays_the_canonical_form() {
     // SAFETY: the parser is expected to accept the canonical copy-number form.
-    let variant = "seq0:100-200(i):3".parse::<Variant>().unwrap();
+    let variant = "seq0:100-200(i):3/2".parse::<Variant>().unwrap();
     assert_eq!(variant.ploidy(), Ploidy::DIPLOID);
-    assert_eq!(variant.to_string(), "seq0:100-200(i):3");
+    assert_eq!(variant.to_string(), "seq0:100-200(i):3/2");
 }
 
 #[test]
@@ -137,7 +152,7 @@ fn round_trips_a_variant_whose_contig_contains_separators() {
     let variant = Variant::try_new("assembly:chr:1", 100, 200, 3, Ploidy::DIPLOID).unwrap();
     let rendered = variant.to_string();
 
-    assert_eq!(rendered, "assembly:chr:1:100-200(i):3");
+    assert_eq!(rendered, "assembly:chr:1:100-200(i):3/2");
     // SAFETY: parsing a displayed valid variant should reconstruct the original value.
     let reparsed = rendered.parse::<Variant>().unwrap();
 
@@ -146,20 +161,43 @@ fn round_trips_a_variant_whose_contig_contains_separators() {
 
 #[test]
 fn rejects_a_missing_interbase_qualifier() {
-    let err = "seq0:100-200:3".parse::<Variant>().unwrap_err();
+    let err = "seq0:100-200:3/2".parse::<Variant>().unwrap_err();
     assert!(matches!(err, ParseError::Qualifier { .. }));
 }
 
 #[test]
 fn rejects_a_malformed_position_range() {
-    let err = "seq0:100200(i):3".parse::<Variant>().unwrap_err();
+    let err = "seq0:100200(i):3/2".parse::<Variant>().unwrap_err();
     assert!(matches!(err, ParseError::Range { .. }));
 }
 
 #[test]
 fn rejects_a_non_integral_count() {
-    let err = "seq0:100-200(i):3.5".parse::<Variant>().unwrap_err();
+    let err = "seq0:100-200(i):3.5/2".parse::<Variant>().unwrap_err();
     assert!(matches!(err, ParseError::Copies { .. }));
+}
+
+#[test]
+fn rejects_a_count_only_copy_number_string() {
+    let err = "seq0:100-200(i):3".parse::<Variant>().unwrap_err();
+
+    assert_eq!(err, ParseError::Format("seq0:100-200(i):3".to_string()));
+}
+
+#[test]
+fn rejects_an_invalid_ploidy() {
+    let err = "seq0:100-200(i):3/not-a-number"
+        .parse::<Variant>()
+        .unwrap_err();
+
+    assert!(matches!(err, ParseError::Ploidy { .. }));
+}
+
+#[test]
+fn rejects_a_zero_ploidy() {
+    let err = "seq0:100-200(i):3/0".parse::<Variant>().unwrap_err();
+
+    assert_eq!(err, ParseError::ZeroPloidy);
 }
 
 #[test]
@@ -229,21 +267,21 @@ fn rejects_finite_inputs_that_round_to_zero() {
 
 #[test]
 fn final_review_maps_an_invalid_contig_to_the_dedicated_parse_error() {
-    let err = ":100-200(i):3".parse::<Variant>().unwrap_err();
+    let err = ":100-200(i):3/2".parse::<Variant>().unwrap_err();
 
     assert!(matches!(err, ParseError::Contig(_)));
 }
 
 #[test]
 fn final_review_maps_an_empty_region_to_the_dedicated_parse_error() {
-    let err = "seq0:100-100(i):3".parse::<Variant>().unwrap_err();
+    let err = "seq0:100-100(i):3/2".parse::<Variant>().unwrap_err();
 
     assert_eq!(err, ParseError::EmptyRegion);
 }
 
 #[test]
 fn final_review_maps_a_reversed_region_to_the_dedicated_parse_error() {
-    let err = "seq0:200-100(i):3".parse::<Variant>().unwrap_err();
+    let err = "seq0:200-100(i):3/2".parse::<Variant>().unwrap_err();
 
     assert_eq!(err, ParseError::ReversedRegion);
 }
