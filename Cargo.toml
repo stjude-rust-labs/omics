@@ -12,19 +12,19 @@ resolver = "2"
 
 [workspace.package]
 license = "MIT OR Apache-2.0"
-edition = "2021"
+edition = "2024"
 authors = ["The Omics project developers"]
 description = "Foundations for the Rust omics ecosystem"
 homepage = "https://github.com/stjude-rust-labs/omics"
 repository = "https://github.com/stjude-rust-labs/omics"
-rust-version = "1.81.0"
+rust-version = "1.98.0"
 
 [workspace.dependencies]
-anyhow = "1.0.89"
-criterion = "0.5.1"
-regex = "1.9.6"
-string-interner = "0.18.0"
-thiserror = "2.0.4"
+anyhow = "1.0.104"
+criterion = "0.8.2"
+regex = "1.13.1"
+string-interner = "0.20.0"
+thiserror = "2.0.20"
 
 [workspace.lints.rust]
 missing_docs = "warn"
