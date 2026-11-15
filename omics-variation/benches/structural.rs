@@ -1,8 +1,4 @@
 //! Benchmarks for structural variants.
-#![expect(
-    missing_docs,
-    reason = "criterion_group generates undocumented registration functions"
-)]
 
 use std::hint::black_box;
 

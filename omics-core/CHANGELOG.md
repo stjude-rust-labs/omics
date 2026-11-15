@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Raised the minimum supported Rust version to `1.87`
   ([#22](https://github.com/stjude-rust-labs/omics/pull/22)).
+* Moved to the Rust 2024 edition and updated dependencies
+  ([#23](https://github.com/stjude-rust-labs/omics/pull/23)).
 
 ## 0.1.0 - 10-09-2024
 

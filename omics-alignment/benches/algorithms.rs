@@ -1,8 +1,4 @@
 //! Benchmarks for global and local alignment algorithms.
-#![expect(
-    missing_docs,
-    reason = "criterion_group generates undocumented registration functions"
-)]
 
 use std::hint::black_box;
 
