@@ -20,7 +20,7 @@ position-u64 = ["omics-coordinate/position-u64"]
 
 [dev-dependencies]
 criterion.workspace = true
-omics-molecule = { path = "../omics-molecule", version = "0.2.0" }
+omics-molecule = { path = "../omics-molecule", version = "0.3.0" }
 
 [lints]
 workspace = true
