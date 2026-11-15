@@ -47,6 +47,13 @@
 //! them, then `i32` lanes. Inputs that exceed both lane widths fall back to
 //! the scalar implementation.
 //!
+//! Dispatch reports its decisions through [`tracing`]. The first backend
+//! selection in a process is logged at `debug` level (`backend` is `neon`,
+//! `avx2`, or `scalar`). Each call logs its lane width (`i16`, `i32`, or
+//! `scalar`) and any scalar fallback, with the reason, at `trace` level.
+//! Sequence contents are never logged. Without a subscriber installed, these
+//! events cost almost nothing.
+//!
 //! ```
 //! use omics_alignment::algorithm::Scoring;
 //! use omics_alignment::algorithm::global;
@@ -305,6 +312,7 @@ pub enum Error {
 
 /// Dynamic-programming and traceback implementation.
 mod engine;
+mod recurrence;
 
 pub mod simd;
 

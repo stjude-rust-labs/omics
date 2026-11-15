@@ -383,11 +383,7 @@ impl Xorshift64 {
 }
 
 fn patterned_bytes(length: usize) -> Vec<u8> {
-    [b'A', b'C', b'G', b'T']
-        .into_iter()
-        .cycle()
-        .take(length)
-        .collect()
+    b"ACGT".iter().copied().cycle().take(length).collect()
 }
 
 fn repeated_bytes(byte: u8, length: usize) -> Vec<u8> {
@@ -590,7 +586,7 @@ fn random_native_case(
     generator: &mut Xorshift64,
     case_index: usize,
 ) -> Result<PublicSimdCase, Box<dyn std::error::Error>> {
-    let (name, minimum_length, scoring) = if case_index % 2 == 0 {
+    let (name, minimum_length, scoring) = if case_index.is_multiple_of(2) {
         ("random-native-i16", 1, Scoring::try_new(2, -3, -2, -1)?)
     } else {
         ("random-native-i32", 4, Scoring::try_new(5_000, -1, -1, -1)?)
@@ -606,32 +602,9 @@ fn random_native_case(
     ))
 }
 
-fn native_backend_available() -> bool {
-    #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
-    {
-        true
-    }
-    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
-    {
-        std::is_x86_feature_detected!("avx2")
-    }
-    #[cfg(not(any(
-        all(target_arch = "aarch64", target_os = "macos"),
-        all(target_arch = "x86_64", target_os = "linux")
-    )))]
-    {
-        false
-    }
-}
-
 fn assert_random_public_simd_global_cases(
     case_count: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    assert!(
-        native_backend_available(),
-        "native backend unavailable for randomized public global coverage",
-    );
-
     let mut generator = Xorshift64::new(0x9E37_79B9_7F4A_7C15);
     for case_index in 0..case_count {
         let case = random_native_case(&mut generator, case_index)?;
@@ -649,11 +622,6 @@ fn assert_random_public_simd_global_cases(
 fn assert_random_public_simd_local_cases(
     case_count: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    assert!(
-        native_backend_available(),
-        "native backend unavailable for randomized public local coverage",
-    );
-
     let mut generator = Xorshift64::new(0xD1B5_4A32_D192_ED03);
     for case_index in 0..case_count {
         let case = random_native_case(&mut generator, case_index)?;

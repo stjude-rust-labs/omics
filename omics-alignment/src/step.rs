@@ -1,4 +1,4 @@
-//! A single lossless step of an [`Alignment`](crate::Alignment) traversal.
+//! A single lossless step of an [`Alignment`] traversal.
 
 use omics_coordinate::interval::interbase::Interval;
 

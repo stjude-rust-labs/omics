@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Added exact-parity SIMD dispatch for byte-slice global and local affine-gap
   alignment with Apple Silicon NEON and Linux `x86_64` AVX2 wavefront kernels.
+  Dispatch logs the selected backend (`debug`, once per process) and each
+  call's lane width and scalar fallbacks (`trace`) through `tracing`.
 * Added the initial version of the `omics-alignment` crate, including a complete
   checked CIGAR model with `OperationKind`, `Operation`, and `Cigar` types supporting
   `FromStr`, `Display`, and aggregate length validation
@@ -25,3 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CIGAR output using `=`, `X`, `I`, and `D`, plus returned half-open local input
   ranges that place each result on the original sequences
   ([#19](https://github.com/stjude-rust-labs/omics/pull/19)).
+
+### Changed
+
+* Raised the minimum supported Rust version to `1.87`
+  ([#22](https://github.com/stjude-rust-labs/omics/pull/22)).
