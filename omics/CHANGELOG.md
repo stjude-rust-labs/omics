@@ -23,6 +23,11 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 * Moved to the Rust 2024 edition and updated dependencies
   ([#23](https://github.com/stjude-rust-labs/omics/pull/23)).
 
+### Crate Updates
+
+- `omics-coordinate`: bumped to v0.5.0
+  ([release](https://github.com/stjude-rust-labs/omics/releases/tag/omics-coordinate-v0.5.0))
+
 ## 0.4.0 - 03-19-2026
 
 ### Crate Updates

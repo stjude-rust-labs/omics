@@ -66,6 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `omics-coordinate`: bumped to v0.4.0
   ([release](https://github.com/stjude-rust-labs/omics/releases/tag/omics-coordinate-v0.4.0))
+- `omics-coordinate`: bumped to v0.5.0
+  ([release](https://github.com/stjude-rust-labs/omics/releases/tag/omics-coordinate-v0.5.0))
 
 ## 0.3.0 - 03-19-2026
 
