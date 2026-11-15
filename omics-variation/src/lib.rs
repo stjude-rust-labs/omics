@@ -475,8 +475,8 @@ impl<N: Nucleotide> Variant<N> {
 
         Ok(match trimmed.kind() {
             Kind::Insertion => {
-                // Collapse-to-insertion: the boundary is one interbase step back
-                // from the base start, then forward by the trimmed prefix.
+                // Collapse-to-insertion: the boundary is one interbase step
+                // back from the base start, then forward by the trimmed prefix.
                 let boundary = start
                     .nudge_backward()
                     .ok_or(Error::NormalizeOverflow)?

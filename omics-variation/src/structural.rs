@@ -522,8 +522,8 @@ fn classify_pair<N: Nucleotide>(first: &Adjacency<N>, second: &Adjacency<N>) -> 
         // The shared boundary pair must span two distinct positions. A pair
         // with `lo == hi` is a zero-length fold-back that cannot form a real
         // inversion, so it falls through to `Kind::Complex`. With the
-        // self-junction rejection in `Adjacency::try_new_paired`, such a pair is
-        // already unconstructable, so this guard is defense-in-depth.
+        // self-junction rejection in `Adjacency::try_new_paired`, such a pair
+        // is already unconstructable, so this guard is defense-in-depth.
         let (lo, hi) = p1;
         if one.is_opposite(two) && p1 == p2 && lo != hi {
             return Kind::Inversion;
@@ -803,7 +803,8 @@ mod tests {
     fn it_rejects_a_triple_that_reuses_a_flank_as_complex() {
         // Three co-linear junctions over three distinct boundaries {100, 200,
         // 300}, each appearing twice overall, but 100 appears twice as a
-        // LowerFlank and never as a HigherFlank, so it is not a proper triangle.
+        // LowerFlank and never as a HigherFlank, so it is not a proper
+        // triangle.
         let one = paired(
             bnd(Orientation::LowerFlank, 100),
             bnd(Orientation::HigherFlank, 200),
@@ -829,9 +830,9 @@ mod tests {
     fn it_rejects_three_self_loop_junctions_as_complex() {
         // Three independent self-loop insertions. Each junction's two breakends
         // sit at the same position, so the graph is three disconnected
-        // self-loops rather than a connected triangle. Although the per-boundary
-        // flank tally is satisfied, this must classify as Complex, not an
-        // intrachromosomal translocation.
+        // self-loops rather than a connected triangle. Although the
+        // per-boundary flank tally is satisfied, this must classify as Complex,
+        // not an intrachromosomal translocation.
         let j1 = paired(
             bnd(Orientation::LowerFlank, 100),
             bnd(Orientation::HigherFlank, 100),
@@ -852,9 +853,9 @@ mod tests {
 
     #[test]
     fn it_rejects_an_inverted_reinsertion_as_complex() {
-        // A three-junction set where one junction is a fold-back (both breakends
-        // share the same orientation). The co-linear check rejects any triple
-        // containing a fold-back, so this classifies as Complex.
+        // A three-junction set where one junction is a fold-back (both
+        // breakends share the same orientation). The co-linear check rejects
+        // any triple containing a fold-back, so this classifies as Complex.
         let fold_back = paired(
             bnd(Orientation::LowerFlank, 100),
             bnd(Orientation::LowerFlank, 200),
