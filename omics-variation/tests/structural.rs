@@ -216,10 +216,11 @@ fn interchromosomal_translocation_is_swap_invariant() {
 
 #[test]
 fn reverse_complement_lands_in_the_canonical_frame() {
-    // The same physical junction supplied in both orders must classify the same,
-    // and the insertion must be reverse-complemented into the canonical frame.
-    // `AAAC` reverse-complements to `GTTT`, so the two orders differ observably
-    // in their stored insertion when the reversed call is supplied `AAAC`.
+    // The same physical junction supplied in both orders must classify the
+    // same, and the insertion must be reverse-complemented into the canonical
+    // frame. `AAAC` reverse-complements to `GTTT`, so the two orders differ
+    // observably in their stored insertion when the reversed call is supplied
+    // `AAAC`.
     let lo = bnd("seq0", Orientation::LowerFlank, 100);
     let hi = bnd("seq0", Orientation::HigherFlank, 200);
 

@@ -115,9 +115,10 @@ impl<N: Nucleotide + Complement> PairedAdjacency<N> {
 
         let same_locus = a.contig() == b.contig() && a.position().get() == b.position().get();
 
-        // Reject a breakend joined to itself. Fully identical breakends, meaning
-        // the same contig, position, and orientation, encode a meaningless
-        // zero-length self-loop that would otherwise misclassify downstream.
+        // Reject a breakend joined to itself. Fully identical breakends,
+        // meaning the same contig, position, and orientation, encode a
+        // meaningless zero-length self-loop that would otherwise misclassify
+        // downstream.
         if same_locus && a.orientation() == b.orientation() {
             return Err(Error::SelfJunction);
         }
@@ -427,7 +428,8 @@ mod tests {
         let hi = bnd("seq0", Orientation::HigherFlank, 200);
 
         // Supplied high-to-low, so the insertion is reverse-complemented into
-        // the canonical low-to-high frame. `AAAC` reverse-complements to `GTTT`.
+        // the canonical low-to-high frame. `AAAC` reverse-complements to
+        // `GTTT`.
         let adjacency = Adjacency::try_new_paired(hi, lo, seq("AAAC")).unwrap();
         let Adjacency::Paired(paired) = adjacency else {
             panic!("expected a paired adjacency");

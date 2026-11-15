@@ -1555,11 +1555,13 @@ mod tests {
     fn positive_strand_offset() {
         let interval = "seq0:+:1000-2000".parse::<Interval<Interbase>>().unwrap();
 
-        // Mismatched contigs means the interval does not contain the coordinate.
+        // Mismatched contigs means the interval does not contain the
+        // coordinate.
         let coordinate = "seq1:+:1000".parse::<Coordinate<Interbase>>().unwrap();
         assert!(interval.coordinate_offset(&coordinate).is_none());
 
-        // Mismatched strands means the interval does not contain the coordinate.
+        // Mismatched strands means the interval does not contain the
+        // coordinate.
         let coordinate = "seq0:-:1000".parse::<Coordinate<Interbase>>().unwrap();
         assert!(interval.coordinate_offset(&coordinate).is_none());
 
@@ -1582,11 +1584,13 @@ mod tests {
     fn negative_strand_offset() {
         let interval = "seq0:-:2000-1000".parse::<Interval<Interbase>>().unwrap();
 
-        // Mismatched contigs means the interval does not contain the coordinate.
+        // Mismatched contigs means the interval does not contain the
+        // coordinate.
         let coordinate = "seq1:-:1000".parse::<Coordinate<Interbase>>().unwrap();
         assert!(interval.coordinate_offset(&coordinate).is_none());
 
-        // Mismatched strands means the interval does not contain the coordinate.
+        // Mismatched strands means the interval does not contain the
+        // coordinate.
         let coordinate = "seq0:+:1000".parse::<Coordinate<Interbase>>().unwrap();
         assert!(interval.coordinate_offset(&coordinate).is_none());
 

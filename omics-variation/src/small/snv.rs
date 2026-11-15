@@ -313,7 +313,8 @@ where
                 let position = parts.next().unwrap();
                 (contig, strand.to_string(), position)
             }
-            // SAFETY: we ensured above that the number of parts must be either four or five.
+            // SAFETY: we ensured above that the number of parts must be either
+            // four or five.
             _ => unreachable!(),
         };
         let (position, qualifier) = split_qualified_position(position).ok_or_else(|| {
@@ -334,16 +335,16 @@ where
             Err(err) => return Err(Error::Parse(ParseError::CoordinateError(err))),
         };
 
-        // SAFETY: in all cases above, we leave two items in the iterator. Since we have
-        // not taken any items yet, this will always unwrap.
+        // SAFETY: in all cases above, we leave two items in the iterator. Since
+        // we have not taken any items yet, this will always unwrap.
         let reference_nucleotide = parts
             .next()
             .unwrap()
             .parse::<N>()
             .map_err(|err| Error::Parse(ParseError::ReferenceNucleotide(err)))?;
 
-        // SAFETY: in all cases above, we leave two items in the iterator. Since we have
-        // only taken one item so far, this will always unwrap.
+        // SAFETY: in all cases above, we leave two items in the iterator. Since
+        // we have only taken one item so far, this will always unwrap.
         let alternate_nucleotide = parts
             .next()
             .unwrap()

@@ -278,7 +278,8 @@ mod tests {
 
     #[test]
     fn shared_prefix_and_suffix_do_not_overlap_count() -> Result<(), Box<dyn std::error::Error>> {
-        // Identical single base: prefix counts it, suffix must not double-count.
+        // Identical single base: prefix counts it, suffix must not
+        // double-count.
         let a = "A".parse::<Sequence<dna::Nucleotide>>()?;
         let b = "A".parse::<Sequence<dna::Nucleotide>>()?;
         assert_eq!(a.shared_prefix_len(&b), 1);

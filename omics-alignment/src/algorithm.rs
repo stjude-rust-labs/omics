@@ -33,6 +33,40 @@
 //! positive strand and retreats them on the negative strand, so the offset
 //! follows sequence traversal direction.
 //!
+//! # SIMD byte-slice dispatch
+//!
+//! [`crate::algorithm::simd::global`] and
+//! [`crate::algorithm::simd::local`] accept byte slices and preserve the exact
+//! scalar result, including errors, scores, CIGARs, and input ranges. On macOS
+//! `aarch64`, they use NEON wavefront kernels. On Linux `x86_64`, they use AVX2
+//! wavefront kernels when the processor supports AVX2 at runtime. Other
+//! targets, Linux processors without AVX2, and inputs whose score bounds do
+//! not fit a SIMD lane use the scalar implementation.
+//!
+//! The SIMD backends select `i16` lanes when the checked score bound permits
+//! them, then `i32` lanes. Inputs that exceed both lane widths fall back to
+//! the scalar implementation.
+//!
+//! Dispatch reports its decisions through [`tracing`]. The first backend
+//! selection in a process is logged at `debug` level (`backend` is `neon`,
+//! `avx2`, or `scalar`). Each call logs its lane width (`i16`, `i32`, or
+//! `scalar`) and any scalar fallback, with the reason, at `trace` level.
+//! Sequence contents are never logged. Without a subscriber installed, these
+//! events cost almost nothing.
+//!
+//! ```
+//! use omics_alignment::algorithm::Scoring;
+//! use omics_alignment::algorithm::global;
+//! use omics_alignment::algorithm::simd;
+//!
+//! let scoring = Scoring::try_new(2, -3, -2, -1)?;
+//! let scalar = global(b"ACGT", b"AGT", scoring)?;
+//! let dispatched = simd::global(b"ACGT", b"AGT", scoring)?;
+//!
+//! assert_eq!(dispatched, scalar);
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
 //! # Determinism
 //!
 //! Equal scores resolve through a fixed policy. Aligned predecessors prefer
@@ -278,6 +312,9 @@ pub enum Error {
 
 /// Dynamic-programming and traceback implementation.
 mod engine;
+mod recurrence;
+
+pub mod simd;
 
 /// Computes a deterministic global affine-gap alignment over two complete
 /// inputs.

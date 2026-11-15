@@ -28,7 +28,8 @@ pub mod interbase {
         let end =
             Coordinate::<Interbase>::try_new(black_box("seq0"), black_box("+"), black_box(20))
                 .unwrap();
-        // SAFETY: the endpoints share metadata and form a positively sized interval.
+        // SAFETY: the endpoints share metadata and form a positively sized
+        // interval.
         black_box(Interval::try_new(start, end).unwrap());
     }
 

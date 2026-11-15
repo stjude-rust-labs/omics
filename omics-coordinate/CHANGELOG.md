@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+* Raised the minimum supported Rust version to `1.87`
+  ([#22](https://github.com/stjude-rust-labs/omics/pull/22)).
 * Compacted `Interval` storage so each interval stores its contig and strand
   once.
 * Changed `Interval<Interbase>::into_equivalent_base()` to return `Option`.

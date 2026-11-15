@@ -375,8 +375,8 @@ mod tests {
     fn contains_next_entity() {
         let interval = create_interval("seq0", "+", 10, 20);
 
-        // An interbase interval does not contain the next entity after its start
-        // position is moved backwards one on the positive strand.
+        // An interbase interval does not contain the next entity after its
+        // start position is moved backwards one on the positive strand.
         assert!(
             !interval
                 .contains_next_entity(create_coordinate("seq0", "+", 9))
@@ -433,8 +433,8 @@ mod tests {
 
         let interval = create_interval("seq0", "-", 20, 10);
 
-        // An interbase interval does not contain the next entity after its start
-        // position is moved backwards one on the negative strand.
+        // An interbase interval does not contain the next entity after its
+        // start position is moved backwards one on the negative strand.
         assert!(
             !interval
                 .contains_next_entity(create_coordinate("seq0", "-", 21))
@@ -514,16 +514,16 @@ mod tests {
     fn contains_prev_entity() {
         let interval = create_interval("seq0", "+", 10, 20);
 
-        // An interbase interval does not contain the previous entity before its start
-        // position on the positive strand.
+        // An interbase interval does not contain the previous entity before its
+        // start position on the positive strand.
         assert!(
             !interval
                 .contains_prev_entity(create_coordinate("seq0", "+", 10))
                 .unwrap()
         );
 
-        // An interbase interval does contain the previous entity before its start
-        // position is moved forward by one on the positive strand.
+        // An interbase interval does contain the previous entity before its
+        // start position is moved forward by one on the positive strand.
         assert!(
             interval
                 .contains_prev_entity(create_coordinate("seq0", "+", 11))
@@ -538,16 +538,16 @@ mod tests {
                 .unwrap()
         );
 
-        // An interbase interval does not contain the previous entity before its end
-        // position is moved forward by one on the positive strand.
+        // An interbase interval does not contain the previous entity before its
+        // end position is moved forward by one on the positive strand.
         assert!(
             !interval
                 .contains_prev_entity(create_coordinate("seq0", "+", 21))
                 .unwrap()
         );
 
-        // An interbase interval does contain the previous entity before a position
-        // in the middle of its range.
+        // An interbase interval does contain the previous entity before a
+        // position in the middle of its range.
         assert!(
             interval
                 .contains_prev_entity(create_coordinate("seq0", "+", 15))
@@ -572,16 +572,16 @@ mod tests {
 
         let interval = create_interval("seq0", "-", 20, 10);
 
-        // An interbase interval does not contain the previous entity before its start
-        // position on the negative strand.
+        // An interbase interval does not contain the previous entity before its
+        // start position on the negative strand.
         assert!(
             !interval
                 .contains_prev_entity(create_coordinate("seq0", "-", 20))
                 .unwrap()
         );
 
-        // An interbase interval does contain the previous entity before its start
-        // position is moved forward by one on the negative strand.
+        // An interbase interval does contain the previous entity before its
+        // start position is moved forward by one on the negative strand.
         assert!(
             interval
                 .contains_prev_entity(create_coordinate("seq0", "-", 19))
@@ -596,16 +596,16 @@ mod tests {
                 .unwrap()
         );
 
-        // An interbase interval does not contain the previous entity before its end
-        // position is moved forward by one on the negative strand.
+        // An interbase interval does not contain the previous entity before its
+        // end position is moved forward by one on the negative strand.
         assert!(
             !interval
                 .contains_prev_entity(create_coordinate("seq0", "-", 9))
                 .unwrap()
         );
 
-        // An interbase interval does contain the previous entity before a position
-        // in the middle of its range.
+        // An interbase interval does contain the previous entity before a
+        // position in the middle of its range.
         assert!(
             interval
                 .contains_prev_entity(create_coordinate("seq0", "-", 15))
@@ -630,8 +630,8 @@ mod tests {
 
         let interval = create_interval("seq0", "+", 0, 10);
 
-        // This position should fail to bump backwards a half-step, so the entire
-        // operation should return a [`None`].
+        // This position should fail to bump backwards a half-step, so the
+        // entire operation should return a [`None`].
         assert!(
             interval
                 .contains_prev_entity(create_coordinate("seq0", "+", 0))

@@ -16,6 +16,11 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   feature, including the `global` and `local` affine-gap aligners
   ([#19](https://github.com/stjude-rust-labs/omics/pull/19)).
 
+### Changed
+
+* Raised the minimum supported Rust version to `1.87`
+  ([#22](https://github.com/stjude-rust-labs/omics/pull/22)).
+
 ## 0.4.0 - 03-19-2026
 
 ### Crate Updates

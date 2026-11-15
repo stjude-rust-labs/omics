@@ -6,21 +6,13 @@ use super::Error;
 use super::Outcome;
 use super::Score;
 use super::Scoring;
+use super::recurrence::Predecessors;
+use super::recurrence::State;
+use super::recurrence::traceback;
 use crate::cigar::Axis;
 use crate::cigar::Cigar;
 use crate::cigar::Operation;
 use crate::cigar::OperationKind;
-
-/// One terminal state in the affine-gap recurrence.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum State {
-    /// Ends by consuming one symbol from each input.
-    Aligned,
-    /// Ends by consuming one query symbol.
-    Insertion,
-    /// Ends by consuming one reference symbol.
-    Deletion,
-}
 
 /// A score and traceback predecessor for one state.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -113,6 +105,13 @@ impl Matrix {
     }
 }
 
+impl Predecessors for Matrix {
+    #[inline]
+    fn predecessor(&self, row: usize, column: usize, state: State) -> Option<State> {
+        self.get(row, column).entry(state).predecessor
+    }
+}
+
 /// Adds to a reachable score with overflow checking.
 fn checked_add(score: Option<Score>, delta: Score) -> Result<Option<Score>, Error> {
     score
@@ -155,7 +154,7 @@ fn push_operation(
 }
 
 /// Converts a non-empty unit-operation path into a canonical CIGAR.
-fn path_to_cigar(path: &[OperationKind]) -> Result<Cigar, Error> {
+pub(super) fn path_to_cigar(path: &[OperationKind]) -> Result<Cigar, Error> {
     // SAFETY: global alignment rejects two empty inputs, and local alignment
     // reaches this function only after finding a positive aligned endpoint.
     let first = path.first().copied().unwrap();
@@ -199,7 +198,7 @@ pub(super) fn local<T: Eq>(
 }
 
 /// Validates that traceback run lengths fit the active CIGAR number type.
-fn validate_lengths(reference: usize, query: usize) -> Result<(), Error> {
+pub(super) fn validate_lengths(reference: usize, query: usize) -> Result<(), Error> {
     Number::try_from(reference).map_err(|_| Error::LengthOutOfRange {
         axis: Axis::Reference,
         length: reference,
@@ -212,61 +211,10 @@ fn validate_lengths(reference: usize, query: usize) -> Result<(), Error> {
 }
 
 /// Returns the checked dynamic-programming dimensions.
-fn matrix_dimensions(reference: usize, query: usize) -> Result<(usize, usize), Error> {
+pub(super) fn matrix_dimensions(reference: usize, query: usize) -> Result<(usize, usize), Error> {
     let rows = reference.checked_add(1).ok_or(Error::MatrixSizeOverflow)?;
     let columns = query.checked_add(1).ok_or(Error::MatrixSizeOverflow)?;
     Ok((rows, columns))
-}
-
-/// Recovers the unit-operation path and start coordinates reached by walking
-/// backward to an entry without a predecessor.
-fn traceback<T: Eq>(
-    matrix: &Matrix,
-    reference: &[T],
-    query: &[T],
-    mut state: State,
-    mut i: usize,
-    mut j: usize,
-) -> Result<(Vec<OperationKind>, usize, usize), Error> {
-    let max_path_length = reference
-        .len()
-        .checked_add(query.len())
-        .ok_or(Error::MatrixSizeOverflow)?;
-    let mut path = Vec::new();
-    path.try_reserve_exact(max_path_length)
-        .map_err(|source| Error::MatrixAllocation { source })?;
-
-    loop {
-        let entry = matrix.get(i, j).entry(state);
-        let Some(predecessor) = entry.predecessor else {
-            break;
-        };
-
-        match state {
-            State::Aligned => {
-                path.push(if reference[i - 1] == query[j - 1] {
-                    OperationKind::SequenceMatch
-                } else {
-                    OperationKind::SequenceMismatch
-                });
-                i -= 1;
-                j -= 1;
-            }
-            State::Insertion => {
-                path.push(OperationKind::Insertion);
-                j -= 1;
-            }
-            State::Deletion => {
-                path.push(OperationKind::Deletion);
-                i -= 1;
-            }
-        }
-
-        state = predecessor;
-    }
-
-    path.reverse();
-    Ok((path, i, j))
 }
 
 /// Drives global matrix initialization, fill, endpoint selection, and
