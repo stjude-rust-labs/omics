@@ -245,15 +245,12 @@ impl AlignmentMode for Local {
         current: &DiagonalScores<S>,
         (interior_start, interior_end): (usize, usize),
     ) {
-        for score_index in interior_start..interior_end {
-            let row = diagonal.first_row + score_index;
+        let interior = &current.aligned[interior_start..interior_end];
+
+        for (offset, aligned) in interior.iter().enumerate() {
+            let row = diagonal.first_row + interior_start + offset;
             let column = diagonal_index - row;
-            update_local_endpoint(
-                endpoint,
-                current.aligned[score_index].into_score(),
-                row,
-                column,
-            );
+            update_local_endpoint(endpoint, aligned.into_score(), row, column);
         }
     }
 
